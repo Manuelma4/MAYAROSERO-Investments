@@ -105,6 +105,11 @@ class CCXTProvider(DataProvider):
             # candles but isn't geo-blocked like api.binance.com (HTTP 451 from US servers).
             opts["options"] = {"defaultType": "spot", "fetchMarkets": ["spot"]}
         self.exchange = getattr(ccxt, exchange)(opts)
+        # ccxt ignores the standard proxy environment variables; honor them explicitly.
+        import os
+
+        if proxy := os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy"):
+            self.exchange.httpsProxy = proxy
         if exchange == "binance":
             self.exchange.urls["api"]["public"] = "https://data-api.binance.vision/api/v3"
 

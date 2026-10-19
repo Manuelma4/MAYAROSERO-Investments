@@ -109,9 +109,10 @@ class MoversScanner:
 
     def _ex(self):
         if self._exchange is None:
-            import ccxt
+            from ..data.providers import CCXTProvider
 
-            self._exchange = getattr(ccxt, self.crypto_exchange)({"enableRateLimit": True})
+            # Same configured client as the data provider (Binance data mirror, proxy support).
+            self._exchange = CCXTProvider(self.crypto_exchange).exchange
         return self._exchange
 
     def crypto_universe(self) -> list[str]:
