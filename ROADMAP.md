@@ -36,6 +36,11 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        optional service — analysts (news, fundamentals, sentiment, technicals), bull/bear debate and a
        risk check produce a short verdict + reasons shown on each opportunity before "Invest". Enabled by
        `ANTHROPIC_API_KEY` in `.env` (documented in LATER.md); app works without it.
+0d. [ ] **Portfolio builder ("My portfolio")**: enter an amount (e.g. EUR 10,000) and risk level → a diversified,
+       ready-to-execute plan built to beat the S&P 500: core (monthly picks, 70-80%) + satellite (live
+       opportunities, 20-30%) + optional SPY anchor; sector cap 25%, single-stock cap ~10%, volatility-aware
+       weights; shows shares to buy per stock, expected risk vs S&P 500, and what changed since last month
+       (buy / sell / keep). Validated walk-forward by quant-researcher; limits reviewed by risk-guardian.
 1. [ ] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
        dividend yield, 52-week range, sector), engine score and factor breakdown, "why / why not
        a pick", similar stocks. Link every symbol in the app to it.
@@ -62,6 +67,8 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
   (offline, validated walk-forward before adoption).
 
 ## Rules for every session
+- Use the subagents in `.claude/agents/` (see CLAUDE.md): quant-researcher for strategy work, product-designer
+  for UI, risk-guardian for anything with money, code-reviewer on the diff, qa-tester before pushing.
 - English only. Commits authored by Manuelma4 only, no co-author trailers.
 - Tests offline (synthetic data); verify on real data before pushing.
 - Never place real orders. Keep honesty notes (survivorship bias, no guaranteed returns).
