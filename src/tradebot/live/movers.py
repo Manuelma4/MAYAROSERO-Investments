@@ -23,6 +23,9 @@ from .scanner import closed_bars
 
 log = logging.getLogger(__name__)
 
+# Pegged to ~1 USD: they never "surge or crash" in a tradable way.
+STABLECOINS = {"USDT", "USDC", "FDUSD", "TUSD", "DAI", "USDP", "BUSD", "USDE", "PYUSD", "EUR", "EURI", "USD1"}
+
 
 @dataclass
 class MoveSettings:
@@ -121,7 +124,7 @@ class MoversScanner:
             try:
                 tickers = self._ex().fetch_tickers()
                 pairs = [(t, d.get("quoteVolume") or 0) for t, d in tickers.items()
-                         if t.endswith(f"/{self.crypto_quote}")]
+                         if t.endswith(f"/{self.crypto_quote}") and t.split("/")[0] not in STABLECOINS]
                 syms += [t for t, _ in sorted(pairs, key=lambda x: -x[1])[: self.crypto_top_n]]
             except Exception as exc:
                 log.warning("Crypto universe failed: %s", exc)
