@@ -1,62 +1,70 @@
-import { useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { getToken, setToken } from "./lib/api";
-import { browserNotifyEnabled, browserNotifySupported, setBrowserNotify } from "./lib/browserNotify";
+import { BrandLockup } from "./components/Brand";
+import { TickerTape } from "./components/TickerTape";
+import { TopBar } from "./components/TopBar";
+import { LiveProvider, useLive } from "./lib/live";
 import Backtest from "./pages/Backtest";
+import Discover from "./pages/Discover";
 import Live from "./pages/Live";
 import Markets from "./pages/Markets";
+import Overview from "./pages/Overview";
+import Picks from "./pages/Picks";
 import Predict from "./pages/Predict";
+import Settings from "./pages/Settings";
 
 const NAV = [
-  { to: "/alerts", label: "Alerts", icon: "M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" },
+  { to: "/", label: "Overview", mobile: true, icon: "M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" },
+  { to: "/discover", label: "Discover", mobile: true, icon: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15.5 8.5l-2 5-5 2 2-5z" },
+  { to: "/picks", label: "Beat the S&P", short: "Picks", mobile: true, icon: "M5 19V9m7 10V5m7 14v-7" },
+  { to: "/alerts", label: "Alerts", mobile: true, badge: true, icon: "M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" },
   { to: "/charts", label: "Charts", icon: "M4 19h16M6 15l4-5 3 3 5-7" },
   { to: "/predict", label: "Predict", icon: "M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z" },
   { to: "/backtest", label: "Backtest", icon: "M4 4v16h16M8 14l3-3 3 2 5-6" },
+  { to: "/settings", label: "Settings", short: "More", mobile: true, icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12l2-1-1-3-2 .2-1.3-1.3L17 5l-3-1-1 2h-2L10 4 7 5l.3 1.9L6 8.2 4 8l-1 3 2 1v0l-2 1 1 3 2-.2 1.3 1.3L7 19l3 1 1-2h2l1 2 3-1-.3-1.9 1.3-1.3 2 .2 1-3z" },
 ];
 
 function Icon({ d }: { d: string }) {
-  return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>;
+  return <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>;
 }
 
-export default function App() {
-  const [notify, setNotify] = useState(browserNotifyEnabled());
-  const [hasToken, setHasToken] = useState(!!getToken());
-
+function Shell() {
+  const { unread } = useLive();
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">
-          <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden><rect width="32" height="32" rx="8" fill="var(--accent-faint)" /><path d="M5 18h5l3-8 5 14 3-6h6" stroke="var(--accent)" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          <span className="brand-name">MAYAROSERO<small>Investments</small></span>
-        </div>
-        <nav>
+        <BrandLockup />
+        <nav aria-label="Main">
           {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
-              <Icon d={n.icon} /><span>{n.label}</span>
+            <NavLink key={n.to} to={n.to} end={n.to === "/"} className={({ isActive }) => `nav-item ${isActive ? "active" : ""} ${n.mobile ? "" : "desktop-only"}`}>
+              <Icon d={n.icon} />
+              <span className="nav-label">{n.label}</span>
+              <span className="nav-short">{n.short ?? n.label}</span>
+              {n.badge && unread > 0 && <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>}
             </NavLink>))}
         </nav>
-        <div className="sidebar-foot">
-          {browserNotifySupported() && (
-            <button className={`btn small ${notify ? "on" : ""}`} onClick={async () => setNotify(await setBrowserNotify(!notify))}>
-              {notify ? "Browser alerts on" : "Enable browser alerts"}
-            </button>)}
-          <button className="btn small ghost" onClick={() => {
-            const t = prompt("API access token (leave empty to clear)", getToken() ?? "");
-            if (t !== null) { setToken(t.trim() || null); setHasToken(!!t.trim()); location.reload(); }
-          }}>{hasToken ? "Access token set" : "Set access token"}</button>
-          <p className="disclaimer">Information only, not financial advice.</p>
-        </div>
+        <p className="disclaimer">Market information and analysis. Not financial advice.</p>
       </aside>
-      <main className="content">
-        <Routes>
-          <Route path="/" element={<Navigate to="/alerts" replace />} />
-          <Route path="/alerts" element={<Live />} />
-          <Route path="/charts" element={<Markets />} />
-          <Route path="/predict" element={<Predict />} />
-          <Route path="/backtest" element={<Backtest />} />
-          <Route path="*" element={<Navigate to="/alerts" replace />} />
-        </Routes>
-      </main>
+      <div className="main">
+        <TopBar />
+        <TickerTape />
+        <main className="content">
+          <Routes>
+            <Route path="/" element={<Overview />} />
+            <Route path="/discover" element={<Discover />} />
+            <Route path="/picks" element={<Picks />} />
+            <Route path="/alerts" element={<Live />} />
+            <Route path="/charts" element={<Markets />} />
+            <Route path="/predict" element={<Predict />} />
+            <Route path="/backtest" element={<Backtest />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
+}
+
+export default function App() {
+  return <LiveProvider><Shell /></LiveProvider>;
 }

@@ -13,7 +13,7 @@ from ..report import analyze_structure
 from ..strategies import REGISTRY, get_strategy
 from . import serialize as ser
 from .market import DataUnavailable
-from .schemas import BacktestRequest, DataQuery, PredictRequest
+from .schemas import BacktestRequest, DataQuery, PicksRequest, PredictRequest
 
 router = APIRouter(prefix="/api")
 
@@ -57,9 +57,80 @@ def strategies():
     return [{"name": n, "description": c.description, "defaults": c.defaults} for n, c in REGISTRY.items()]
 
 
+@router.get("/universe")
+def universe():
+    from ..universe import as_dict
+
+    return as_dict()
+
+
+@router.post("/picks")
+def picks(request: Request, body: PicksRequest):
+    import pandas as pd
+
+    from ..picker import PRESET_INFO, PickerConfig, run_picker
+    from ..universe import by_symbol, sp500_symbols
+
+    symbols = body.symbols or sp500_symbols()
+    # One extra year before `start` so 12-month factors exist on day one.
+    fetch_start = (pd.Timestamp(body.start) - pd.Timedelta(days=400)).date().isoformat()
+    market = _state(request).market
+    frames = market.history_many("yahoo", symbols, "1d", start=fetch_start)
+    try:
+        bench = market.history("yahoo", body.benchmark, "1d", start=fetch_start)
+    except DataUnavailable as exc:
+        raise HTTPException(502, str(exc)) from exc
+    if len(frames) < body.top_n:
+        raise HTTPException(502, f"Only {len(frames)} of {len(symbols)} stocks could be loaded")
+    cfg = PickerConfig(preset=body.preset, top_n=body.top_n, rebalance=body.rebalance,
+                       trend_filter=body.trend_filter, regime_filter=body.regime_filter, cost_bps=body.cost_bps)
+    try:
+        res = run_picker(frames, bench, cfg, start=body.start)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    info = by_symbol()
+    cur = res.current
+
+    def row(sym: str, r) -> dict:
+        s = info.get(sym)
+        return {"symbol": sym, "name": s.name if s else sym, "sector": s.sector if s else None,
+                "score": r.score, "eligible": bool(r.eligible), "price": r.price,
+                "return_1m_%": r.return_1m * 100, "momentum_12_1_%": r.momentum_12_1 * 100,
+                "momentum_6_1_%": r.momentum_6_1 * 100, "rel_strength_%": r.rel_strength * 100,
+                "trend_%": r.trend * 100, "volatility_%": -r.low_vol * 100}
+
+    ranking = [row(sym, r) for sym, r in cur.iterrows()]
+    current = [x for x in ranking if x["eligible"]][: body.top_n]
+    risk_off = bool(res.holdings and res.holdings[-1]["risk_off"])
+    return ser.clean({
+        "preset": body.preset, "preset_info": PRESET_INFO,
+        "as_of": res.equity.index[-1].isoformat(),
+        "risk_off": risk_off,
+        "picks": [] if risk_off else current,
+        "ranking": ranking[:60],
+        "stats": res.stats,
+        "equity": ser.line(res.equity),
+        "benchmark": ser.line(res.benchmark),
+        "holdings": res.holdings[-36:][::-1],
+        "universe_size": len(frames),
+        "missing": sorted(set(symbols) - set(frames)),
+    })
+
+
+@router.get("/quotes")
+def quotes(request: Request, symbols: str = Query(..., max_length=8000), exchange: str = "binance"):
+    syms = list(dict.fromkeys(s.strip() for s in symbols.split(",") if s.strip()))[:400]
+    return ser.clean(_state(request).market.quotes(syms, exchange))
+
+
 @router.get("/chart")
-def chart(request: Request, provider: str = "yahoo", exchange: str = "binance", symbol: str = "AAPL",
+def chart(request: Request, provider: str = "auto", exchange: str = "binance", symbol: str = "AAPL",
           timeframe: str = "1d", limit: int = Query(500, ge=50, le=5000)):
+    if provider == "auto":
+        from ..data import provider_for
+
+        provider = provider_for(symbol)
     q = DataQuery(provider=provider, exchange=exchange, symbol=symbol, timeframe=timeframe, limit=limit)
     df = _load(request, q)
     c = df["close"]

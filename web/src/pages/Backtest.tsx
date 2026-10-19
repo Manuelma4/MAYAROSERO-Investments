@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { fmtDate, fmtNum, fmtPct, fmtPrice, tone } from "../lib/format";
 import type { BacktestResult, StrategyInfo } from "../lib/types";
-import { LinesChart, PriceChart, type Marker } from "../components/charts";
+import { LinesChart, PriceChart, SERIES, downColor, upColor, type Marker } from "../components/charts";
 import { MarketPicker, type MarketSel } from "../components/MarketPicker";
 import { Card, Empty, ErrorBox, Field, Spinner, Stat } from "../components/ui";
 
@@ -37,13 +37,13 @@ export default function Backtest() {
   };
 
   const markers = useMemo<Marker[]>(() => (res?.trades ?? []).flatMap((t) => [
-    { time: t.entry_time, position: t.side === "long" ? "belowBar" : "aboveBar", color: t.side === "long" ? "#34d399" : "#f87171",
+    { time: t.entry_time, position: t.side === "long" ? "belowBar" : "aboveBar", color: t.side === "long" ? upColor() : downColor(),
       shape: t.side === "long" ? "arrowUp" : "arrowDown", text: t.side === "long" ? "L" : "S" } as Marker,
-    { time: t.exit_time, position: "aboveBar", color: t.pnl >= 0 ? "#34d399" : "#f87171", shape: "circle", text: `${t.R >= 0 ? "+" : ""}${t.R.toFixed(1)}R` } as Marker,
+    { time: t.exit_time, position: "aboveBar", color: t.pnl >= 0 ? upColor() : downColor(), shape: "circle", text: `${t.R >= 0 ? "+" : ""}${t.R.toFixed(1)}R` } as Marker,
   ]), [res]);
   const curves = useMemo(() => res ? [
-    { data: res.equity, color: "#34d399", title: "Strategy" },
-    { data: res.buy_hold, color: "#94a3b8", dashed: true, title: "Buy & hold" },
+    { data: res.equity, color: SERIES.ema20, title: "Strategy" },
+    { data: res.buy_hold, color: SERIES.band, dashed: true, title: "Buy & hold" },
   ] : [], [res]);
 
   const s = res?.stats as Record<string, number> | undefined;

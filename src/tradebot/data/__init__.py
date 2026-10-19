@@ -1,3 +1,3 @@
-from .providers import DataProvider, YahooProvider, CCXTProvider, get_provider
+from .providers import CCXTProvider, DataProvider, YahooProvider, get_provider, provider_for
 
-__all__ = ["DataProvider", "YahooProvider", "CCXTProvider", "get_provider"]
+__all__ = ["DataProvider", "YahooProvider", "CCXTProvider", "get_provider", "provider_for"]

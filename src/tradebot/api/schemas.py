@@ -37,3 +37,15 @@ class PredictRequest(BaseModel):
     horizon: int = Field(5, ge=1, le=100)
     threshold_atr: float = Field(0.5, gt=0, le=5)
     min_confidence: float = Field(0.45, ge=0.34, le=0.99)
+
+
+class PicksRequest(BaseModel):
+    preset: Literal["momentum", "quality_momentum", "low_volatility", "trend_following"] = "quality_momentum"
+    top_n: int = Field(10, ge=3, le=30)
+    rebalance: Literal["ME", "QE", "W-FRI"] = "ME"
+    start: str = "2015-01-01"
+    trend_filter: bool = True
+    regime_filter: bool = False
+    cost_bps: float = Field(10, ge=0, le=200)
+    symbols: list[str] | None = Field(None, max_length=300)   # default: S&P 500 members of the universe
+    benchmark: str = "SPY"

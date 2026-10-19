@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { fmtNum, fmtPct, fmtPrice, fmtTime, tone } from "../lib/format";
 import type { LiveEvent, PaperState } from "../lib/types";
-import { useLiveEvents } from "../lib/useEvents";
+import { useLive } from "../lib/live";
 import { Badge, Card, Empty, ErrorBox, Spinner, Stat } from "../components/ui";
 
 function MoveRow({ e }: { e: LiveEvent }) {
@@ -41,14 +41,11 @@ function SignalRow({ e }: { e: LiveEvent }) {
 }
 
 export default function Live() {
-  const { events, status, setStatus, connected } = useLiveEvents();
+  const { events, status, setStatus, connected } = useLive();
   const [paper, setPaper] = useState<PaperState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.liveStatus().then(setStatus).catch((e) => setError(e.message));
-  }, [setStatus]);
   useEffect(() => {
     const load = () => api.paper().then(setPaper).catch(() => undefined);
     load();
@@ -72,7 +69,7 @@ export default function Live() {
           <p className="muted">Real-time notifications: sudden surges and crashes, and your setups triggering. Also delivered to your browser, email and WhatsApp.</p>
         </div>
         <div className="row gap">
-          <span className={`dot ${connected ? "on" : ""}`} title={connected ? "Live connection open" : "Reconnecting…"} />
+          <span className={`live-pill ${connected ? "on" : ""}`}><span className="dot" />{connected ? "Connected" : "Reconnecting"}</span>
           {status?.running
             ? <button className="btn" disabled={!!busy} onClick={() => act("stop", api.liveStop)}>Stop engine</button>
             : <button className="btn primary" disabled={!!busy} onClick={() => act("start", api.liveStart)}>Start engine</button>}

@@ -134,3 +134,37 @@ def test_spa_fallback_and_traversal(tmp_path):
         assert "app" in c.get("/backtest").text
         assert "nope" not in c.get("/..%2Fsecret.txt").text
         assert c.get("/api/unknown").status_code == 404
+
+
+def test_quotes(client):
+    r = client.get("/api/quotes", params={"symbols": "AAPL,BTC/USDT,MISSING,AAPL"})
+    assert r.status_code == 200
+    q = {x["symbol"]: x for x in r.json()}
+    assert set(q) == {"AAPL", "BTC/USDT", "MISSING"}  # de-duplicated
+    assert q["BTC/USDT"]["provider"] == "ccxt" and q["AAPL"]["provider"] == "yahoo"
+    assert len(q["AAPL"]["spark"]) == 30 and q["AAPL"]["price"] == q["AAPL"]["spark"][-1]
+    assert "error" in q["MISSING"]
+
+
+def test_chart_auto_provider(client):
+    d = client.get("/api/chart", params={"symbol": "ETH/USDT", "provider": "auto", "limit": 100}).json()
+    assert len(d["candles"]) == 100
+
+
+def test_universe(client):
+    d = client.get("/api/universe").json()
+    assert len(d["sectors"]) == 11 and "Magnificent 7" in d["themes"]
+    m7 = [s["symbol"] for s in d["stocks"] if "Magnificent 7" in s["themes"]]
+    assert set(m7) == {"AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA"}
+    assert any(c["symbol"] == "BTC/USDT" for c in d["crypto"])
+
+
+def test_picks(client):
+    r = client.post("/api/picks", json={"symbols": [f"S{i}" for i in range(15)], "top_n": 5,
+                                         "start": "2020-01-01", "benchmark": "SPY"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert len(d["picks"]) <= 5 and d["universe_size"] == 15
+    assert len(d["equity"]) == len(d["benchmark"]) > 100
+    assert {"cagr_%", "benchmark_cagr_%", "excess_cagr_%", "max_drawdown_%"} <= set(d["stats"])
+    assert d["holdings"][0]["date"] >= d["holdings"][-1]["date"]  # newest first

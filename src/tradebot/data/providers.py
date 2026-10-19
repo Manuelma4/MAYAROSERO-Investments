@@ -55,6 +55,10 @@ class YahooProvider(DataProvider):
                   "multi_level_index": False}
         if start:
             kwargs.update(start=start, end=end)
+        elif limit and timeframe in ("1d", "1wk"):
+            # Only download what's needed (~1.5 calendar days per trading day).
+            days = int(limit * (7 if timeframe == "1wk" else 1) * 1.5) + 10
+            kwargs["period"] = f"{days}d"
         else:
             kwargs["period"] = self._PERIOD_FOR.get(timeframe, "max")
         raw = yf.download(symbol, **kwargs)
@@ -64,6 +68,31 @@ class YahooProvider(DataProvider):
         if timeframe == "4h":
             df = resample(df, "4h")
         return df.tail(limit) if limit else df
+
+
+    def history_many(self, symbols: list[str], timeframe: str = "1d", start: str | None = None,
+                     limit: int | None = None) -> dict[str, pd.DataFrame]:
+        """One batched Yahoo request for many symbols (much faster than one call each)."""
+        import yfinance as yf
+
+        kwargs = {"interval": timeframe, "auto_adjust": True, "progress": False, "group_by": "ticker",
+                  "threads": True}
+        if start:
+            kwargs["start"] = start
+        else:
+            days = int((limit or 300) * (7 if timeframe == "1wk" else 1) * 1.5) + 10
+            kwargs["period"] = f"{days}d"
+        raw = yf.download(symbols, **kwargs)
+        out: dict[str, pd.DataFrame] = {}
+        for sym in symbols:
+            try:
+                sub = raw[sym] if isinstance(raw.columns, pd.MultiIndex) else raw
+                df = normalize(sub)
+            except (KeyError, ValueError):
+                continue
+            if len(df):
+                out[sym] = df.tail(limit) if limit else df
+        return out
 
 
 class CCXTProvider(DataProvider):
@@ -101,6 +130,11 @@ class CCXTProvider(DataProvider):
 def resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
     agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
     return df.resample(rule).agg(agg).dropna()
+
+
+def provider_for(symbol: str) -> str:
+    """Guess the provider from the symbol: crypto pairs look like BASE/QUOTE."""
+    return "ccxt" if "/" in symbol else "yahoo"
 
 
 def get_provider(name: str, **kwargs) -> DataProvider:

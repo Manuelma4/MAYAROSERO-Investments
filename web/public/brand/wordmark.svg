@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 80" role="img" aria-label="MAYAROSERO Investments">
+  <style>.n{font:400 26px Michroma, sans-serif;letter-spacing:8.3px}.s{font:500 11px Barlow, sans-serif;letter-spacing:6.8px;opacity:.6}</style>
+  <g fill="currentColor">
+    <g transform="translate(0 4) scale(.72)"><g transform="translate(1 -4)"><path d="M4 90 28 32.4 40.83 63.2 34.83 77.6 28 61.2 16 90z"/><path d="M34 90 64 18 94 90H82L64 46.8 46 90z"/></g></g>
+    <text class="n" x="92" y="44">MAYAROSERO</text>
+    <text class="s" x="93" y="66">INVESTMENTS</text>
+  </g>
+</svg>

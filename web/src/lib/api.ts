@@ -1,6 +1,6 @@
-import type { BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, PredictResult, StrategyInfo } from "./types";
+import type { BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, PicksResult, PredictResult, Quote, StrategyInfo, Universe } from "./types";
 
-const TOKEN_KEY = "tradebot.token";
+const TOKEN_KEY = "mri.token";
 
 export function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
@@ -36,6 +36,9 @@ const qs = (o: Record<string, string | number | undefined>) =>
   new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)])).toString();
 
 export const api = {
+  universe: () => request<Universe>("/api/universe"),
+  picks: (body: object) => request<PicksResult>("/api/picks", { method: "POST", body: JSON.stringify(body) }),
+  quotes: (symbols: string[]) => request<Quote[]>(`/api/quotes?${qs({ symbols: symbols.join(",") })}`),
   strategies: () => request<StrategyInfo[]>("/api/strategies"),
   chart: (p: { provider: string; exchange?: string; symbol: string; timeframe: string; limit?: number }) =>
     request<ChartData>(`/api/chart?${qs(p)}`),

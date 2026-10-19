@@ -75,3 +75,24 @@ export interface PaperState {
   positions: { symbol: string; strategy: string; side: string; entry_time: string; entry: number; qty: number; stop: number; target: number | null }[];
   history: { symbol: string; strategy: string; side: string; entry: number; exit: number; exit_time: string; reason: string; pnl: number }[];
 }
+
+export interface Quote {
+  symbol: string; provider: string; price?: number; change?: number; change_pct?: number;
+  time?: string; spark?: number[]; error?: string;
+}
+
+export interface UniverseStock { symbol: string; name: string; sector: string; industry: string; region: string; sp500: boolean; themes: string[] }
+export interface Universe { sectors: string[]; themes: string[]; stocks: UniverseStock[]; crypto: UniverseStock[] }
+
+export interface PickRow {
+  symbol: string; name: string; sector: string | null; score: number; eligible: boolean; price: number;
+  "return_1m_%": number; "momentum_12_1_%": number; "momentum_6_1_%": number; "rel_strength_%": number;
+  "trend_%": number; "volatility_%": number;
+}
+export interface PicksResult {
+  preset: string; preset_info: Record<string, string>; as_of: string; risk_off: boolean;
+  picks: PickRow[]; ranking: PickRow[]; stats: Record<string, number | string>;
+  equity: Point[]; benchmark: Point[];
+  holdings: { date: string; symbols: string[]; turnover: number; risk_off: boolean }[];
+  universe_size: number; missing: string[];
+}

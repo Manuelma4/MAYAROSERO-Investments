@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { isCrypto, marketName } from "../lib/markets";
 import { api } from "../lib/api";
 import { fmtNum, fmtPrice } from "../lib/format";
 import type { ChartData } from "../lib/types";
-import { LinesChart, PriceChart, type Marker, type Overlay } from "../components/charts";
+import { LinesChart, PriceChart, SERIES, downColor, upColor, type Marker, type Overlay } from "../components/charts";
 import { MarketPicker, PRESETS, type MarketSel } from "../components/MarketPicker";
 import { Badge, Card, ErrorBox, Spinner, Stat } from "../components/ui";
 
 const TREND = { 1: ["Uptrend", "up"], [-1]: ["Downtrend", "down"], 0: ["Range", ""] } as const;
 
 export default function Markets() {
-  const [sel, setSel] = useState<MarketSel>(PRESETS[0].sel);
+  const [params, setParams] = useSearchParams();
+  const fromUrl = (): MarketSel => {
+    const symbol = params.get("symbol");
+    if (!symbol) return PRESETS[0].sel;
+    const crypto = isCrypto(symbol);
+    return { provider: crypto ? "ccxt" : "yahoo", exchange: "binance", symbol, timeframe: params.get("tf") ?? (crypto ? "4h" : "1d") };
+  };
+  const [sel, setSel] = useState<MarketSel>(fromUrl);
   const [data, setData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,18 +28,26 @@ export default function Markets() {
     setLoading(true); setError(null);
     try { setData(await api.chart({ ...s, limit: 500 })); } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
   }, []);
-  useEffect(() => { load(PRESETS[0].sel); }, [load]);
+  // The URL (?symbol=&tf=) is the source of truth: search, presets and the form all navigate.
+  const urlKey = `${params.get("symbol")}|${params.get("tf")}`;
+  useEffect(() => {
+    const s = fromUrl();
+    setSel(s);
+    load(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlKey]);
+  const open = (s: MarketSel) => setParams({ symbol: s.symbol, tf: s.timeframe });
 
   const overlays = useMemo<Overlay[]>(() => {
     if (!data) return [];
     const o: Overlay[] = [];
     if (show.ema) o.push(
-      { data: data.overlays.ema20, color: "#60a5fa", title: "EMA20" },
-      { data: data.overlays.ema50, color: "#f59e0b", title: "EMA50" },
-      { data: data.overlays.ema200, color: "#a78bfa", width: 2, title: "EMA200" });
+      { data: data.overlays.ema20, color: SERIES.ema20, title: "EMA20" },
+      { data: data.overlays.ema50, color: SERIES.ema50, title: "EMA50" },
+      { data: data.overlays.ema200, color: SERIES.ema200, width: 2, title: "EMA200" });
     if (show.bb) o.push(
-      { data: data.overlays.bb_upper, color: "#64748b", dashed: true },
-      { data: data.overlays.bb_lower, color: "#64748b", dashed: true });
+      { data: data.overlays.bb_upper, color: SERIES.band, dashed: true },
+      { data: data.overlays.bb_lower, color: SERIES.band, dashed: true });
     return o;
   }, [data, show]);
 
@@ -41,16 +58,16 @@ export default function Markets() {
     const recent = data.candles.length > 120 ? data.candles[data.candles.length - 120].time : 0;
     const initials = (s: string) => s.split("_").map((w) => w[0].toUpperCase()).join("");
     if (show.patterns) for (const p of data.patterns) if (p.time >= recent) m.push({
-      time: p.time, position: p.kind === "bull" ? "belowBar" : "aboveBar", color: p.kind === "bull" ? "#34d399" : "#f87171",
+      time: p.time, position: p.kind === "bull" ? "belowBar" : "aboveBar", color: p.kind === "bull" ? upColor() : downColor(),
       shape: p.kind === "bull" ? "arrowUp" : "arrowDown", text: initials(p.label),
     });
     if (show.pivots) for (const p of data.pivots) m.push({
-      time: p.time, position: p.kind === "H" ? "aboveBar" : "belowBar", color: "#94a3b8", shape: "circle",
+      time: p.time, position: p.kind === "H" ? "aboveBar" : "belowBar", color: SERIES.band, shape: "circle",
     });
     return m;
   }, [data, show]);
 
-  const rsiSeries = useMemo<Overlay[]>(() => data ? [{ data: data.rsi, color: "#60a5fa", title: "RSI 14" }] : [], [data]);
+  const rsiSeries = useMemo<Overlay[]>(() => data ? [{ data: data.rsi, color: SERIES.ema20, title: "RSI 14" }] : [], [data]);
   const a = data?.analysis;
   const [trendLabel, trendTone] = a ? TREND[a.trend] : ["–", ""];
 
@@ -60,21 +77,21 @@ export default function Markets() {
         <div><h1>Charts</h1><p className="muted">Interactive charts with market structure: Dow trend, Wyckoff ranges, Elliott impulses and candlestick patterns (last 120 bars: H hammer, BE bullish / bearish engulfing, MS/ES morning/evening star, SS shooting star).</p></div>
       </div>
       <Card>
-        <form className="form" onSubmit={(e) => { e.preventDefault(); load(sel); }}>
+        <form className="form" onSubmit={(e) => { e.preventDefault(); if (`${sel.symbol}|${sel.timeframe}` === urlKey) load(sel); else open(sel); }}>
           <MarketPicker value={sel} onChange={setSel} />
           <button className="btn primary" disabled={loading}>{loading ? <Spinner /> : "Load"}</button>
         </form>
         <div className="chips">
           {PRESETS.map((p) => (
             <button key={p.label} className={`chip btn-chip ${p.sel.symbol === data?.symbol ? "active" : ""}`}
-              onClick={() => { setSel(p.sel); load(p.sel); }}>{p.label}</button>))}
+              onClick={() => open(p.sel)} type="button">{p.label}</button>))}
         </div>
       </Card>
       <ErrorBox error={error} />
 
       {data && a && (
         <div className="grid-main">
-          <Card title={<>{data.symbol} <span className="muted">{data.timeframe}</span></>} actions={
+          <Card title={<>{marketName(data.symbol)} <span className="muted">{data.symbol !== marketName(data.symbol) && data.symbol} · {data.timeframe}</span></>} actions={
             <div className="toggles">
               {(Object.keys(show) as (keyof typeof show)[]).map((k) => (
                 <label key={k}><input type="checkbox" checked={show[k]} onChange={(e) => setShow({ ...show, [k]: e.target.checked })} /> {k === "bb" ? "Bollinger" : k}</label>))}

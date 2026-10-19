@@ -11,6 +11,9 @@ email and on WhatsApp.
 
 | Page | What it does |
 |---|---|
+| **Overview** | Live indices, crypto, commodities with sparklines, watchlist, top movers, latest alerts |
+| **Discover** | ~140 leading stocks + crypto organized by theme (Magnificent 7, AI & chips, Luxury…), GICS sector and region, with live sector performance |
+| **Beat the S&P** | Factor engine ranks S&P 500 leaders monthly, shows this month's picks and a backtest vs SPY (dividends included), net of costs |
 | **Alerts** | Live feed of big movers (surges / crashes) and setup signals, pushed over WebSocket; engine control; paper-trading positions |
 | **Charts** | Candlesticks + volume, EMA 20/50/200, Bollinger, swing pivots, candlestick patterns, RSI, and a structure panel (Dow trend, Wyckoff range, Elliott impulse) |
 | **Predict** | Train the model on one or many symbols, see BUY / HOLD / SELL probabilities and the out-of-sample validation |
@@ -30,6 +33,9 @@ Development (hot reload): `tradebot serve --reload` and, in another shell,
 Production: `cp .env.example .env` (set `TRADEBOT_API_TOKEN`!), then
 `docker compose up -d --build`. Put it behind HTTPS (Caddy / a PaaS) and
 enter the token in the UI ("Set access token").
+
+Brand and design system: see [BRAND.md](BRAND.md). The app is installable on
+phones (Add to Home Screen).
 
 Architecture: FastAPI (REST + WebSocket) over the Python engine, SQLite for
 the event history, React + TypeScript + TradingView lightweight-charts for the
@@ -156,6 +162,8 @@ src/tradebot/
   ml/                      features, labels, walk-forward validated predictor
   live/                    real-time scanner, movers detector, email/WhatsApp notifiers, paper broker
   report.py                market snapshot (data for the API, text for the CLI)
+  universe.py              curated stocks by sector / theme / region (Discover + picker)
+  picker.py                factor ranking + monthly rebalanced portfolio vs benchmark
   api/                     FastAPI app: routes, live engine, WebSocket broadcast, SQLite store
   cli.py
 web/                       React + TypeScript UI (Vite)
