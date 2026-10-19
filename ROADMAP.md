@@ -1,0 +1,37 @@
+# Roadmap to November 5, 2026
+
+Automated work sessions run daily at ~08:00 and ~19:00 Paris time. Each session takes
+the first unchecked item, builds it end to end (backend + UI + tests + visual check
+on real data), pushes to `main` as Manuelma4, ticks the item here and notifies Manuel.
+
+Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
+
+## Done
+- [x] Engine: data providers, indicators, candlesticks, Dow, Wyckoff, Elliott, backtester
+- [x] ML predictor with walk-forward validation
+- [x] Real-time movers detector, scanner, paper trading, email/WhatsApp notifiers
+- [x] Web platform: FastAPI + WebSocket + React; Alerts, Charts, Predict, Backtest
+- [x] Brand: aerospace design system, twin-peak logo, PWA, social preview
+- [x] Overview, Discover (themes / sectors / regions), Beat the S&P 500 engine
+- [x] Real data: Yahoo (stocks) + Binance data mirror (crypto)
+
+## Next
+1. [ ] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
+       dividend yield, 52-week range, sector), engine score and factor breakdown, "why / why not
+       a pick", similar stocks. Link every symbol in the app to it.
+2. [ ] **Full S&P 500 universe**: load all ~500 constituents (bundled list with sector, refreshable),
+       picker and Discover use it; keep curated themes.
+3. [ ] **Watchlists and custom price alerts**: create / edit lists, price-above / below and
+       % move alerts stored in SQLite, checked by the live engine, delivered via notifiers + bell.
+4. [ ] **Monthly picks alert**: when the picker's holdings change (buy / sell list), notify;
+       "Picks history" view.
+5. [ ] **S&P 500 real-time movers**: scan all constituents intraday in batches; surge / crash feed
+       on Overview and Alerts.
+6. [ ] **Quality pass**: code-split bundle, loading / empty / error states everywhere, keyboard and
+       screen-reader basics, Playwright end-to-end tests of the main flows.
+7. [ ] **Handover**: email + WhatsApp setup walkthrough (with Manuel), hosting guide, final README.
+
+## Rules for every session
+- English only. Commits authored by Manuelma4 only, no co-author trailers.
+- Tests offline (synthetic data); verify on real data before pushing.
+- Never place real orders. Keep honesty notes (survivorship bias, no guaranteed returns).
