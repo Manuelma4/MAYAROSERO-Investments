@@ -24,10 +24,18 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
          surging right now, market mood (S&P trend, breadth), and the engine's top 3 with reasons.
        - Fewer clicks, clearer labels, plain-language explanations, stock rows open a detail view,
          consistent empty / loading states, mobile-first layout check.
-0b. [ ] **Live opportunities ("invest now")**: intraday scanner over S&P 500 + popular stocks + crypto
-       flags stocks surging within the hour (move + volume + trend confirmation), ranks them, shows
-       entry / stop / target and a one-tap "Invest" action (paper broker now, real broker in item 8),
-       pushes a notification, auto-expires stale signals.
+0b. [ ] **Live catalyst-momentum scanner ("invest now")** — the satellite strategy (20–30% of capital;
+       the monthly picks stay the core). During market hours, every few minutes, over S&P 500 +
+       popular stocks + crypto: flag only stocks that are (a) up strongly today on >= 2x normal volume,
+       (b) have a real news catalyst (earnings, guidance, upgrade, contract — fetched from Yahoo news /
+       SEC filings), (c) above the 200-day average and near the 52-week high, (d) liquid large caps.
+       Moves without news are filtered out (research: they tend to reverse; news-driven moves drift).
+       Each signal: entry, stop, target, time limit, one-tap "Invest" (paper broker now), push notification,
+       auto-expiry. Validate the rules on history internally; never show backtests on the main screens.
+0c. [ ] **AI analyst on live candidates**: integrate TradingAgents (Apache-2.0, supports Claude) as an
+       optional service — analysts (news, fundamentals, sentiment, technicals), bull/bear debate and a
+       risk check produce a short verdict + reasons shown on each opportunity before "Invest". Enabled by
+       `ANTHROPIC_API_KEY` in `.env` (documented in LATER.md); app works without it.
 1. [ ] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
        dividend yield, 52-week range, sector), engine score and factor breakdown, "why / why not
        a pick", similar stocks. Link every symbol in the app to it.
@@ -48,6 +56,10 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        IBKR and ccxt adapters; order ticket UI with confirmation, positions and P&L page, max order size,
        daily loss limit and kill switch; real money only when `TRADING_MODE=live`.
 9. [ ] **Handover**: email + WhatsApp setup walkthrough (with Manuel), hosting guide, final README.
+
+## Later research track
+- Microsoft Qlib + RD-Agent to discover better ranking factors for the monthly core picks
+  (offline, validated walk-forward before adoption).
 
 ## Rules for every session
 - English only. Commits authored by Manuelma4 only, no co-author trailers.

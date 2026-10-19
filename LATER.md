@@ -40,12 +40,22 @@ MAX_ORDER_EUR=1000  MAX_DAILY_LOSS_EUR=300
 Note: investing your own money through your own account is fine. Managing other people's
 money or selling signals as a service needs a license in France (AMF); talk to a professional first.
 
-## 3. Hosting (so it runs 24/7 and you can open it anywhere)
+## 3. AI analyst (Claude API key)
+The live "invest now" opportunities can be checked by a team of AI agents (TradingAgents:
+news, fundamentals, sentiment, bull vs bear debate, risk check) before you invest.
+Create a key at console.anthropic.com (pay as you go, roughly a few cents per analysis) and add:
+```
+ANTHROPIC_API_KEY=sk-ant-...
+AI_ANALYST=on
+```
+Without it, the app works the same, just without the AI verdicts.
+
+## 4. Hosting (so it runs 24/7 and you can open it anywhere)
 Any of: a small VPS (Hetzner / OVH ~€5/month), Railway, Render or Fly.io. Run
 `docker compose up -d` (files are ready), set `TRADEBOT_API_TOKEN`, and add HTTPS
 (Caddy does it automatically). Optional: buy a domain such as `mayarosero.com` (~€10/year).
 
-## 4. Optional extras
+## 5. Optional extras
 - **Verified commits**: add a GPG or SSH signing key to your GitHub account so commits show "Verified".
 - **Install on your phone**: once hosted, open the site in Safari/Chrome → "Add to Home Screen".
 - **Better S&P 500 history**: a paid point-in-time constituents dataset (e.g. Norgate Data)
