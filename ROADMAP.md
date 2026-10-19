@@ -41,6 +41,17 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        opportunities, 20-30%) + optional SPY anchor; sector cap 25%, single-stock cap ~10%, volatility-aware
        weights; shows shares to buy per stock, expected risk vs S&P 500, and what changed since last month
        (buy / sell / keep). Validated walk-forward by quant-researcher; limits reviewed by risk-guardian.
+0e. [ ] **Live intraday charts + two-sided probabilistic forecasts** (comment from Manuel, Oct 19):
+       - Charts open on intraday data (5m / 15m, ~15 min delayed for stocks with free data, real time for
+         crypto and later with the paid feed), auto-refresh every minute, live last-price line.
+       - Predictions for BOTH directions: long (expected rise) and short (expected fall) signals in the
+         scanner, picks and stock pages, with paper short trades; risk-guardian adds short-specific limits
+         (stop always required, borrow/margin warning, max short exposure).
+       - Quant-style stochastic modelling: Monte Carlo price simulation (bootstrapped returns with GARCH
+         volatility) giving a fan chart, P(up) / P(down) at the horizon and the 5-95% expected range.
+       - Volume analysis: volume profile (point of control, value area), VWAP and bands, relative volume,
+         on-balance volume; volume features feed the ML direction model. Validated walk-forward by
+         quant-researcher (calibration of probabilities, not just accuracy).
 1. [ ] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
        dividend yield, 52-week range, sector), engine score and factor breakdown, "why / why not
        a pick", similar stocks. Link every symbol in the app to it.
