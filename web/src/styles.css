@@ -396,3 +396,8 @@ tbody tr:hover { background: var(--surface-2); }
 }
 
 .preview-banner { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; padding: 8px 16px; border-bottom: 1px solid var(--line); color: var(--text-2); background: var(--surface-2); }
+
+.history { border-top: 1px solid var(--line); padding-top: 4px; }
+.history-toggle { all: unset; cursor: pointer; width: 100%; box-sizing: border-box; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 0; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.history-toggle:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+.history-body { display: flex; flex-direction: column; gap: 20px; }

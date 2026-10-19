@@ -16,6 +16,18 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Real data: Yahoo (stocks) + Binance data mirror (crypto)
 
 ## Next
+0. [ ] **UX overhaul: everything already computed, nothing to "run"** (Manuel's top priority, Oct 20):
+       - A background job precomputes picks (all 4 strategies), ML predictions for every S&P 500 /
+         popular stock, and market analysis on a schedule; pages just show results instantly.
+         Remove Run / Train & predict buttons (keep advanced settings tucked away).
+       - New home "Today" board answering at a glance: what to buy / hold / sell now, what is
+         surging right now, market mood (S&P trend, breadth), and the engine's top 3 with reasons.
+       - Fewer clicks, clearer labels, plain-language explanations, stock rows open a detail view,
+         consistent empty / loading states, mobile-first layout check.
+0b. [ ] **Live opportunities ("invest now")**: intraday scanner over S&P 500 + popular stocks + crypto
+       flags stocks surging within the hour (move + volume + trend confirmation), ranks them, shows
+       entry / stop / target and a one-tap "Invest" action (paper broker now, real broker in item 8),
+       pushes a notification, auto-expires stale signals.
 1. [ ] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
        dividend yield, 52-week range, sector), engine score and factor breakdown, "why / why not
        a pick", similar stocks. Link every symbol in the app to it.
