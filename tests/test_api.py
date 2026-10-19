@@ -166,5 +166,6 @@ def test_picks(client):
     d = r.json()
     assert len(d["picks"]) <= 5 and d["universe_size"] == 15
     assert len(d["equity"]) == len(d["benchmark"]) > 100
-    assert {"cagr_%", "benchmark_cagr_%", "excess_cagr_%", "max_drawdown_%"} <= set(d["stats"])
+    assert {"cagr_%", "benchmark_cagr_%", "excess_cagr_%", "max_drawdown_%", "skill_vs_universe_%"} <= set(d["stats"])
+    assert len(d["universe"]) == len(d["equity"])
     assert d["holdings"][0]["date"] >= d["holdings"][-1]["date"]  # newest first

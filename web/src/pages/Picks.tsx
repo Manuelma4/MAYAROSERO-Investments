@@ -47,6 +47,7 @@ export default function Picks() {
   const curves = useMemo<Overlay[]>(() => res ? [
     { data: res.equity, color: cssVar("--text"), width: 2, title: "Portfolio" },
     { data: res.benchmark, color: SERIES.band, dashed: true, title: "S&P 500" },
+    { data: res.universe, color: SERIES.ema50, dashed: true, width: 1, title: "Same stocks, equal weight" },
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ] : [], [res, resolved]);
   const s = res?.stats as Record<string, number> | undefined;
@@ -92,6 +93,11 @@ export default function Picks() {
               <span className={`kpi-value ${beat ? "up" : "down"}`}>{fmtPct(s["excess_cagr_%"], 1)}</span>
               <span className="kpi-sub">{beat ? "Outperformed" : "Underperformed"} since {s.start}</span>
             </div>
+            <div className="kpi" title="Return over the same stocks held equally with no selection. Both share the survivorship bias, so this gap is the engine's own contribution.">
+              <span className="kpi-label">Selection skill / year</span>
+              <span className={`kpi-value ${s["skill_vs_universe_%"] >= 0 ? "up" : "down"}`}>{fmtPct(s["skill_vs_universe_%"], 1)}</span>
+              <span className="kpi-sub">vs same stocks equal-weight {fmtPct(s["universe_cagr_%"], 1)}</span>
+            </div>
             <div className="kpi">
               <span className="kpi-label">Worst drawdown</span>
               <span className="kpi-value">{fmtPct(s["max_drawdown_%"], 1)}</span>
@@ -109,8 +115,8 @@ export default function Picks() {
             </div>
           </div>
 
-          <Card title={<>Growth of 100 <span className="muted small">· portfolio vs S&amp;P 500 (SPY, dividends included)</span></>}>
-            <LinesChart series={curves} height={340} />
+          <Card title={<>Growth of 100 <span className="muted small">· log scale · portfolio · S&amp;P 500 (SPY, dividends included) · same stocks equal-weight</span></>}>
+            <LinesChart series={curves} height={360} log />
           </Card>
 
           <Card title={<>{res.risk_off ? "Signal: stay in cash" : `Current picks · ${res.picks.length} stocks`}</>}
@@ -165,7 +171,7 @@ export default function Picks() {
           </div>
 
           <p className="caveat">
-            <strong>Read this before investing.</strong> The universe is today's S&amp;P 500 leaders ({res.universe_size} companies), so the backtest carries survivorship bias: companies that fell out of the index are missing, which flatters past results. Factor strategies beat the market on average over long periods but can lag it for years. Costs of {"0.10%"} per trade are included; taxes are not. This is research, not financial advice.
+            <strong>Read this before investing.</strong> The universe is today's S&amp;P 500 leaders ({res.universe_size} companies), so the backtest carries survivorship bias: companies that fell out of the index are missing, which flatters past results. The orange line holds those same stocks with no selection; the gap between it and the portfolio ("selection skill") is the most honest measure of the engine. Factor strategies beat the market on average over long periods but can lag it for years. Costs of {"0.10%"} per trade are included; taxes are not. This is research, not financial advice.
           </p>
         </>
       )}

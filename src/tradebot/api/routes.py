@@ -86,8 +86,15 @@ def picks(request: Request, body: PicksRequest):
                        trend_filter=body.trend_filter, regime_filter=body.regime_filter, cost_bps=body.cost_bps)
     try:
         res = run_picker(frames, bench, cfg, start=body.start)
+        # Honest yardstick: the same stocks, equal weight, no selection. It shares the
+        # survivorship bias, so the gap to it measures the selection skill itself.
+        ew = run_picker(frames, bench, PickerConfig(top_n=len(frames), trend_filter=False,
+                                                    rebalance=body.rebalance, cost_bps=body.cost_bps),
+                        start=body.start)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    res.stats["universe_cagr_%"] = ew.stats["cagr_%"]
+    res.stats["skill_vs_universe_%"] = res.stats["cagr_%"] - ew.stats["cagr_%"]
 
     info = by_symbol()
     cur = res.current
@@ -112,6 +119,7 @@ def picks(request: Request, body: PicksRequest):
         "stats": res.stats,
         "equity": ser.line(res.equity),
         "benchmark": ser.line(res.benchmark),
+        "universe": ser.line(ew.equity),
         "holdings": res.holdings[-36:][::-1],
         "universe_size": len(frames),
         "missing": sorted(set(symbols) - set(frames)),

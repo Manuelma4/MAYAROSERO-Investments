@@ -92,7 +92,7 @@ export interface PickRow {
 export interface PicksResult {
   preset: string; preset_info: Record<string, string>; as_of: string; risk_off: boolean;
   picks: PickRow[]; ranking: PickRow[]; stats: Record<string, number | string>;
-  equity: Point[]; benchmark: Point[];
+  equity: Point[]; benchmark: Point[]; universe: Point[];
   holdings: { date: string; symbols: string[]; turnover: number; risk_off: boolean }[];
   universe_size: number; missing: string[];
 }

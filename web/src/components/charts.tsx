@@ -60,18 +60,19 @@ export function PriceChart({ candles, overlays = [], markers = [], height = 460 
   return <div className="chart" ref={ref} style={{ height }} />;
 }
 
-export function LinesChart({ series, height = 260 }: { series: Overlay[]; height?: number }) {
+export function LinesChart({ series, height = 260, log = false }: { series: Overlay[]; height?: number; log?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const { resolved } = useTheme();
   useEffect(() => {
     if (!ref.current) return;
     const chart = baseChart(ref.current);
+    if (log) chart.priceScale("right").applyOptions({ mode: 1 }); // logarithmic: equal % moves look equal
     for (const o of series) {
       const s = chart.addSeries(LineSeries, { color: o.color, lineWidth: (o.width ?? 2) as 2, lineStyle: o.dashed ? 2 : 0, priceLineVisible: false, title: o.title ?? "" });
       s.setData(o.data.map((p) => ({ time: t(p.time), value: p.value })));
     }
     chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [series, resolved]);
+  }, [series, resolved, log]);
   return <div className="chart" ref={ref} style={{ height }} />;
 }

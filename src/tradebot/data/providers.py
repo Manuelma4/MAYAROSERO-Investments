@@ -99,7 +99,14 @@ class CCXTProvider(DataProvider):
     def __init__(self, exchange: str = "binance"):
         import ccxt
 
-        self.exchange = getattr(ccxt, exchange)({"enableRateLimit": True})
+        opts: dict = {"enableRateLimit": True}
+        if exchange == "binance":
+            # Spot market data only, via Binance's public data mirror: it serves the same
+            # candles but isn't geo-blocked like api.binance.com (HTTP 451 from US servers).
+            opts["options"] = {"defaultType": "spot", "fetchMarkets": ["spot"]}
+        self.exchange = getattr(ccxt, exchange)(opts)
+        if exchange == "binance":
+            self.exchange.urls["api"]["public"] = "https://data-api.binance.vision/api/v3"
 
     def history(self, symbol, timeframe, start=None, end=None, limit=None):
         since = self.exchange.parse8601(pd.Timestamp(start, tz="UTC").isoformat()) if start else None

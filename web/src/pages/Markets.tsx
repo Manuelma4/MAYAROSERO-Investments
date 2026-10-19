@@ -22,7 +22,7 @@ export default function Markets() {
   const [data, setData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [show, setShow] = useState({ ema: true, bb: false, patterns: true, pivots: true });
+  const [show, setShow] = useState({ ema: true, bb: false, patterns: true, pivots: false });
 
   const load = useCallback(async (s: MarketSel) => {
     setLoading(true); setError(null);

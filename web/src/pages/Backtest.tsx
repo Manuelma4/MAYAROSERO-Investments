@@ -91,7 +91,7 @@ export default function Backtest() {
             <Stat label="Profit factor" value={fmtNum(s.profit_factor)} />
             <Stat label="Expectancy" value={`${fmtNum(s.expectancy_R, 2)} R`} tone={tone(s.expectancy_R)} hint="Average result per trade in units of risk" />
           </div>
-          <Card title="Equity curve"><LinesChart series={curves} /></Card>
+          <Card title="Equity curve"><LinesChart series={curves} log /></Card>
           <Card title="Trades on chart"><PriceChart candles={res.candles} markers={markers} height={420} /></Card>
           <Card title={`Trades (${res.trades.length})`}>
             {res.trades.length ? (
