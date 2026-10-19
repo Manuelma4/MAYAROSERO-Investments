@@ -17,3 +17,4 @@ node_modules/
 web/dist/
 *.db
 *.tsbuildinfo
+web/dist-static/

@@ -2,7 +2,9 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { BrandLockup } from "./components/Brand";
 import { TickerTape } from "./components/TickerTape";
 import { TopBar } from "./components/TopBar";
+import { useEffect, useState } from "react";
 import { LiveProvider, useLive } from "./lib/live";
+import { STATIC, snapshotMeta } from "./lib/snapshot";
 import Backtest from "./pages/Backtest";
 import Discover from "./pages/Discover";
 import Live from "./pages/Live";
@@ -27,6 +29,16 @@ function Icon({ d }: { d: string }) {
   return <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>;
 }
 
+function PreviewBanner() {
+  const [asOf, setAsOf] = useState<string | null>(null);
+  useEffect(() => { snapshotMeta().then((m) => setAsOf(m.as_of)).catch(() => undefined); }, []);
+  return (
+    <div className="preview-banner" role="note">
+      Preview · real market data captured {asOf ? new Date(asOf).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "recently"} · live prices and alerts run on the full app
+    </div>
+  );
+}
+
 function Shell() {
   const { unread } = useLive();
   return (
@@ -45,6 +57,7 @@ function Shell() {
         <p className="disclaimer">Market information and analysis. Not financial advice.</p>
       </aside>
       <div className="main">
+        {STATIC && <PreviewBanner />}
         <TopBar />
         <TickerTape />
         <main className="content">

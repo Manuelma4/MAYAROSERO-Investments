@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, eventsSocketUrl } from "./api";
 import { notifyEvent } from "./browserNotify";
+import { STATIC } from "./snapshot";
 import type { LiveEvent, LiveStatus } from "./types";
 
 interface LiveCtx {
@@ -31,6 +32,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     let closed = false;
     api.events().then(setEvents).catch(() => undefined);
     api.liveStatus().then(setStatus).catch(() => undefined);
+    if (STATIC) return; // preview: no live connection
 
     const connect = () => {
       ws = new WebSocket(eventsSocketUrl());

@@ -1,3 +1,4 @@
+import { STATIC, snapshotRequest } from "./snapshot";
 import type { BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, PicksResult, PredictResult, Quote, StrategyInfo, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
@@ -14,6 +15,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (STATIC) {
+    try { return (await snapshotRequest(path, init)) as T; } catch (e) { throw new ApiError(400, (e as Error).message); }
+  }
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);

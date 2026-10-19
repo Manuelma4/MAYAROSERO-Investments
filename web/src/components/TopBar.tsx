@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fmtPct, fmtTime } from "../lib/format";
 import { useLive } from "../lib/live";
+import { STATIC } from "../lib/snapshot";
 import { MARKETS, STOCKS } from "../lib/markets";
 import { BrandMark } from "./Brand";
 
@@ -76,9 +77,10 @@ export function TopBar() {
       <Link to="/" className="topbar-brand" aria-label="Home"><BrandMark size={30} /></Link>
       <SymbolSearch />
       <div className="topbar-right">
-        <span className={`live-pill ${connected ? "on" : ""}`} title={connected ? "Real-time connection open" : "Reconnecting…"}>
-          <span className="dot" />{connected ? (status?.running ? "Live" : "Connected") : "Offline"}
-        </span>
+        {STATIC ? <span className="live-pill" title="Snapshot of real market data"><span className="dot" />Preview</span> : (
+          <span className={`live-pill ${connected ? "on" : ""}`} title={connected ? "Real-time connection open" : "Reconnecting…"}>
+            <span className="dot" />{connected ? (status?.running ? "Live" : "Connected") : "Offline"}
+          </span>)}
         <Bell />
       </div>
     </header>

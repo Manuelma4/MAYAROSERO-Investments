@@ -394,3 +394,5 @@ tbody tr:hover { background: var(--surface-2); }
   .ranking li { grid-template-columns: 24px 60px minmax(0, 1fr) 48px; } .ranking .scorebar { display: none; }
   .hero-x { padding-top: 10px; }
 }
+
+.preview-banner { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; padding: 8px 16px; border-bottom: 1px solid var(--line); color: var(--text-2); background: var(--surface-2); }

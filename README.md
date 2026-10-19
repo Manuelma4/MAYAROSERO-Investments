@@ -34,7 +34,11 @@ Production: `cp .env.example .env` (set `TRADEBOT_API_TOKEN`!), then
 `docker compose up -d --build`. Put it behind HTTPS (Caddy / a PaaS) and
 enter the token in the UI ("Set access token").
 
-Brand and design system: see [BRAND.md](BRAND.md). The app is installable on
+Brand and design system: see [BRAND.md](BRAND.md). Plan: [ROADMAP.md](ROADMAP.md).
+Things to switch on later (paid real-time data, broker, hosting): [LATER.md](LATER.md).
+
+Static preview (no server, snapshot of real data):
+`cd web && VITE_STATIC=1 npx vite build --base ./ --outDir dist-static && cd .. && python scripts/export_snapshot.py web/dist-static/data`. The app is installable on
 phones (Add to Home Screen).
 
 Architecture: FastAPI (REST + WebSocket) over the Python engine, SQLite for

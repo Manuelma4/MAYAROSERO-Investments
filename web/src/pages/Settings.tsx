@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { getToken, setToken } from "../lib/api";
 import { browserNotifyEnabled, browserNotifySupported, setBrowserNotify } from "../lib/browserNotify";
+import { STATIC } from "../lib/snapshot";
 import { useLive } from "../lib/live";
 import { setThemePref, useTheme, type ThemePref } from "../lib/theme";
 import { Badge, Card } from "../components/ui";
@@ -38,7 +39,7 @@ export default function Settings() {
       <Card title="Notifications">
         <div className="setting">
           <div><strong>Browser notifications</strong><p className="muted small">Pop-up alerts on this device while the app is open.</p></div>
-          {browserNotifySupported()
+          {!STATIC && browserNotifySupported()
             ? <button className={`switch ${notify ? "on" : ""}`} role="switch" aria-checked={notify} onClick={async () => setNotify(await setBrowserNotify(!notify))}><span /></button>
             : <Badge>Not supported</Badge>}
         </div>
