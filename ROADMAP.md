@@ -19,10 +19,12 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 0. [ ] **UX overhaul: everything already computed, nothing to "run"** (Manuel's top priority, Oct 20):
        - A background job precomputes picks (all 4 strategies), ML predictions for every S&P 500 /
          popular stock, and market analysis on a schedule; pages just show results instantly.
-         Remove Run / Train & predict buttons (keep advanced settings tucked away).
+         Results show without pressing anything; buttons stay available to customize (time period,
+         number of stocks, options) and recompute.
        - New home "Today" board answering at a glance: what to buy / hold / sell now, what is
          surging right now, market mood (S&P trend, breadth), and the engine's top 3 with reasons.
-       - Fewer clicks, clearer labels, plain-language explanations, stock rows open a detail view,
+       - Fewer clicks, clearer labels, plain-language explanations ("what this means" hints on every
+         number and option, beginner-friendly), stock rows open a detail view,
          consistent empty / loading states, mobile-first layout check.
 0b. [ ] **Live catalyst-momentum scanner ("invest now")** — the satellite strategy (20–30% of capital;
        the monthly picks stay the core). During market hours, every few minutes, over S&P 500 +
@@ -52,8 +54,13 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        - Volume analysis: volume profile (point of control, value area), VWAP and bands, relative volume,
          on-balance volume; volume features feed the ML direction model. Validated walk-forward by
          quant-researcher (calibration of probabilities, not just accuracy).
-       - **Predict page rework** (comment from Manuel, Oct 19): no form and no "Train & predict" button.
-         Opens on a precomputed ranking of the strongest expected moves for the coming days: top expected
+       - **Predict page rework** (comments from Manuel, Oct 19): opens instantly on precomputed results,
+         AND keeps a simple "Customize" panel with a Predict button so Manuel can choose: time horizon in
+         plain words (tomorrow / 1 week / 1 month / 3 months), how many stocks to show (5 / 10 / 20 / 50),
+         market (S&P 500, popular, Europe, crypto, or his own symbols), direction (rises, falls, both) and
+         options like "only uptrends" or "include volume signals". Every option has a one-line "what this
+         means" explanation for a non-expert, plus a short "How to read this page" guide. Default view: a
+         precomputed ranking of the strongest expected moves for the coming days: top expected
          risers (long) and top expected fallers (short) across the S&P 500 + popular stocks + crypto, each
          with probability, expected range, confidence badge and a one-line reason (momentum, volume,
          news). Tap a row: fan chart + volume profile + what drives the prediction. Model quality shown as
