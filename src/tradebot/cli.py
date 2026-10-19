@@ -9,6 +9,7 @@ Examples:
   tradebot movers   --config config/config.yaml        # one pass of the surge/crash detector
   tradebot scan     --config config/config.yaml        # one pass over the watchlist
   tradebot live     --config config/config.yaml        # loop forever, real-time alerts
+  tradebot serve    --port 8000                        # web platform (API + UI)
 """
 
 from __future__ import annotations
@@ -124,6 +125,16 @@ def cmd_live(args) -> None:
     Scanner.from_config(cfg).run_forever(cfg.get("poll_seconds", 60))
 
 
+def cmd_serve(args) -> None:
+    import os
+
+    import uvicorn
+
+    os.environ.setdefault("TRADEBOT_CONFIG", args.config)
+    uvicorn.run("tradebot.api.app:create_app", factory=True, host=args.host, port=args.port,
+                reload=args.reload)
+
+
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     ap = argparse.ArgumentParser(prog="tradebot", description=__doc__,
@@ -162,6 +173,13 @@ def main(argv: list[str] | None = None) -> None:
         p = sub.add_parser(name, help=help_)
         p.add_argument("--config", default="config/config.yaml")
         p.set_defaults(fn=fn)
+
+    p = sub.add_parser("serve", help="run the web platform (API + UI)")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--config", default="config/config.yaml")
+    p.add_argument("--reload", action="store_true")
+    p.set_defaults(fn=cmd_serve)
 
     args = ap.parse_args(argv)
     args.fn(args)

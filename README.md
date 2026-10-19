@@ -1,8 +1,41 @@
-# tradebot
+# MAYAROSERO Investments
 
-Market analysis, backtesting and real-time signal bot for **stocks, indices
-and crypto**, built around classic technical analysis: Japanese candlesticks,
-Dow theory, Wyckoff and Elliott waves.
+A trading **notifications and charting platform** for **stocks, indices and
+crypto**: real-time alerts when markets surge or crash, interactive charts
+with classic technical analysis (Japanese candlesticks, Dow theory, Wyckoff,
+Elliott waves), ML predictions validated on unseen data, and a backtester to
+prove your setups before risking money. Alerts reach you in the browser, by
+email and on WhatsApp.
+
+## Web platform
+
+| Page | What it does |
+|---|---|
+| **Alerts** | Live feed of big movers (surges / crashes) and setup signals, pushed over WebSocket; engine control; paper-trading positions |
+| **Charts** | Candlesticks + volume, EMA 20/50/200, Bollinger, swing pivots, candlestick patterns, RSI, and a structure panel (Dow trend, Wyckoff range, Elliott impulse) |
+| **Predict** | Train the model on one or many symbols, see BUY / HOLD / SELL probabilities and the out-of-sample validation |
+| **Backtest** | Run any setup on history: equity vs buy & hold, trades on chart, full stats |
+
+Run it:
+
+```bash
+pip install -e '.[dev]'
+cd web && npm install && npm run build && cd ..
+tradebot serve                     # http://127.0.0.1:8000
+```
+
+Development (hot reload): `tradebot serve --reload` and, in another shell,
+`cd web && npm run dev` (http://localhost:5173, proxies to the API).
+
+Production: `cp .env.example .env` (set `TRADEBOT_API_TOKEN`!), then
+`docker compose up -d --build`. Put it behind HTTPS (Caddy / a PaaS) and
+enter the token in the UI ("Set access token").
+
+Architecture: FastAPI (REST + WebSocket) over the Python engine, SQLite for
+the event history, React + TypeScript + TradingView lightweight-charts for the
+UI, one Docker image serving both.
+
+## Engine and CLI
 
 The workflow is:
 
@@ -122,8 +155,10 @@ src/tradebot/
   backtest/                engine + metrics
   ml/                      features, labels, walk-forward validated predictor
   live/                    real-time scanner, movers detector, email/WhatsApp notifiers, paper broker
-  report.py                market snapshot used by `tradebot analyze`
+  report.py                market snapshot (data for the API, text for the CLI)
+  api/                     FastAPI app: routes, live engine, WebSocket broadcast, SQLite store
   cli.py
+web/                       React + TypeScript UI (Vite)
 ```
 
 ## Writing your own setup

@@ -16,3 +16,4 @@ paper_state.json
 node_modules/
 web/dist/
 *.db
+*.tsbuildinfo
