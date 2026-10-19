@@ -52,6 +52,12 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        - Volume analysis: volume profile (point of control, value area), VWAP and bands, relative volume,
          on-balance volume; volume features feed the ML direction model. Validated walk-forward by
          quant-researcher (calibration of probabilities, not just accuracy).
+       - **Predict page rework** (comment from Manuel, Oct 19): no form and no "Train & predict" button.
+         Opens on a precomputed ranking of the strongest expected moves for the coming days: top expected
+         risers (long) and top expected fallers (short) across the S&P 500 + popular stocks + crypto, each
+         with probability, expected range, confidence badge and a one-line reason (momentum, volume,
+         news). Tap a row: fan chart + volume profile + what drives the prediction. Model quality shown as
+         one plain sentence ("right 56% of the time on unseen data, better than chance"), details collapsed.
 1. [ ] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
        dividend yield, 52-week range, sector), engine score and factor breakdown, "why / why not
        a pick", similar stocks. Link every symbol in the app to it.
