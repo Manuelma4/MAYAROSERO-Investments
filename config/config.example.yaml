@@ -1,0 +1,56 @@
+# Copy to config/config.yaml (git-ignored) and edit.
+poll_seconds: 60          # how often the live scanner checks the market
+history_bars: 400         # candles loaded per symbol for indicator warm-up
+
+notifiers: [console]      # add "email" and/or "whatsapp" (credentials via env vars, see .env.example)
+
+risk:
+  risk_per_trade: 0.01    # 1% of equity per trade
+  fee: 0.001
+  max_leverage: 1.0
+
+paper_trading:
+  enabled: true           # simulate positions; no real orders are ever sent
+  capital: 10000
+  state_file: paper_state.json
+
+# Real-time surge / crash detector
+movers:
+  enabled: true
+  timeframe: 5m
+  lookback_bars: 3        # move measured over the last 3 closed 5m bars (15 min)
+  min_move_pct: 2.0       # at least +/-2%
+  min_zscore: 3.0         # and >= 3 standard deviations of the symbol's normal volatility
+  min_volume_ratio: 2.0   # and volume >= 2x its average
+  stocks:
+    symbols: [AAPL, MSFT, NVDA, TSLA, AMD, META, AMZN, MC.PA, AIR.PA, TTE.PA]
+    screeners: [day_gainers, day_losers, most_actives]   # Yahoo dynamic lists (US)
+  crypto:
+    exchange: binance
+    quote: USDT
+    top_n: 30             # top 30 pairs by 24h volume
+    symbols: []
+
+watchlist:
+  - provider: ccxt        # crypto, real-time
+    exchange: binance
+    timeframe: 1h
+    symbols: [BTC/USDT, ETH/USDT, SOL/USDT]
+    strategies:
+      - name: ema_cross_rsi
+      - name: dow_pullback
+
+  - provider: yahoo       # indices (intraday may be delayed ~15 min)
+    timeframe: 1d
+    symbols: ["^GSPC", "^NDX", "^GDAXI", "^FCHI"]
+    strategies:
+      - name: dow_pullback
+      - name: wyckoff_spring
+
+  - provider: yahoo       # stocks
+    timeframe: 1d
+    symbols: [AAPL, MSFT, NVDA, TSLA, MC.PA]
+    strategies:
+      - name: ema_cross_rsi
+        params: {fast: 10, slow: 30}
+      - name: wyckoff_spring
