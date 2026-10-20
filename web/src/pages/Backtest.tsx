@@ -19,7 +19,7 @@ export default function Backtest() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { api.strategies().then(setStrategies).catch((e) => setError(e.message)); }, []);
+  useEffect(() => { api.strategies().then(setStrategies).catch((e) => setError(`The list of setups could not be loaded. ${(e as Error).message}`)); }, []);
   const current = strategies.find((s) => s.name === strategy);
   useEffect(() => {
     if (current) setParams(Object.fromEntries(Object.entries(current.defaults).map(([k, v]) => [k, String(v)])));
@@ -33,7 +33,7 @@ export default function Backtest() {
         params: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, Number(v)])),
         risk_per_trade: Number(risk) / 100, fee: Number(fee) / 100, allow_short: allowShort,
       }));
-    } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
+    } catch (e) { setError(`The backtest could not run. ${(e as Error).message}`); } finally { setLoading(false); }
   };
 
   // Show a result immediately with the default setup; the form is for customizing.
@@ -84,6 +84,7 @@ export default function Backtest() {
         )}
       </Card>
       <ErrorBox error={error} />
+      {loading && !res && <div className="empty"><Spinner /> Replaying the setup on past prices…</div>}
 
       {res && s && (
         <>

@@ -57,7 +57,9 @@ export function PriceChart({ candles, overlays = [], markers = [], height = 460 
     return () => chart.remove();
   }, [candles, overlays, markers, resolved]);
 
-  return <div className="chart" ref={ref} style={{ height }} />;
+  const last = candles[candles.length - 1];
+  const label = last ? `Price chart, ${candles.length} candles, last close ${last.close.toFixed(2)}${overlays.some((o) => o.title) ? `, with ${overlays.filter((o) => o.title).map((o) => o.title).join(", ")}` : ""}` : "Price chart, no data";
+  return <div className="chart" ref={ref} style={{ height }} role="img" aria-label={label} />;
 }
 
 export function LinesChart({ series, height = 260, log = false }: { series: Overlay[]; height?: number; log?: boolean }) {
@@ -74,5 +76,6 @@ export function LinesChart({ series, height = 260, log = false }: { series: Over
     chart.timeScale().fitContent();
     return () => chart.remove();
   }, [series, resolved, log]);
-  return <div className="chart" ref={ref} style={{ height }} />;
+  const names = series.map((o) => o.title).filter(Boolean);
+  return <div className="chart" ref={ref} style={{ height }} role="img" aria-label={`Line chart${names.length ? `: ${names.join(", ")}` : ""}${log ? " (log scale)" : ""}`} />;
 }

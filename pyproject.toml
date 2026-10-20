@@ -37,3 +37,6 @@ tradebot = ["data/*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "e2e: browser end-to-end flows (Playwright + Chromium, needs web/dist); skip with -m \"not e2e\"",
+]

@@ -76,7 +76,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        "Picks history" view.
 5. [x] **S&P 500 real-time movers**: scan all constituents intraday in batches; surge / crash feed
        on Overview and Alerts.
-6. [ ] **Quality pass**: code-split bundle, loading / empty / error states everywhere, keyboard and
+6. [x] **Quality pass**: code-split bundle, loading / empty / error states everywhere, keyboard and
        screen-reader basics, Playwright end-to-end tests of the main flows.
 7. [x] **Paid real-time stock data, ready to switch on**: provider adapters for Polygon, Alpaca and
        Finnhub (REST + websocket streaming), selected by `MARKET_DATA_PROVIDER` in `.env`, Yahoo as

@@ -22,7 +22,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body) headers.set("Content-Type", "application/json");
-  const res = await fetch(path, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers });
+  } catch {
+    throw new ApiError(0, "Can't reach the MAYAROSERO server. Check your internet connection; the page tries again by itself.");
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -31,6 +36,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         : Array.isArray(body.detail) ? body.detail.map((d: { loc: string[]; msg: string }) => `${d.loc.slice(1).join(".")}: ${d.msg}`).join("; ")
         : detail;
     } catch { /* not json */ }
+    if (res.status === 401) detail = "This server needs an access token. Add it in Settings › Access.";
+    else if (res.status >= 500 && (!detail || detail === res.statusText))
+      detail = "The server ran into a problem. Please try again in a minute.";
     throw new ApiError(res.status, detail);
   }
   return res.json() as Promise<T>;

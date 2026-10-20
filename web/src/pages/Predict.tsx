@@ -6,7 +6,7 @@ import { STATIC } from "../lib/snapshot";
 import type { PredictionsResult, RankedItem } from "../lib/types";
 import { ForecastPanel } from "../components/Forecast";
 import { Hint } from "../components/Hint";
-import { Badge, Card, ErrorBox, Field, Spinner } from "../components/ui";
+import { Badge, Card, Empty, ErrorBox, Field, Spinner } from "../components/ui";
 
 const HORIZONS = [{ h: 1, label: "Tomorrow" }, { h: 5, label: "1 week" }, { h: 21, label: "1 month" }];
 
@@ -99,12 +99,12 @@ export default function Predict() {
         <div className="grid-2">
           {dir !== "down" && (
             <Card title={<>Expected to beat the others · {res.horizon_label}<Hint>"Top 10%" means the model ranks this stock among the best tenth of the list. The "chance" is how often similar past cases beat the typical stock: edges are small (a few points above 50%) but add up across many stocks and weeks.</Hint></>}>
-              <ul className="pred-list">{risers.map((it) => <Row key={it.symbol} it={it} side="up" horizon={res.horizon} />)}</ul>
+              {risers.length ? <ul className="pred-list">{risers.map((it) => <Row key={it.symbol} it={it} side="up" horizon={res.horizon} />)}</ul> : <Empty>No ranking for this list yet.</Empty>}
             </Card>
           )}
           {dir !== "up" && (
             <Card title={<>Expected to lag · {res.horizon_label}<Hint>The percentage is the chance this stock does worse than the typical stock. Useful to avoid, or as short ideas for experienced investors.</Hint></>}>
-              <ul className="pred-list">{fallers.map((it) => <Row key={it.symbol} it={it} side="down" horizon={res.horizon} />)}</ul>
+              {fallers.length ? <ul className="pred-list">{fallers.map((it) => <Row key={it.symbol} it={it} side="down" horizon={res.horizon} />)}</ul> : <Empty>No ranking for this list yet.</Empty>}
             </Card>
           )}
         </div>

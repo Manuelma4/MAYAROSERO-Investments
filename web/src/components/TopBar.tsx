@@ -17,14 +17,16 @@ function SymbolSearch() {
     : [];
   const go = (symbol: string) => { nav(stockPath(symbol)); setQ(""); setOpen(false); };
   return (
-    <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); if (q.trim()) go(matches[0]?.symbol ?? q.trim().toUpperCase()); }}>
+    <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); if (q.trim()) go(matches[0]?.symbol ?? q.trim().toUpperCase()); }}
+      onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setTimeout(() => setOpen(false), 150); }}>
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M16 16l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
       <input value={q} placeholder="Search a stock, index or crypto (AAPL, ^GSPC, BTC/USDT)" aria-label="Search symbol"
-        onChange={(e) => { setQ(e.target.value); setOpen(true); }} onBlur={() => setTimeout(() => setOpen(false), 150)} onFocus={() => setOpen(true)} />
+        onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} />
       {open && matches.length > 0 && (
-        <ul className="search-pop">
+        <ul className="search-pop" aria-label="Suggestions">
           {matches.map((m) => (
-            <li key={m.symbol}><button type="button" onMouseDown={() => go(m.symbol)}>
+            <li key={m.symbol}><button type="button" onMouseDown={(e) => { e.preventDefault(); go(m.symbol); }} onClick={() => go(m.symbol)}>
               <strong>{m.symbol}</strong><span className="muted">{m.name}</span><span className="muted small">{m.group}</span>
             </button></li>))}
         </ul>

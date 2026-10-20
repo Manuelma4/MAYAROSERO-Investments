@@ -30,7 +30,7 @@ export default function Markets() {
 
   const load = useCallback(async (s: MarketSel, silent = false) => {
     if (!silent) { setLoading(true); setError(null); }
-    try { setData(await api.chart({ ...s, limit: 500 })); } catch (e) { if (!silent) setError((e as Error).message); } finally { if (!silent) setLoading(false); }
+    try { setData(await api.chart({ ...s, limit: 500 })); } catch (e) { if (!silent) setError(`The chart for ${s.symbol} could not be loaded. ${(e as Error).message}`); } finally { if (!silent) setLoading(false); }
   }, []);
   const intraday = /^[0-9]+(m|h)$/.test(sel.timeframe) && sel.timeframe !== "4h";
   // The URL (?symbol=&tf=) is the source of truth: search, presets and the form all navigate.
@@ -101,6 +101,7 @@ export default function Markets() {
         </div>
       </Card>
       <ErrorBox error={error} />
+      {loading && !data && <div className="empty"><Spinner /> Loading the chart…</div>}
 
       {data && a && (
         <div className="grid-main">

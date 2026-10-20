@@ -6,7 +6,7 @@ import { useQuotes } from "../lib/quotes";
 import { STATIC } from "../lib/snapshot";
 import type { PicksResult } from "../lib/types";
 import { LinesChart, SERIES, type Overlay } from "../components/charts";
-import { Card, ErrorBox, Field, Spinner } from "../components/ui";
+import { Card, Empty, ErrorBox, Field, Spinner } from "../components/ui";
 import { Hint } from "../components/Hint";
 import { cssVar, useTheme } from "../lib/theme";
 
@@ -57,7 +57,7 @@ export default function Picks() {
       // Default settings: instant precomputed result. Custom settings (or not ready yet): compute now.
       const r = isDefault ? await api.picksLatest(preset).catch(custom) : await custom();
       if (id === reqId.current) setRes(r);
-    } catch (e) { if (id === reqId.current) setError((e as Error).message); } finally { if (id === reqId.current) setLoading(false); }
+    } catch (e) { if (id === reqId.current) setError(`The picks could not be computed. ${(e as Error).message}`); } finally { if (id === reqId.current) setLoading(false); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { run(); }, [preset]);
@@ -123,7 +123,7 @@ export default function Picks() {
           actions={<span className="muted small">{basketToday !== undefined && <>Basket today <Delta v={basketToday} digits={2} /> · </>}equal weight · ranked {res.as_of.slice(0, 10)}</span>}>
           {res.risk_off ? (
             <div className="notice">The S&amp;P 500 is below its 200-day average, so the bear-market filter says to hold cash until the trend recovers.</div>
-          ) : (
+          ) : !res.picks.length ? <Empty>No stock passes the engine's rules today (strong trend, beating the index). Holding cash until one does is part of the plan.</Empty> : (
             <>
             <ul className="pick-cards">
               {res.picks.map((p, i) => {

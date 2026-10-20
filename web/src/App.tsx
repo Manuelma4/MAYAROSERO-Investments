@@ -59,7 +59,7 @@ function Shell() {
               <Icon d={n.icon} />
               <span className="nav-label">{n.label}</span>
               <span className="nav-short">{n.short ?? n.label}</span>
-              {n.badge && unread > 0 && <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>}
+              {n.badge && unread > 0 && <><span className="nav-badge" aria-hidden>{unread > 99 ? "99+" : unread}</span><span className="sr-only">({unread} unread)</span></>}
             </NavLink>))}
         </nav>
         <p className="disclaimer">Market information and analysis. Not financial advice.</p>

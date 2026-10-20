@@ -42,7 +42,7 @@ export function Field({ label, children, wide = false }: { label: string; childr
 }
 
 export function Spinner() {
-  return <span className="spinner" aria-label="Loading" />;
+  return <span className="spinner" role="status" aria-label="Loading" />;
 }
 
 export function Empty({ children }: { children: ReactNode }) {

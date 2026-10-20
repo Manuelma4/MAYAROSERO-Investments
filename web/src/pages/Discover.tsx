@@ -5,7 +5,7 @@ import { fmtPct, fmtPrice, stockPath } from "../lib/format";
 import { useQuotes } from "../lib/quotes";
 import type { Quote, Universe, UniverseStock } from "../lib/types";
 import { Sparkline } from "../components/Sparkline";
-import { ErrorBox, Spinner } from "../components/ui";
+import { Empty, ErrorBox, Spinner } from "../components/ui";
 
 type Mode = "themes" | "sectors" | "regions";
 const REGIONS = ["US", "Europe", "Asia", "Global"];
@@ -42,7 +42,7 @@ export default function Discover() {
   const mode = (params.get("by") as Mode) || "themes";
   const [query, setQuery] = useState("");
 
-  useEffect(() => { api.universe().then(setUni).catch((e) => setError(e.message)); }, []);
+  useEffect(() => { api.universe().then(setUni).catch((e) => setError(`The list of companies could not be loaded. ${(e as Error).message}`)); }, []);
 
   const all = useMemo(() => (uni ? [...uni.stocks, ...uni.crypto] : []), [uni]);
   const groups = useMemo(() => {
@@ -84,7 +84,7 @@ export default function Discover() {
         </div>
       </section>
       <ErrorBox error={error} />
-      {!uni && !error && <div className="empty"><Spinner /></div>}
+      {!uni && !error && <div className="empty"><Spinner /> Loading the companies…</div>}
 
       {uni && !q && (
         <div className="tiles" role="tablist" aria-label="Groups">
@@ -102,9 +102,11 @@ export default function Discover() {
       {uni && (
         <section>
           <h2 className="section-title">{q ? `Results for "${query}" · ${visible.length}` : `${current?.key} · ${visible.length}`}</h2>
-          <div className="srows">
-            {visible.map((s) => <StockRow key={s.symbol} s={s} q={quotes[s.symbol]} />)}
-          </div>
+          {visible.length ? (
+            <div className="srows">
+              {visible.map((s) => <StockRow key={s.symbol} s={s} q={quotes[s.symbol]} />)}
+            </div>
+          ) : <Empty>{q ? `Nothing matches "${query}". Try a company name (Apple), a ticker (AAPL) or an industry (Semiconductors).` : "No companies in this group."}</Empty>}
         </section>
       )}
     </div>

@@ -81,7 +81,7 @@ export default function Settings() {
         <div className="setting">
           <div><strong>Browser notifications</strong><p className="muted small">Pop-up alerts on this device while the app is open.</p></div>
           {!STATIC && browserNotifySupported()
-            ? <button className={`switch ${notify ? "on" : ""}`} role="switch" aria-checked={notify} onClick={async () => setNotify(await setBrowserNotify(!notify))}><span /></button>
+            ? <button className={`switch ${notify ? "on" : ""}`} role="switch" aria-checked={notify} aria-label="Browser notifications" onClick={async () => setNotify(await setBrowserNotify(!notify))}><span /></button>
             : <Badge>Not supported</Badge>}
         </div>
         {[["email", "Email", "SMTP_* variables in .env"], ["whatsapp", "WhatsApp", "TWILIO_* variables in .env"]].map(([k, label, how]) => (
@@ -94,7 +94,7 @@ export default function Settings() {
       <Card title="Access">
         <form className="setting" onSubmit={(e) => { e.preventDefault(); setToken(token.trim() || null); setSaved(true); setTimeout(() => location.reload(), 400); }}>
           <div style={{ flex: 1 }}><strong>Access token</strong><p className="muted small">Required when the server sets TRADEBOT_API_TOKEN. Stored only in this browser.</p>
-            <input type="password" value={token} onChange={(e) => setTok(e.target.value)} placeholder="Paste your token" style={{ width: "100%", marginTop: 8 }} />
+            <input type="password" aria-label="Access token" autoComplete="off" value={token} onChange={(e) => setTok(e.target.value)} placeholder="Paste your token" style={{ width: "100%", marginTop: 8 }} />
           </div>
           <button className="btn primary">{saved ? "Saved" : "Save"}</button>
         </form>

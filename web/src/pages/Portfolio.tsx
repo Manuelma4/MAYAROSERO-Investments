@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { fmtNum, fmtPct, stockPath } from "../lib/format";
 import type { PortfolioPlan } from "../lib/types";
 import { Hint } from "../components/Hint";
-import { Badge, Card, ErrorBox, Spinner } from "../components/ui";
+import { Badge, Card, Empty, ErrorBox, Spinner } from "../components/ui";
 
 const KEY = "mri.portfolio";
 const RISKS = [
@@ -31,7 +31,7 @@ export default function Portfolio() {
   const build = async (next = inp) => {
     setBusy(true); setErr(null);
     try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
-    try { setPlan(await api.portfolio({ ...next, amount: Number(next.amount) })); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+    try { setPlan(await api.portfolio({ ...next, amount: Number(next.amount) })); } catch (e) { setErr(`Your plan could not be built. ${(e as Error).message}`); } finally { setBusy(false); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { build(); }, []);
@@ -72,7 +72,7 @@ export default function Portfolio() {
         <>
           {plan.core_risk_off && <div className="notice">The S&amp;P 500 is in a downtrend, so the engine keeps the picks part in cash until the trend recovers.</div>}
           <section className="alloc">
-            <div className="alloc-bar" role="img" aria-label="Allocation">
+            <div className="alloc-bar" role="img" aria-label={`Allocation: ${roles.map((r) => `${ROLE[r]} ${fmtNum(plan.by_role[r] * 100, 0)}%`).join(", ")}`}>
               {roles.map((r) => <span key={r} style={{ flexBasis: `${plan.by_role[r] * 100}%`, background: ROLE_COLOR[r] }} />)}
             </div>
             <div className="alloc-legend">
@@ -83,7 +83,7 @@ export default function Portfolio() {
 
           <Card title={<>What to buy · {lines.length} positions<Hint>Your shopping list. Prices are in US dollars on US exchanges; amounts are converted to {plan.currency}. Place these orders at your broker, then come back monthly for the changes.</Hint></>}
             actions={<span className="muted small">{plan.currency === "EUR" ? `1 EUR = ${fmtNum(plan.fx_usd_per_unit, 4)} USD` : ""}</span>}>
-            <ul className="pick-cards always">
+            {!lines.length && plan.cash <= 0.5 ? <Empty>Nothing to buy with this amount. Try a larger amount or tick "Fractional shares".</Empty> : <ul className="pick-cards always">
               {lines.map((l) => (
                 <li key={l.symbol}>
                   <div className="pc-top">
@@ -94,7 +94,7 @@ export default function Portfolio() {
                   <p className="muted small">{fmtNum(l.invested / plan.amount * 100, 1)}% of the portfolio{l.stop ? ` · stop-loss $${fmtNum(l.stop, 2)}` : ""}{l.note ? ` · ${l.note}` : ""}</p>
                 </li>))}
               {plan.cash > 0.5 && <li><div className="pc-top"><Badge>Cash</Badge><span className="pc-name"><strong>Keep in cash</strong><span className="muted small">{plan.by_role.satellite === undefined || plan.by_role.satellite < plan.mix.satellite - 0.005 ? "Waiting for live ideas, plus rounding" : "Rounding"}</span></span><span className="pc-num">{money(plan.cash)}</span></div></li>}
-            </ul>
+            </ul>}
           </Card>
 
           <div className="grid-2">

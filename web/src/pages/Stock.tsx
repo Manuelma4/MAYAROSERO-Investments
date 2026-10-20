@@ -33,12 +33,13 @@ export default function Stock() {
   const [info, setInfo] = useState<StockInfo | null>(null);
   const [chart, setChart] = useState<ChartData | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [chartErr, setChartErr] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;  // a late answer for the previous stock must not land on this page
-    setInfo(null); setChart(null); setErr(null);
+    setInfo(null); setChart(null); setErr(null); setChartErr(null);
     api.stock(symbol).then((d) => alive && setInfo(d)).catch((e) => alive && setErr((e as Error).message));
-    api.chart({ provider: "auto", symbol, timeframe: "1d", limit: 260 }).then((d) => alive && setChart(d)).catch(() => undefined);
+    api.chart({ provider: "auto", symbol, timeframe: "1d", limit: 260 }).then((d) => alive && setChart(d)).catch((e) => alive && setChartErr((e as Error).message));
     return () => { alive = false; };
   }, [symbol]);
   const { quotes } = useQuotes(info?.similar.map((s) => s.symbol) ?? [], 60_000);
@@ -48,7 +49,13 @@ export default function Stock() {
     { data: chart.overlays.ema200, color: SERIES.ema200, width: 2, title: "EMA200" },
   ] : [], [chart]);
 
-  if (err) return <div className="page"><ErrorBox error={err} /></div>;
+  if (err) return (
+    <div className="page">
+      <section className="hero-x"><p className="eyebrow">Stock</p><h1 className="display">{symbol}</h1></section>
+      <ErrorBox error={`This page could not be loaded. ${err}`} />
+      <p className="muted">Check the ticker (for example AAPL, MC.PA, ^GSPC or BTC/USDT) with the search box at the top, or go back to <Link className="link" to="/">Today</Link>.</p>
+    </div>
+  );
   const q = info?.quote;
   const f = info?.fundamentals ?? {};
   const target = typeof f.targetMeanPrice === "number" ? f.targetMeanPrice : null;
@@ -76,11 +83,13 @@ export default function Stock() {
 
       <div className="grid-main">
         <Card title={<>Price · 1 year<Hint>Daily candles with the 50-day (orange) and 200-day (violet) averages. Price above the 200-day line = long-term uptrend.</Hint></>} actions={<Link className="link" to={`/charts?symbol=${encodeURIComponent(symbol)}`}>Full chart</Link>}>
-          {chart ? <PriceChart candles={chart.candles} overlays={overlays} height={360} /> : <div className="empty"><Spinner /></div>}
+          {chart ? <PriceChart candles={chart.candles} overlays={overlays} height={360} />
+            : chartErr ? <div className="empty">The price history is not available right now. {chartErr}</div>
+            : <div className="empty"><Spinner /> Loading one year of prices…</div>}
         </Card>
         <div className="stack">
           <Card title="The engine's view">
-            {!info ? <Spinner /> : (
+            {!info ? <div className="muted small"><Spinner /> Loading…</div> : (
               <div className="verdict">
                 <Badge tone={VERDICT_TONE[info.verdict.status]}>{VERDICT_LABEL[info.verdict.status]}</Badge>
                 <p>{info.verdict.text}</p>
