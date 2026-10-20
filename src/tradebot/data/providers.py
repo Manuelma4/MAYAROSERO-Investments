@@ -157,8 +157,17 @@ def provider_for(symbol: str) -> str:
 
 def get_provider(name: str, **kwargs) -> DataProvider:
     name = name.lower()
-    if name in ("yahoo", "yfinance", "stocks"):
+    if name in ("yahoo", "stocks"):
+        # Stocks: Yahoo, or the paid real-time feed set by MARKET_DATA_PROVIDER (Yahoo as fallback).
+        from .paid import stock_provider_from_env
+
+        return stock_provider_from_env()
+    if name == "yfinance":
         return YahooProvider()
+    if name in ("polygon", "alpaca", "finnhub"):
+        from .paid import build_paid_provider
+
+        return build_paid_provider(name)
     if name in ("ccxt", "crypto"):
         return CCXTProvider(kwargs.get("exchange", "binance"))
     raise ValueError(f"Unknown provider: {name}")

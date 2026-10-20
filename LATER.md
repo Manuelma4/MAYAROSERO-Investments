@@ -5,20 +5,41 @@ put the credentials in `.env` on the server. Nothing here is required to use the
 
 ## 1. Real-time stock prices (paid)
 Today: stocks come from Yahoo Finance (free, often ~15 min delayed); crypto is already real time.
-When you want true real-time stocks, pick ONE provider:
+The code for three paid feeds is ready (`src/tradebot/data/paid.py`). Pick ONE:
 
-| Provider | Price (approx.) | Good for |
+| Provider | Plan to buy (approx.) | Notes |
 |---|---|---|
-| Polygon.io "Stocks Starter/Developer" | ~$30–80 / month | All US stocks and indices, real-time websockets |
-| Alpaca "Algo Trader Plus" | ~$99 / month | Real-time US data + the same account can trade |
-| Finnhub (paid tier) | ~$50+ / month | US + some international markets |
+| **Polygon.io** (now also branded Massive) | "Stocks Advanced" ~$199/month (real time). Starter ~$29 / Developer ~$79 are 15-min delayed like Yahoo (more reliable, not faster) | Best coverage: all US exchanges, minute bars, live snapshot. Recommended. |
+| **Alpaca** | "Algo Trader Plus" ~$99/month (full SIP feed). The free plan works too but only with IEX prices (~2-3% of US volume) | The same account will be used for trading (item 2). |
+| **Finnhub** | A paid stock plan that includes "Stock candles" (~$50+/month) | Free keys only give quotes, not candles: the app would keep using Yahoo. |
 
-Then in `.env`:
+Steps:
+1. Sign up, buy the plan, copy the API key from the provider's dashboard.
+2. Add to `.env` on the server (only the lines for your provider):
 ```
-MARKET_DATA_PROVIDER=polygon          # or alpaca / finnhub
-POLYGON_API_KEY=...                   # or ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY, FINNHUB_API_KEY
+MARKET_DATA_PROVIDER=polygon          # yahoo (default) | polygon | alpaca | finnhub
+POLYGON_API_KEY=...
+# ALPACA_API_KEY_ID=...  ALPACA_API_SECRET_KEY=...  ALPACA_DATA_FEED=sip   (sip = paid full feed, iex = free)
+# FINNHUB_API_KEY=...
 ```
-The app switches automatically; Yahoo stays as the free fallback. (Built in roadmap item 7.)
+3. Restart: `docker compose up -d` (it reads `.env`).
+4. Check it works (calls the paid feed directly, no fallback, prints the last bars and last trade):
+```
+docker compose exec app python -m tradebot.data.paid AAPL
+```
+   Without Docker: `set -a; . ./.env; set +a; python -m tradebot.data.paid AAPL`.
+   "OK: polygon works" means you are live. "FAILED ... HTTP 403" means the key or plan is wrong.
+
+What happens automatically: US stocks (AAPL, BRK-B, ...) come from the paid feed; indices (^GSPC),
+European listings (MC.PA) and crypto stay on Yahoo / Binance. If the paid feed fails (bad key, rate
+limit, outage) the app quietly uses Yahoo for that request and logs one warning; nothing breaks.
+After a rejected key it stops asking the provider for 15 minutes.
+
+Optional settings: `MARKET_DATA_MAX_RPM=60` (cap requests per minute, for low-tier plans),
+`MARKET_DATA_EXTENDED_HOURS=1` (include pre/after-market bars; default is the regular 9:30-16:00
+session, like Yahoo), `POLYGON_BASE_URL=https://api.massive.com` (if Polygon retires the old domain).
+Live streaming clients (trades + 1-minute bars over WebSocket) are in `src/tradebot/data/streaming.py`,
+ready for a later push-to-browser feature; they stay off until a key is set.
 
 ## 2. Investing from the platform (broker connection)
 The app can send orders to a broker through its official API. Plan:

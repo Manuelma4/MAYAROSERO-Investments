@@ -78,7 +78,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        on Overview and Alerts.
 6. [ ] **Quality pass**: code-split bundle, loading / empty / error states everywhere, keyboard and
        screen-reader basics, Playwright end-to-end tests of the main flows.
-7. [ ] **Paid real-time stock data, ready to switch on**: provider adapters for Polygon, Alpaca and
+7. [x] **Paid real-time stock data, ready to switch on**: provider adapters for Polygon, Alpaca and
        Finnhub (REST + websocket streaming), selected by `MARKET_DATA_PROVIDER` in `.env`, Yahoo as
        fallback; tests with mocked responses; documented in LATER.md.
 8. [ ] **Broker connection (invest from the app)**: broker interface + Alpaca adapter (paper by default),
