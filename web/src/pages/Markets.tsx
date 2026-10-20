@@ -7,6 +7,7 @@ import type { ChartData } from "../lib/types";
 import { LinesChart, PriceChart, SERIES, downColor, upColor, type Marker, type Overlay } from "../components/charts";
 import { MarketPicker, PRESETS, type MarketSel } from "../components/MarketPicker";
 import { Badge, Card, ErrorBox, Spinner, Stat } from "../components/ui";
+import { AIDesk } from "../components/AIDesk";
 
 const TREND = { 1: ["Uptrend", "up"], [-1]: ["Downtrend", "down"], 0: ["Range", ""] } as const;
 
@@ -113,6 +114,7 @@ export default function Markets() {
               <dt>MACD histogram</dt><dd className={a.macd_hist > 0 ? "up" : "down"}>{fmtNum(a.macd_hist, 4)}</dd>
               <dt>Wyckoff range</dt><dd>{fmtPrice(a.wyckoff_range.support)} – {fmtPrice(a.wyckoff_range.resistance)} {a.wyckoff_range.tight ? <Badge>tight range</Badge> : <Badge>wide / trending</Badge>}</dd>
               <dt>Recent candles</dt><dd>{a.recent_patterns.length ? a.recent_patterns.map((p) => <Badge key={p.time + p.pattern}>{p.pattern.replace(/_/g, " ")}</Badge>) : "none"}</dd>
+              <dt>AI desk</dt><dd><AIDesk symbol={data.symbol} /></dd>
               <dt>Elliott</dt><dd>{a.elliott ? <>Valid {a.elliott.direction} impulse {a.elliott.start.slice(0, 10)} → {a.elliott.end.slice(0, 10)} (w3/w1 {fmtNum(a.elliott.wave3_extension, 2)})</> : "No rule-valid 5-wave impulse recently"}</dd>
             </dl>
           </Card>

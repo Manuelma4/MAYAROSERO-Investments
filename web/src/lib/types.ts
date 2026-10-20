@@ -121,3 +121,9 @@ export interface OpportunitiesResult { as_of: string; us_market_open: boolean; i
 export interface OrderPlan { symbol: string; side: string; entry: number; stop: number; target: number | null; qty: number; value: number; max_loss: number; risk_pct_of_equity: number }
 export interface PaperPosition { symbol: string; strategy: string; side: string; entry_time: string; entry: number; qty: number; stop: number; target: number | null; price?: number | null; pnl?: number | null }
 export interface PaperAccount { enabled: boolean; cash: number; equity: number; open_pnl: number; positions: PaperPosition[]; history: { symbol: string; strategy: string; side: string; entry: number; exit: number; exit_time: string; reason: string; pnl: number }[] }
+
+export interface AIAnalysis {
+  symbol: string; as_of: string; model: string; technical: string; news: string; fundamentals: string;
+  bull_case: string; bear_case: string; verdict: "favorable" | "neutral" | "avoid"; confidence: number;
+  summary: string; main_risk: string; invalidation: string;
+}

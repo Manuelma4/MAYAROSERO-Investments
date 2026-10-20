@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { fmtNum, fmtPct, fmtPrice, fmtTime } from "../lib/format";
 import { STATIC } from "../lib/snapshot";
 import type { Opportunity, OpportunitiesResult, OrderPlan, PaperAccount } from "../lib/types";
+import { AIDesk } from "../components/AIDesk";
 import { Hint } from "../components/Hint";
 import { Badge, Card, Empty, ErrorBox, Spinner } from "../components/ui";
 
@@ -87,6 +88,7 @@ function OppCard({ o, onDone }: { o: Opportunity; onDone: (m: string) => void })
         <span className="muted small">Reward/risk {fmtNum(rr, 1)} · score {fmtNum(o.score, 0)}/100 · valid until {fmtTime(o.expires_at)}</span>
         {o.qualified && <button className="btn primary small" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Close" : "Invest"}</button>}
       </footer>
+      {o.qualified && <AIDesk symbol={o.symbol} />}
       {open && <InvestPanel o={o} onDone={(m) => { setOpen(false); onDone(m); }} />}
     </article>
   );

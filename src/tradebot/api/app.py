@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None, provider_factory: ProviderFactory | None = None,
-               config: dict | None = None, scanner_factory=None) -> FastAPI:
+               config: dict | None = None, scanner_factory=None, analyst_client=None) -> FastAPI:
     settings = settings or Settings()
     config = config if config is not None else settings.load_config()
 
@@ -66,6 +66,10 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
         except Exception as exc:
             log.warning("notify failed: %s", exc)
 
+    from ..ai.analyst import AIAnalyst
+    from ..live.news import NewsSource
+
+    app.state.analyst = AIAnalyst(app.state.market, NewsSource(), client=analyst_client)
     app.state.precompute = Precomputer(app.state.market, interval=settings.precompute_seconds,
                                        on_opportunity=on_opportunity, paper=app.state.paper,
                                        paper_lock=app.state.paper_lock)

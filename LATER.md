@@ -46,9 +46,12 @@ news, fundamentals, sentiment, bull vs bear debate, risk check) before you inves
 Create a key at console.anthropic.com (pay as you go, roughly a few cents per analysis) and add:
 ```
 ANTHROPIC_API_KEY=sk-ant-...
-AI_ANALYST=on
+AI_ANALYST=on                      # set to off to disable
+AI_ANALYST_MODEL=claude-opus-5-5   # optional
 ```
-Without it, the app works the same, just without the AI verdicts.
+Then install the extra once: `pip install -e '.[ai]'`. The "Ask the AI desk" button appears on every
+Invest-now idea and on Charts. Each stock is reviewed at most once every 6 hours (cached) to keep costs low.
+Without a key, the app works the same, just without the AI verdicts.
 
 ## 4. Hosting (so it runs 24/7 and you can open it anywhere)
 Any of: a small VPS (Hetzner / OVH ~€5/month), Railway, Render or Fly.io. Run

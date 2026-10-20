@@ -263,3 +263,38 @@ def test_opportunities_and_paper_invest(client, monkeypatch):
     r = client.post("/api/paper/orders", json=order)
     assert r.status_code == 400 and "moved" in r.json()["detail"]
     assert client.get("/api/paper").json()["positions"] == []
+
+
+def test_ai_analyst_off_without_key(client, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    client.app.state.analyst._client = None
+    assert client.get("/api/ai/status").json()["enabled"] is False
+    r = client.post("/api/ai/analyze", params={"symbol": "AAA"})
+    assert r.status_code == 503 and "ANTHROPIC_API_KEY" in r.json()["detail"]
+
+
+def test_ai_analyst_with_fake_client(client):
+    import json as _json
+    from types import SimpleNamespace
+
+    calls = []
+
+    class FakeMessages:
+        def create(self, **kw):
+            calls.append(kw)
+            out = {"technical": "Uptrend.", "news": "No news.", "fundamentals": "Missing.", "bull_case": "Momentum.",
+                   "bear_case": "Extended.", "verdict": "neutral", "confidence": 140, "summary": "Mixed.",
+                   "main_risk": "Pullback.", "invalidation": "Close below the 200-day average."}
+            return SimpleNamespace(stop_reason="end_turn", model="claude-opus-5-5",
+                                   content=[SimpleNamespace(type="text", text=_json.dumps(out))])
+
+    an = client.app.state.analyst
+    an._client = SimpleNamespace(beta=SimpleNamespace(messages=FakeMessages()))
+    an.news, an.fundamentals_fn = None, lambda s: {"sector": "Tech"}  # offline
+    d = client.post("/api/ai/analyze", params={"symbol": "AAA"}).json()
+    assert d["verdict"] == "neutral" and d["confidence"] == 100 and d["symbol"] == "AAA"
+    sent = calls[0]
+    assert sent["model"] == "claude-opus-5-5" and sent["output_config"]["format"]["type"] == "json_schema"
+    assert "technical" in sent["messages"][0]["content"]
+    client.post("/api/ai/analyze", params={"symbol": "AAA"})
+    assert len(calls) == 1  # cached for the day

@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, PicksResult, PredictResult, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
+import type { AIAnalysis, BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, PicksResult, PredictResult, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -46,6 +46,8 @@ export const api = {
   paperOrder: (body: object) => request<{ mode: string; plan: OrderPlan; placed?: boolean }>("/api/paper/orders", { method: "POST", body: JSON.stringify(body) }),
   paperCloseAll: () => request<{ closed: unknown[] }>("/api/paper/close-all", { method: "POST" }),
   paperAccount: () => request<PaperAccount>("/api/paper"),
+  aiStatus: () => request<{ enabled: boolean; how_to_enable: string | null }>("/api/ai/status"),
+  aiAnalyze: (symbol: string) => request<AIAnalysis>(`/api/ai/analyze?${qs({ symbol })}`, { method: "POST" }),
   today: () => request<TodayBoard>("/api/today"),
   picksLatest: (preset: string) => request<PicksResult>(`/api/picks/latest?${qs({ preset })}`),
   picks: (body: object) => request<PicksResult>("/api/picks", { method: "POST", body: JSON.stringify(body) }),

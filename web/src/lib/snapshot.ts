@@ -47,6 +47,8 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
     case "/api/today": return load("today.json");
     case "/api/opportunities": case "/api/opportunities/scan": return load("opportunities.json");
     case "/api/paper/orders": return limit("Placing paper orders");
+    case "/api/ai/status": return { enabled: false, how_to_enable: "Runs on the live app with a Claude API key." };
+    case "/api/ai/analyze": return limit("The AI analyst");
     case "/api/picks/latest": {
       try { return await load(`picks_${url.searchParams.get("preset") ?? "quality_momentum"}.json`); } catch { return limit("This strategy"); }
     }

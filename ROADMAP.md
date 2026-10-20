@@ -34,7 +34,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        Moves without news are filtered out (research: they tend to reverse; news-driven moves drift).
        Each signal: entry, stop, target, time limit, one-tap "Invest" (paper broker now), push notification,
        auto-expiry. Validate the rules on history internally; never show backtests on the main screens.
-0c. [ ] **AI analyst on live candidates**: integrate TradingAgents (Apache-2.0, supports Claude) as an
+0c. [x] **AI analyst on live candidates**: integrate TradingAgents (Apache-2.0, supports Claude) as an
        optional service — analysts (news, fundamentals, sentiment, technicals), bull/bear debate and a
        risk check produce a short verdict + reasons shown on each opportunity before "Invest". Enabled by
        `ANTHROPIC_API_KEY` in `.env` (documented in LATER.md); app works without it.

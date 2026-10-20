@@ -184,6 +184,33 @@ def paper_close_all(request: Request):
     return ser.clean({"closed": closed})
 
 
+@router.get("/ai/status")
+def ai_status(request: Request):
+    a = _state(request).analyst
+    return {"enabled": a.available,
+            "how_to_enable": None if a.available else "Add ANTHROPIC_API_KEY to the .env file on the server (see LATER.md)."}
+
+
+@router.post("/ai/analyze")
+async def ai_analyze(request: Request, symbol: str = Query(..., max_length=20)):
+    from ..ai.analyst import AnalystUnavailable
+
+    st = _state(request)
+    if not st.analyst.available:
+        raise HTTPException(503, "The AI analyst is off. Add ANTHROPIC_API_KEY to .env to turn it on (see LATER.md).")
+    opps = (st.precompute.get("opportunities") or {}).get("items", [])
+    idea = next((o for o in opps if o["symbol"] == symbol and o["qualified"]), None)
+    core = st.precompute.get("picks:quality_momentum") or {}
+    factors = next((r for r in core.get("ranking", []) if r["symbol"] == symbol), None)
+    try:
+        res = await asyncio.to_thread(st.analyst.analyze, symbol, idea, factors)
+    except AnalystUnavailable as exc:
+        raise HTTPException(502, str(exc)) from exc
+    except DataUnavailable as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return ser.clean(res.to_dict())
+
+
 @router.get("/quotes")
 def quotes(request: Request, symbols: str = Query(..., max_length=8000), exchange: str = "binance"):
     syms = list(dict.fromkeys(s.strip() for s in symbols.split(",") if s.strip()))[:400]

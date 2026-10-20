@@ -24,6 +24,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "httpx>=0.27"]
 plot = ["matplotlib>=3.7"]
+ai = ["anthropic>=1.15"]
 
 [project.scripts]
 tradebot = "tradebot.cli:main"
