@@ -655,3 +655,7 @@ tbody tr:hover { background: var(--surface-2); }
 .risk-readout { margin: 4px 0 0; min-height: 1.5em; }
 .target-risk { margin: 12px 0 0; }
 @media (max-width: 860px) { .risk-table td, .risk-table th { padding: 10px 6px; } }
+
+/* Earnings calendar */
+.earnings-week .badge { margin: 0 0 0 6px; padding: 1px 6px; font-size: 9.5px; vertical-align: 1px; }
+.earnings-kv dd { text-align: right; }

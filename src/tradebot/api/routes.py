@@ -509,6 +509,25 @@ def stock(request: Request, symbol: str = Query(..., max_length=20)):
     })
 
 
+@router.get("/earnings")
+def earnings(request: Request, symbols: str = Query(..., max_length=2000)):
+    """Next / last earnings per stock (cached 12 h; missing ones are fetched from Yahoo, at most 20 per call).
+    Symbols without data (or crypto, indices) come back with status "unknown" / "none"."""
+    syms = list(dict.fromkeys(_known_symbol(s) for s in symbols.split(",") if s.strip()))[:100]
+    if not syms:
+        raise HTTPException(422, "Give at least one symbol.")
+    from ..data.earnings import HINT
+
+    return ser.clean({"items": _state(request).precompute.earnings_for(syms), "hint": HINT})
+
+
+@router.get("/earnings/upcoming")
+def earnings_upcoming(request: Request, days: int = Query(14, ge=0, le=90), mine: bool = False):
+    """Reports in the next `days` days for the picks, watchlists, held stocks (and popular names unless `mine`),
+    soonest first, each marked pick / watchlist / held."""
+    return _state(request).precompute.upcoming_earnings(days, mine_only=mine)
+
+
 @router.get("/ai/status")
 def ai_status(request: Request):
     a = _state(request).analyst

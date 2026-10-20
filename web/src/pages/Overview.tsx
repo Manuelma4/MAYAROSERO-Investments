@@ -5,7 +5,8 @@ import { fmtDay, fmtPct, fmtPrice, fmtTime, stockPath } from "../lib/format";
 import { useLive } from "../lib/live";
 import { MARKETS, STOCKS, marketName } from "../lib/markets";
 import { useQuotes } from "../lib/quotes";
-import type { LiveEvent, OpportunitiesResult, Quote, TodayBoard } from "../lib/types";
+import { EARNINGS_HINT, TIMING_SHORT, fmtEarnDay, whenText } from "../lib/earnings";
+import type { LiveEvent, OpportunitiesResult, Quote, TodayBoard, UpcomingEarnings } from "../lib/types";
 import { Hint } from "../components/Hint";
 import { Sparkline } from "../components/Sparkline";
 import { TrackRecordCard } from "../components/TrackRecord";
@@ -20,6 +21,7 @@ function greeting() {
 function eventLine(e: LiveEvent): { title: string; what: string; value: string; tone: string } {
   const when = fmtTime(e.created_at || e.time);
   if (e.type === "picks") return { title: "Picks updated", what: `Buy ${e.buy?.join(", ") || "nothing new"} · ${when}`, value: "Review", tone: "" };
+  if (e.type === "earnings") return { title: e.symbol, what: `Reports ${e.phase === "today" ? "today" : "tomorrow"}${e.timing_text && e.timing !== "unknown" ? `, ${e.timing_text}` : ""} · ${when}`, value: e.avg_move_pct != null ? `±${e.avg_move_pct.toFixed(1)}%` : "Earnings", tone: "" };
   if (e.type === "alert") return { title: e.symbol, what: `Your price alert fired · ${when}`, value: fmtPrice(e.price), tone: "" };
   if (e.type === "move") return { title: e.symbol, what: `${e.direction === "SURGE" ? "Sudden rise" : "Sudden drop"} · ${when}`, value: fmtPct(e.move_pct, 2), tone: (e.move_pct ?? 0) >= 0 ? "up" : "down" };
   // Live ideas carry "long" / "short" in direction; setup signals carry it in side.
@@ -48,7 +50,30 @@ function MarketCard({ symbol, name, q }: { symbol: string; name: string; q?: Quo
   );
 }
 
-function TodayBoardView({ t, ideas }: { t: TodayBoard; ideas: ReactNode }) {
+/** Results due this week for the stocks that matter to Manuel (picks, watchlists, holdings). */
+function EarningsWeek({ data }: { data: UpcomingEarnings }) {
+  const items = data.items.slice(0, 8);
+  return (
+    <Card title={<>Earnings this week<Hint>{`${EARNINGS_HINT} Listed: your picks, watchlist stocks and stocks you hold that publish results in the next 7 days. "Typical move" is the average size of the price move after their last reports.`}</Hint></>}>
+      {!items.length ? <Empty>None of your picks, watchlist or held stocks publishes results in the next 7 days.</Empty> : (
+        <ul className="movers earnings-week">
+          {items.map((i) => (
+            <li key={i.symbol}>
+              <Link to={stockPath(i.symbol)} className="idea-main">
+                <span><strong>{i.symbol}</strong> <span className="muted small">{i.name}</span>
+                  {i.held && <span className="badge">Held</span>}{i.pick && <span className="badge">Pick</span>}{i.watchlist && <span className="badge">Watchlist</span>}</span>
+                <span className="muted small">{fmtEarnDay(i.date)} · {whenText(i.days_until)} · {TIMING_SHORT[i.timing]}</span>
+              </Link>
+              <span className="num" title="Typical move after its last reports">{i["avg_move_%"] != null ? `±${i["avg_move_%"].toFixed(1)}%` : "–"}</span>
+            </li>))}
+        </ul>
+      )}
+      {data.items.length > items.length && <p className="muted small">+ {data.items.length - items.length} more this week</p>}
+    </Card>
+  );
+}
+
+function TodayBoardView({ t, ideas, earnings }: { t: TodayBoard; ideas: ReactNode; earnings?: ReactNode }) {
   const core = t.core;
   const ch = core?.changes;
   return (
@@ -101,6 +126,8 @@ function TodayBoardView({ t, ideas }: { t: TodayBoard; ideas: ReactNode }) {
         </Card>
       </div>
 
+      {earnings}
+
       <TrackRecordCard compact />
 
       <div className="grid-2">
@@ -139,6 +166,14 @@ export default function Overview() {
   }, []);
   const hot = (opps?.items ?? []).filter((o) => o.qualified).slice(0, 3);
 
+  const [earn, setEarn] = useState<UpcomingEarnings | null>(null);
+  useEffect(() => {
+    const load = () => api.earningsUpcoming(7, true).then(setEarn).catch(() => undefined);
+    load();
+    const id = setInterval(load, 10 * 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const ideas = hot.length > 0 && (
     <Card title={<>Invest now · {hot.length} live idea{hot.length > 1 ? "s" : ""}<Hint>Stocks moving strongly right now with news, heavy volume and the trend on their side. Open Invest now for the full plan (entry, stop-loss, target).</Hint></>}
       actions={<Link to="/now" className="link">See the plans</Link>}>
@@ -162,7 +197,7 @@ export default function Overview() {
         <p className="muted lead">Everything is already calculated: the market mood, what to hold, what changed and what is moving right now.</p>
       </section>
 
-      {today ? <TodayBoardView t={today} ideas={ideas} /> : <>{ideas}{todayErr ? <div className="error" role="alert">Today's board is not available yet. {todayErr}</div> : <div className="empty"><Spinner /> Preparing today's board…</div>}</>}
+      {today ? <TodayBoardView t={today} ideas={ideas} earnings={earn && <EarningsWeek data={earn} />} /> : <>{ideas}{todayErr ? <div className="error" role="alert">Today's board is not available yet. {todayErr}</div> : <div className="empty"><Spinner /> Preparing today's board…</div>}</>}
 
       {anyError && <div className="error" role="alert">Market data is unreachable from this server. Check its network access to Yahoo Finance and your crypto exchange.</div>}
 

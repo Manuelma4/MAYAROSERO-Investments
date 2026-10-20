@@ -154,3 +154,8 @@ Any of: a small VPS (Hetzner / OVH ~€5/month), Railway, Render or Fly.io. Run
   about a month; some smaller additions and every company that LEFT the index are missing, so results are
   still somewhat flattering). A paid point-in-time constituents dataset (e.g. Norgate Data, or S&P's own
   files) would make it exact: replace that CSV and add the leavers to the universe.
+- **Earnings calendar**: free from Yahoo Finance, nothing to set up. Yahoo sometimes lists a date before the
+  company confirms it (the time of day can be off until then) and has few dates for non-US stocks. If you want
+  confirmed dates for every listing, a paid calendar (e.g. Finnhub or Polygon earnings endpoints) could replace
+  it in `src/tradebot/data/earnings.py`. The "earnings tomorrow" alert is sent from 08:00 in the digest time zone
+  (`DIGEST_TIMEZONE`, Europe/Paris by default) through the same channels as the other alerts.

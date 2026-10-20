@@ -46,6 +46,30 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
       }
     }
     case "/api/today": return load("today.json");
+    case "/api/earnings": {
+      let all: Record<string, unknown> = {};
+      try { all = await load<Record<string, unknown>>("earnings.json"); } catch { /* older snapshot */ }
+      const hint = "Earnings: the company publishes its quarterly results. Prices often jump or drop sharply right after, in either direction.";
+      return { hint, items: (url.searchParams.get("symbols") ?? "").split(",").filter(Boolean).map((s) => all[s]
+        ?? { symbol: s, status: "unknown", next: null, last: null, history: [], reason: "Not in preview snapshot" }) };
+    }
+    case "/api/earnings/upcoming": {
+      const days = Number(url.searchParams.get("days") ?? 14);
+      const mine = url.searchParams.get("mine") === "true";
+      try {
+        const up = await load<{ items: { date: string; days_until: number; pick: boolean; watchlist: boolean; held: boolean }[] }>("earnings_upcoming.json");
+        const now = new Date();
+        const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+        const items = up.items.map((i) => {
+          const [y, m, d] = i.date.split("-").map(Number);
+          return { ...i, days_until: Math.round((Date.UTC(y, m - 1, d) - today) / 86_400_000) };
+        }).filter((i) => i.days_until >= 0 && i.days_until <= days && (!mine || i.pick || i.watchlist || i.held));
+        return { ...up, days, items };
+      } catch {
+        return { as_of: new Date().toISOString(), days, today: new Date().toISOString().slice(0, 10), items: [], last_refresh: null,
+          hint: "Earnings: the company publishes its quarterly results. Prices often jump or drop sharply right after." };
+      }
+    }
     case "/api/track-record": {
       try { return await load("track_record.json"); } catch {
         return { preset: "quality_momentum", as_of: new Date().toISOString(), started: null, days: 0, too_early: true,

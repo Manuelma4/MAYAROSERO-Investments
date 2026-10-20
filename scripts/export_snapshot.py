@@ -105,6 +105,16 @@ def main(out: Path) -> None:
             except Exception as exc:
                 print("stock page failed", s, exc)
         print(f"stock pages: {n_st}")
+        # Earnings calendar: the upcoming list (filtered by days in the browser) and the records of every stock page.
+        save("earnings_upcoming.json", get("/api/earnings/upcoming", days=90))
+        earn_syms = [s for s in dict.fromkeys(picks_now + popular + [s.symbol for s in CURATED])
+                     if "/" not in s and not s.startswith("^") and "=" not in s]
+        earn: dict = {}
+        for i in range(0, len(earn_syms), 20):   # the API fetches at most 20 missing symbols per call
+            for rec in get("/api/earnings", symbols=",".join(earn_syms[i:i + 20]))["items"]:
+                earn[rec["symbol"]] = rec
+        save("earnings.json", earn)
+        print(f"earnings: {sum(r['status'] == 'ok' for r in earn.values())}/{len(earn)}")
         for risk in ("cautious", "balanced", "bold"):
             save(f"portfolio_{risk}.json", post("/api/portfolio", {"amount": 10000, "currency": "EUR", "risk": risk}))
         print("picks + today: ok")

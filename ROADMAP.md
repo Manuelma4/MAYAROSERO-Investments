@@ -110,7 +110,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
 ## Phase 4: deeper tools (overnight Oct 20-21, Manuel: "use all the credits")
 
-17. [~] **Earnings calendar**: upcoming earnings dates for picks, watchlists and held stocks, shown on
+17. [x] **Earnings calendar**: upcoming earnings dates for picks, watchlists and held stocks, shown on
         stock pages and Today, with an optional alert the day before (plain-English "what earnings mean").
 18. [~] **Learn**: a glossary of every term the app uses and a short first-visit tour, written for a beginner.
 19. [x] **Portfolio risk**: how much the plan could lose in a bad month (Monte Carlo), how much its holdings

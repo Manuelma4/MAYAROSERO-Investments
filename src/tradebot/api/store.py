@@ -1,6 +1,6 @@
 """SQLite store for live events (signals, abnormal moves), watchlists, price alerts and the live
-track record (daily picks snapshots and Invest-now ideas, recorded as they happen), the saved portfolio target
-and the "already sent" marks of the weekly digest and drift alerts (so a restart never repeats them)."""
+track record (daily picks snapshots and Invest-now ideas, recorded as they happen), the saved portfolio target,
+the earnings calendar cache and the "already sent" marks of the weekly digest and drift alerts (so a restart never repeats them)."""
 
 from __future__ import annotations
 
@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS notices (
     period TEXT NOT NULL,
     sent_at TEXT NOT NULL,
     PRIMARY KEY (kind, period)
+);
+CREATE TABLE IF NOT EXISTS earnings_cache (
+    symbol TEXT PRIMARY KEY,
+    data TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS kv (
     key TEXT PRIMARY KEY,
@@ -227,6 +231,25 @@ class EventStore:
             r = self._conn.execute("SELECT * FROM notices WHERE kind = ? ORDER BY sent_at DESC LIMIT 1",
                                    (kind,)).fetchone()
         return dict(r) if r else None
+
+    # --- earnings calendar cache (survives restarts so Yahoo isn't asked again) ----------------
+    def earnings_get(self, symbols: list[str]) -> dict[str, dict]:
+        if not symbols:
+            return {}
+        out: dict[str, dict] = {}
+        with self._lock:
+            for i in range(0, len(symbols), 500):
+                chunk = symbols[i:i + 500]
+                q = f"SELECT symbol, data FROM earnings_cache WHERE symbol IN ({','.join('?' * len(chunk))})"
+                for r in self._conn.execute(q, chunk).fetchall():
+                    out[r["symbol"]] = json.loads(r["data"])
+        return out
+
+    def earnings_put(self, symbol: str, data: dict) -> None:
+        with self._lock:
+            self._conn.execute("INSERT INTO earnings_cache(symbol, data) VALUES (?, ?) ON CONFLICT(symbol) DO UPDATE "
+                               "SET data = excluded.data", (symbol, json.dumps(data, default=str)))
+            self._conn.commit()
 
     # --- small saved settings (portfolio target) ------------------------------------------------
     def get_value(self, key: str):

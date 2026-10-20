@@ -3,7 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { fmtBig, fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
 import { useQuotes } from "../lib/quotes";
-import type { ChartData, StockInfo } from "../lib/types";
+import { EARNINGS_HINT, TIMING_SHORT, daysUntil, fmtEarnDay, whenText } from "../lib/earnings";
+import type { ChartData, EarningsRecord, StockInfo } from "../lib/types";
 import { AIDesk } from "../components/AIDesk";
 import { ForecastPanel } from "../components/Forecast";
 import { Hint } from "../components/Hint";
@@ -26,6 +27,48 @@ const FIELDS: { key: string; label: string; fmt: (v: number) => string; hint: st
   { key: "debtToEquity", label: "Debt / equity", fmt: (v) => fmtNum(v, 0), hint: "Debt compared with the owners' money (×100). Above ~150 means a lot of debt." },
   { key: "dividendYield", label: "Dividend yield", fmt: (v) => fmtPct(v, 2, false), hint: "Yearly cash dividend as a share of the price (Yahoo reports it in percent)." },
 ];
+
+const hasEarnings = (s: string) => !!s && !s.includes("/") && !s.startsWith("^") && !s.includes("=");
+
+/** Next / last quarterly results, in plain English. */
+function EarningsCard({ symbol }: { symbol: string }) {
+  const [rec, setRec] = useState<EarningsRecord | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setRec(null); setFailed(false);
+    api.earnings([symbol]).then((d) => alive && setRec(d.items[0] ?? null)).catch(() => alive && setFailed(true));
+    return () => { alive = false; };
+  }, [symbol]);
+  if (failed || rec?.status === "none") return null;
+  const n = rec?.next;
+  const l = rec?.last;
+  const move = rec?.avg_move;
+  return (
+    <Card title={<>Earnings<Hint>{EARNINGS_HINT}</Hint></>}>
+      {!rec ? <div className="muted small"><Spinner /> Loading…</div> : (
+        <dl className="kv earnings-kv">
+          <dt>Next earnings<Hint>The day the company publishes its results; prices often jump or drop that day or the next.</Hint></dt>
+          <dd>{n ? <><strong>{fmtEarnDay(n.date)}</strong> <span className="muted">· {whenText(daysUntil(n.date))} · {TIMING_SHORT[n.timing]}</span></>
+            : <span className="muted">Not announced yet</span>}</dd>
+          {n?.eps_estimate != null && <>
+            <dt>Analysts expect<Hint>Expected profit per share for that quarter (EPS). Beating or missing this number is what usually moves the price.</Hint></dt>
+            <dd>{fmtNum(n.eps_estimate, 2)} per share</dd>
+          </>}
+          {l && <>
+            <dt>Last results<Hint>The latest published results: actual profit per share against what analysts expected. "Beat" means better than expected.</Hint></dt>
+            <dd>{fmtEarnDay(l.date)}{l.eps_actual != null && <> · {fmtNum(l.eps_actual, 2)} per share{l.eps_estimate != null && <> vs {fmtNum(l.eps_estimate, 2)} expected</>}</>}
+              {l.surprise_pct != null && <span className={l.surprise_pct >= 0 ? "up" : "down"}> ({l.surprise_pct >= 0 ? "beat" : "missed"} by {fmtPct(Math.abs(l.surprise_pct), 1, false)})</span>}</dd>
+          </>}
+          {move && <>
+            <dt>Typical move<Hint>How much the price moved, up or down, on the trading day that reacted to each of the last reports (average size of the move, ignoring direction). Past moves don't predict the next one's direction.</Hint></dt>
+            <dd>±{fmtNum(move["avg_abs_move_%"], 1)}% <span className="muted small">(last {move.moves.length} report{move.moves.length > 1 ? "s" : ""})</span></dd>
+          </>}
+        </dl>
+      )}
+    </Card>
+  );
+}
 
 export default function Stock() {
   const { symbol: raw = "" } = useParams();
@@ -102,6 +145,7 @@ export default function Stock() {
               </div>
             )}
           </Card>
+          {hasEarnings(symbol) && <EarningsCard key={symbol} symbol={symbol} />}
           {target && (
             <Card title={<>Analysts<Hint>Average 12-month price target from the analysts covering the stock, and their consensus. Analysts are often too optimistic; treat it as one opinion.</Hint></>}>
               <dl className="kv">

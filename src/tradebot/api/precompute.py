@@ -6,6 +6,8 @@ Jobs run at startup and then every `interval` seconds in a daemon thread:
 - the live track record: one picks snapshot per preset and trading day (once the US close is known),
   and every qualified Invest-now idea (recorded by the opportunity loop)
 - the weekly digest (once per week at the configured slot) and the portfolio drift alert (at most weekly)
+- the earnings calendar (once a day) for every preset's picks, watchlists, held stocks and popular names,
+  and the "earnings tomorrow" alert for picks, watchlist and held stocks (once per report)
 """
 
 from __future__ import annotations
@@ -16,11 +18,12 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
+from ..data import earnings as er
 from ..live import alerts
 from ..live import digest as dg
 from ..live import drift as dr
 from ..picker import PRESETS
-from ..universe import by_symbol, sp500_symbols
+from ..universe import CURATED, POP, by_symbol, sp500_symbols
 from . import serialize as ser
 from .market import MarketData
 from .schemas import PicksRequest
@@ -33,7 +36,8 @@ class Precomputer:
     def __init__(self, market: MarketData, interval: int = 1800, opportunities_interval: int = 300,
                  on_opportunity=None, paper=None, paper_lock=None, store=None, on_alert=None,
                  on_picks_change=None, alert_preset: str = "quality_momentum", broker_exits=None,
-                 notify=None, holdings=None, digest_schedule: dg.Schedule | None = None):
+                 notify=None, holdings=None, digest_schedule: dg.Schedule | None = None,
+                 earnings: er.EarningsCalendar | None = None, on_earnings=None):
         self.market = market
         self.interval = interval
         self.opportunities_interval = opportunities_interval
@@ -48,6 +52,10 @@ class Precomputer:
         self.notify = notify                   # callable(text): send through the configured notifiers
         self.holdings = holdings               # callable() -> what the owner holds (practice account or broker)
         self.digest_schedule = digest_schedule or dg.Schedule()
+        self.earnings = earnings or er.EarningsCalendar(store)
+        self.on_earnings = on_earnings         # callback(event, text) for each "earnings tomorrow" alert
+        self._earnings_day: str | None = None
+        self._held: tuple[float, set[str]] | None = None
         self._seen: set[tuple] = set()
         self._scanner = None
         self._data: dict[str, dict] = {}
@@ -93,6 +101,10 @@ class Precomputer:
             self.check_drift()
         except Exception as exc:
             errors.append(f"portfolio drift: {exc}")
+        try:
+            self.refresh_earnings()
+        except Exception as exc:
+            errors.append(f"earnings: {exc}")
         today = datetime.now(timezone.utc).date().isoformat()
         for h in ((5, 1, 21) if predictions else ()):   # heavy: recomputed once per day
             key = f"predictions:{h}"
@@ -350,6 +362,129 @@ class Precomputer:
                     log.warning("alert %s delivery failed: %s", a["id"], exc)
         return fired
 
+    # ---- earnings calendar ----------------------------------------------------------
+    HELD_TTL = 900.0
+
+    def held_symbols(self) -> set[str]:
+        """Symbols the owner holds (practice account or broker), cached 15 min: alerts check every 5 min."""
+        if self.holdings is None:
+            return set()
+        if self._held and time.time() - self._held[0] < self.HELD_TTL:
+            return self._held[1]
+        try:
+            held = {p["symbol"] for p in self.holdings().get("positions") or [] if p.get("symbol")}
+        except Exception as exc:
+            log.warning("earnings: holdings unavailable: %s", exc)
+            held = self._held[1] if self._held else set()
+        self._held = (time.time(), held)
+        return held
+
+    def earnings_interest(self) -> dict[str, dict]:
+        """Stocks whose earnings matter: every preset's current picks, watchlists, held stocks, popular names."""
+        flags: dict[str, dict] = {}
+
+        def mark(sym: str, key: str) -> None:
+            if er.applicable(sym):
+                flags.setdefault(sym, {"pick": False, "main_pick": False, "watchlist": False, "held": False,
+                                       "popular": False})[key] = True
+
+        for preset in PRESETS:
+            for p in (self.get(f"picks:{preset}") or {}).get("picks") or []:
+                mark(p["symbol"], "pick")
+                if preset == self.alert_preset:
+                    mark(p["symbol"], "main_pick")
+        if self.store is not None:
+            for w in self.store.watchlists():
+                for sym in w["symbols"]:
+                    mark(sym, "watchlist")
+        for sym in self.held_symbols():
+            mark(sym, "held")
+        for st in CURATED:
+            if POP in st.themes:
+                mark(st.symbol, "popular")
+        return flags
+
+    def _add_average_moves(self, records: list[dict]) -> None:
+        syms = [r["symbol"] for r in records if r.get("history")]
+        bars = self.market.history_many("yahoo", syms, "1d", limit=320) if syms else {}
+        for r in records:
+            r["avg_move"] = er.average_move(r.get("history") or [], bars.get(r["symbol"]))
+
+    def refresh_earnings(self, now: datetime | None = None) -> dict:
+        """Once a day: refresh every stale (12 h) entry; in the other runs only fetch newly added symbols."""
+        now = now or datetime.now(timezone.utc)
+        syms = sorted(self.earnings_interest())
+        day = now.date().isoformat()
+        if self._earnings_day != day:
+            res = self.earnings.refresh(syms, enrich=self._add_average_moves)
+            self._earnings_day = day
+        else:
+            have = self.earnings.cached(syms)
+            res = self.earnings.refresh([s for s in syms if s not in have], enrich=self._add_average_moves)
+        return res
+
+    def earnings_for(self, symbols: list[str], fetch: bool = True) -> list[dict]:
+        """Records for the API (stale or missing ones fetched on demand, at most 20, never behind a refresh)."""
+        recs = self.earnings.get(symbols, fetch=fetch)
+        missing_move = [r for r in recs.values() if r.get("status") == "ok" and "avg_move" not in r]
+        if missing_move:
+            try:
+                self._add_average_moves(missing_move)
+                for r in missing_move:
+                    self.earnings.put(r)
+            except Exception as exc:
+                log.warning("earnings average move failed: %s", exc)
+        return [er.public(recs[s]) for s in symbols]
+
+    def upcoming_earnings(self, days: int = 14, mine_only: bool = False, now: datetime | None = None) -> dict:
+        now = now or datetime.now(timezone.utc)
+        flags = self.earnings_interest()
+        if mine_only:
+            flags = {s: f for s, f in flags.items() if f["pick"] or f["watchlist"] or f["held"]}
+        names = {k: v.name for k, v in by_symbol().items()}
+        today = now.astimezone(er.NY).date()
+        items = er.upcoming(self.earnings.cached(list(flags)), today, days, flags, names)
+        return ser.clean({"as_of": now.isoformat(), "days": days, "today": today.isoformat(), "items": items,
+                          "last_refresh": self.earnings.last_refresh, "hint": er.HINT})
+
+    def check_earnings(self, now: datetime | None = None) -> list[dict]:
+        """The day before a report (owner's time zone) for a pick, a watchlist or a held stock: one alert per
+        report (the "already sent" mark lives in SQLite)."""
+        if self.store is None:
+            return []
+        now = now or datetime.now(timezone.utc)
+        tz = self.digest_schedule.timezone
+        # Alerts only for the main strategy's picks (the other presets would flood the phone in earnings season).
+        flags = {s: f for s, f in self.earnings_interest().items() if f["main_pick"] or f["watchlist"] or f["held"]}
+        recs = self.earnings.cached(list(flags))
+        names = {k: v.name for k, v in by_symbol().items()}
+        sent = []
+        for sym in sorted(recs):
+            rec = recs[sym]
+            nxt = rec.get("next")
+            phase = er.alert_phase(nxt, now, tz)
+            if not phase or not self.store.claim_notice("earnings", f"{sym}:{nxt['date']}", now):
+                continue
+            f = flags[sym]
+            reasons = [r for r, on in (("you hold it", f["held"]), ("one of the picks", f["main_pick"]),
+                                       ("on your watchlist", f["watchlist"])) if on]
+            move = rec.get("avg_move")
+            text = er.alert_text(sym, names.get(sym, sym), nxt, phase, reasons, move)
+            ev = self.store.add("earnings", sym, {
+                "name": names.get(sym, sym), "date": nxt["date"], "time": nxt.get("time"),
+                "timing": nxt.get("timing"), "timing_text": er.TIMING_TEXT.get(nxt.get("timing") or "unknown"),
+                "phase": phase, "eps_estimate": nxt.get("eps_estimate"),
+                "avg_move_pct": (move or {}).get("avg_abs_move_%"), "reasons": reasons, "text": text})
+            sent.append(ev)
+            try:
+                if self.on_earnings:
+                    self.on_earnings(ev, text)
+                elif self.notify:
+                    self.notify(text)
+            except Exception as exc:   # one failed delivery must not stop the others
+                log.warning("earnings alert %s delivery failed: %s", sym, exc)
+        return sent
+
     def _loop(self) -> None:
         while not self._stop.is_set():
             started = time.time()
@@ -380,6 +515,10 @@ class Precomputer:
                 self.check_digest()
             except Exception as exc:
                 log.warning("weekly digest failed: %s", exc)
+            try:
+                self.check_earnings()
+            except Exception as exc:
+                log.warning("earnings alerts failed: %s", exc)
             self._stop.wait(max(60.0, self.opportunities_interval - (time.time() - started)))
 
     def start(self) -> None:

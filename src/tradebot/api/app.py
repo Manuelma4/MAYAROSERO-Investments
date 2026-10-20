@@ -111,6 +111,13 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
         return sent
 
     app.state.notify = notify
+
+    def on_earnings(ev: dict, text: str) -> None:
+        app.state.broadcaster.publish(ev)
+        try:
+            notify(text)
+        except Exception as exc:
+            log.warning("notify failed: %s", exc)
     from ..live.digest import Schedule, schedule_from
 
     try:
@@ -129,7 +136,7 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
                                        on_alert=on_alert, on_picks_change=on_picks_change,
                                        broker_exits=lambda: manage_broker_exits(app.state),
                                        notify=notify, holdings=lambda: current_holdings(app.state),
-                                       digest_schedule=digest_schedule)
+                                       digest_schedule=digest_schedule, on_earnings=on_earnings)
     app.state.broadcaster = Broadcaster()
     kw = {"scanner_factory": scanner_factory} if scanner_factory else {}
     app.state.engine = LiveEngine(config, app.state.store, app.state.broadcaster, **kw)

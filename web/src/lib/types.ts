@@ -64,7 +64,9 @@ export interface LiveStatus {
 }
 
 export interface LiveEvent {
-  id: number; created_at: string; type: "signal" | "move" | "opportunity" | "alert" | "picks"; symbol: string; time: string;
+  id: number; created_at: string; type: "signal" | "move" | "opportunity" | "alert" | "picks" | "earnings"; symbol: string; time: string;
+  // earnings (a pick, watchlist or held stock reports tomorrow); date = report day
+  phase?: "tomorrow" | "today"; timing?: EarningsTiming; timing_text?: string; avg_move_pct?: number | null; reasons?: string[]; text?: string; eps_estimate?: number | null;
   // alert (one of the user's own price alerts fired)
   kind?: AlertKind; value?: number; note?: string;
   // picks (the Beat-the-S&P list changed at a review)
@@ -234,3 +236,16 @@ export interface TrackRecord {
   };
   ideas: { count: number; closed_count: number; open_count: number; pending_count: number; win_rate: number | null; avg_r: number | null; "total_r_%": number | null; open: TrackIdea[]; closed: TrackIdea[] };
 }
+
+export type EarningsTiming = "before_open" | "after_close" | "during" | "unknown";
+export interface EarningsEvent { date: string; time: string | null; timing: EarningsTiming; timing_text?: string; eps_estimate: number | null; eps_actual?: number | null; surprise_pct?: number | null }
+export interface EarningsRecord {
+  symbol: string; status: "ok" | "unknown" | "none"; next: EarningsEvent | null; last: EarningsEvent | null; history?: EarningsEvent[];
+  avg_move?: { "avg_abs_move_%": number; moves: { date: string; "move_%": number }[] } | null; fetched_at?: string; reason?: string;
+}
+export interface EarningsResult { items: EarningsRecord[]; hint: string }
+export interface UpcomingEarning {
+  symbol: string; name: string; date: string; time: string | null; timing: EarningsTiming; timing_text: string; days_until: number;
+  eps_estimate: number | null; "avg_move_%": number | null; reports_measured: number; pick: boolean; watchlist: boolean; held: boolean;
+}
+export interface UpcomingEarnings { as_of: string; days: number; today: string; items: UpcomingEarning[]; last_refresh: string | null; hint: string }

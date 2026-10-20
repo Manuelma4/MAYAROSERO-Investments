@@ -6,7 +6,8 @@ import { useLive } from "../lib/live";
 import { Badge, Card, Empty, ErrorBox, Spinner, Stat } from "../components/ui";
 import { Hint } from "../components/Hint";
 import { MyAlerts, Watchlists } from "../components/MyAlerts";
-import { alertText } from "../lib/browserNotify";
+import { alertText, earningsText } from "../lib/browserNotify";
+import { fmtEarnDay } from "../lib/earnings";
 
 function MoveRow({ e }: { e: LiveEvent }) {
   const up = e.direction === "SURGE";
@@ -65,11 +66,11 @@ export default function Live() {
   // Own alerts are fetched by type so busy days of market moves never push them out of the feed.
   const [own, setOwn] = useState<LiveEvent[]>([]);
   useEffect(() => {
-    Promise.all([api.events("alert", 20), api.events("picks", 10)])
-      .then(([a, p]) => setOwn([...a, ...p])).catch(() => undefined);
+    Promise.all([api.events("alert", 20), api.events("picks", 10), api.events("earnings", 10)])
+      .then(([a, p, x]) => setOwn([...a, ...p, ...x])).catch(() => undefined);
   }, []);
   const fired = useMemo(() => {
-    const byId = new Map([...own, ...events.filter((e) => e.type === "alert" || e.type === "picks")].map((e) => [e.id, e]));
+    const byId = new Map([...own, ...events.filter((e) => e.type === "alert" || e.type === "picks" || e.type === "earnings")].map((e) => [e.id, e]));
     return [...byId.values()].sort((a, b) => b.id - a.id);
   }, [own, events]);
   const signals = events.filter((e) => e.type === "signal");
@@ -93,11 +94,14 @@ export default function Live() {
       <ErrorBox error={error ?? status?.last_error ?? null} />
 
       {fired.length > 0 && (
-        <Card title={<>Alerts received <Badge>{fired.length}</Badge><Hint>Your own price alerts that fired, and every change to the Beat-the-S&amp;P picks. Newest first.</Hint></>}>
+        <Card title={<>Alerts received <Badge>{fired.length}</Badge><Hint>Your own price alerts that fired, every change to the Beat-the-S&amp;P picks, and a reminder the day before a stock you hold, pick or watch publishes its results (earnings). Newest first.</Hint></>}>
           <ul className="feed">{fired.slice(0, 20).map((e) => (
             <li key={e.id} className="feed-row">
-              <span className="feed-icon" aria-hidden>{e.type === "picks" ? "★" : <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" /></svg>}</span>
-              {e.type === "picks" ? <>
+              <span className="feed-icon" aria-hidden>{e.type === "picks" ? "★" : e.type === "earnings" ? "◷" : <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" /></svg>}</span>
+              {e.type === "earnings" ? <>
+                <div className="feed-main"><strong>{e.symbol} reports {e.phase === "today" ? "today" : "tomorrow"}{e.date ? ` (${fmtEarnDay(e.date)})` : ""}</strong><span className="muted small">{earningsText(e)}</span></div>
+                <div className="feed-num"><span className="muted small">Earnings</span><span className="muted small">{fmtTime(e.created_at)}</span></div>
+              </> : e.type === "picks" ? <>
                 <div className="feed-main"><strong>Beat-the-S&amp;P picks updated</strong><span className="muted small">Buy {e.buy?.join(", ") || "nothing new"} · Sell {e.sell?.join(", ") || "nothing"}</span></div>
                 <div className="feed-num"><span className="muted small">{fmtTime(e.created_at)}</span></div>
               </> : <>
