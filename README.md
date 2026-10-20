@@ -1,23 +1,41 @@
 # MAYAROSERO Investments
 
-A trading **notifications and charting platform** for **stocks, indices and
-crypto**: real-time alerts when markets surge or crash, interactive charts
-with classic technical analysis (Japanese candlesticks, Dow theory, Wyckoff,
-Elliott waves), ML predictions validated on unseen data, and a backtester to
-prove your setups before risking money. Alerts reach you in the browser, by
-email and on WhatsApp.
+A trading **notifications and investing platform** for **stocks, indices and crypto**, built to help
+beat the S&P 500: already-computed recommendations, live "invest now" ideas, a diversified portfolio
+plan, price alerts and forecasts, delivered in the app, the browser, by email and on WhatsApp.
+Everything opens computed and live; a **Customize** panel changes the period, number of stocks and
+options, and every number has a short "what this means" hint.
+
+## Start here (Manuel)
+
+1. **Run it** at home or on a small server: [docs/HOSTING.md](docs/HOSTING.md) (about 10 minutes).
+2. **Get alerts on your phone** by email and WhatsApp: [docs/ALERTS_SETUP.md](docs/ALERTS_SETUP.md)
+   (about 15 minutes), then check with `python scripts/test_alerts.py`.
+3. **Install it on your phone**: open the app in the browser → Add to Home Screen.
+4. **Later, when you decide to pay** (real-time prices, a broker for real money, the AI analyst):
+   [LATER.md](LATER.md) has the exact `.env` lines for each. Nothing else changes in the code.
+
+| Works now, free | Switch on later in `.env` (LATER.md) |
+|---|---|
+| Prices from Yahoo (~15 min delayed) and Binance (real time) | Real-time stock prices: Polygon, Alpaca or Finnhub (`MARKET_DATA_PROVIDER`) |
+| Invest button on a practice account (10,000 practice money) | A real broker: Alpaca, a crypto exchange or IBKR (`BROKER`, then `TRADING_MODE=live`) |
+| All picks, forecasts, alerts, portfolio plan | The AI analyst desk (`ANTHROPIC_API_KEY`) |
 
 ## Web platform
 
 | Page | What it does |
 |---|---|
-| **Overview** | Live indices, crypto, commodities with sparklines, watchlist, top movers, latest alerts |
-| **Discover** | ~520 stocks (the full S&P 500 plus curated Europe / Asia names) + crypto organized by theme (Magnificent 7, AI & chips, Luxury…), GICS sector and region, with live sector performance |
-| **Beat the S&P** | Factor engine ranks the S&P 500 monthly, shows this month's picks and a backtest vs SPY (dividends included), net of costs |
-| **Alerts** | Live feed of big movers (surges / crashes) and setup signals, pushed over WebSocket; engine control; paper-trading positions |
-| **Charts** | Candlesticks + volume, EMA 20/50/200, Bollinger, swing pivots, candlestick patterns, RSI, and a structure panel (Dow trend, Wyckoff range, Elliott impulse) |
-| **Predict** | Train the model on one or many symbols, see BUY / HOLD / SELL probabilities and the out-of-sample validation |
-| **Backtest** | Run any setup on history: equity vs buy & hold, trades on chart, full stats |
+| **Today** | Market mood, what to hold this month, buy / sell / keep changes, today's biggest movers |
+| **My portfolio** | A ready-to-buy diversified plan for your amount and risk level: picks core, live ideas, S&P 500 anchor, sector caps |
+| **Discover** | ~520 stocks (the full S&P 500 plus curated Europe / Asia names) + crypto by theme, GICS sector and region, with live performance |
+| **Beat the S&P** | Factor engine ranks every S&P 500 member monthly: this month's picks, why each one, picks history, and a collapsed honest track record vs SPY |
+| **Invest now** | Stocks and coins moving hard right now on news and heavy volume, with entry / stop / target and an order ticket; the S&P 500 movers board |
+| **Stock page** | Any symbol: price, key figures, the engine's verdict, forecast, live idea, similar companies, Set price alert, Add to watchlist |
+| **Alerts** | Your price alerts and watchlists, picks updates, surges / crashes and setup signals, pushed live |
+| **Charts** | Candlesticks + volume, VWAP, EMAs, Bollinger, patterns, structure (Dow, Wyckoff, Elliott) and a Monte Carlo forecast fan |
+| **Predict** | Weekly ranking of which stocks should beat the others, with up / down probabilities and an honest validation |
+| **Backtest** | Test any setup on history before risking money |
+| **Settings** | Broker and safety limits, Close everything (kill switch), notifications, theme, access token |
 
 Run it:
 
@@ -169,9 +187,8 @@ with your setups and risk rules.
 | Crypto | `ccxt` (Binance by default, any ccxt exchange via `--exchange`) | Real time, no API key needed |
 | Stocks, indices, ETFs, FX | `yahoo` (yfinance) | Free; intraday is often ~15 min delayed. Intraday history is limited (1m: 7 days, <1h: 60 days) |
 
-For true real-time stock data later, add a provider (Alpaca, Polygon,
-Interactive Brokers) in `src/tradebot/data/providers.py` implementing
-`DataProvider.history()`.
+Paid real-time stock feeds (Polygon, Alpaca, Finnhub) are built in (`src/tradebot/data/paid.py`) and switch on
+with `MARKET_DATA_PROVIDER` + a key; Yahoo stays the automatic fallback. See [LATER.md](LATER.md).
 
 ## Project layout
 
@@ -190,11 +207,21 @@ src/tradebot/
   ml/                      features, labels, walk-forward validated predictor
   live/                    real-time scanner, movers detector, email/WhatsApp notifiers, paper broker
   report.py                market snapshot (data for the API, text for the CLI)
-  universe.py              curated stocks by sector / theme / region (Discover + picker)
+  data/paid.py             Polygon / Alpaca / Finnhub adapters with Yahoo fallback (+ data/streaming.py)
+  data/sp500.csv           S&P 500 members with sector and industry
+  universe.py              curated stocks + the S&P 500 by sector / theme / region (Discover + picker)
   picker.py                factor ranking + monthly rebalanced portfolio vs benchmark
-  api/                     FastAPI app: routes, live engine, WebSocket broadcast, SQLite store
+  portfolio.py             diversified ready-to-buy plan (core / ideas / anchor, sector caps)
+  forecast.py              Monte Carlo fan, volume profile, VWAP bands
+  ml/ranker.py             weekly cross-sectional ranker with walk-forward IC
+  ai/analyst.py            optional Claude-powered analyst desk
+  live/alerts.py           price alerts; live/opportunities.py "invest now" scanner + movers board
+  trading/                 risk limits, broker adapters (paper / Alpaca / ccxt / IBKR), safety guard
+  api/                     FastAPI app: routes, orders, precompute, WebSocket broadcast, SQLite store
   cli.py
 web/                       React + TypeScript UI (Vite)
+docs/                      hosting guide, alerts setup walkthrough
+tests/                     offline tests on synthetic data, incl. tests/e2e (Playwright, desktop + phone)
 ```
 
 ## Writing your own setup
@@ -237,11 +264,11 @@ Then register it in `strategies/__init__.py`. A strategy fills these columns:
   (`tests/test_backtest.py::test_signals_have_no_lookahead`).
 - Watch for overfitting: tune parameters on one period, validate on another.
 
-## Roadmap
+## Tests
 
-- [ ] Walk-forward / out-of-sample parameter optimization
-- [ ] Multi-timeframe confirmation (e.g. daily trend + 1h entry)
-- [ ] Equity curve and trade charts (matplotlib / plotly)
-- [ ] Portfolio-level backtests across many symbols
-- [ ] Broker adapters (ccxt with API keys, Alpaca / IBKR) behind a kill switch
-- [ ] Deploy the live scanner on a small server / container
+```bash
+OMP_NUM_THREADS=1 pytest            # everything, offline (~3 min)
+pytest -m "not e2e"                 # skip the browser tests
+```
+
+Plan and status: [ROADMAP.md](ROADMAP.md).

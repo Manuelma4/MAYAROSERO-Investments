@@ -84,7 +84,8 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 8. [x] **Broker connection (invest from the app)**: broker interface + Alpaca adapter (paper by default),
        IBKR and ccxt adapters; order ticket UI with confirmation, positions and P&L page, max order size,
        daily loss limit and kill switch; real money only when `TRADING_MODE=live`.
-9. [ ] **Handover**: email + WhatsApp setup walkthrough (with Manuel), hosting guide, final README.
+9. [x] **Handover**: email + WhatsApp setup walkthrough (docs/ALERTS_SETUP.md; first live run together with Manuel
+       once his Gmail / Twilio accounts exist), hosting guide (docs/HOSTING.md), final README.
 
 ## Later research track
 - Microsoft Qlib + RD-Agent to discover better ranking factors for the monthly core picks
