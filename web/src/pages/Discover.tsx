@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtPct, fmtPrice } from "../lib/format";
+import { fmtPct, fmtPrice, stockPath } from "../lib/format";
 import { useQuotes } from "../lib/quotes";
 import type { Quote, Universe, UniverseStock } from "../lib/types";
 import { Sparkline } from "../components/Sparkline";
@@ -23,7 +23,7 @@ function heat(v: number | undefined) {
 
 function StockRow({ s, q }: { s: UniverseStock; q?: Quote }) {
   return (
-    <Link to={`/charts?symbol=${encodeURIComponent(s.symbol)}`} className="srow">
+    <Link to={stockPath(s.symbol)} className="srow">
       <span className="avatar">{s.symbol.replace(/[-.^/].*/, "").slice(0, 4)}</span>
       <span className="srow-name"><strong>{s.name}</strong><span className="muted small">{s.symbol} · {s.industry}</span></span>
       <Sparkline data={q?.spark} width={84} height={26} className="hide-sm" />

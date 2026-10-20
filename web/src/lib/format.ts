@@ -20,3 +20,11 @@ export const fmtDate = (sec: number) =>
   new Date(sec * 1000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
 export const tone = (v: number | null | undefined) => (v === null || v === undefined || v === 0 ? "" : v > 0 ? "up" : "down");
+
+export const fmtBig = (v: number | null | undefined) => {
+  if (v === null || v === undefined || Number.isNaN(v)) return "–";
+  const a = Math.abs(v);
+  return a >= 1e12 ? `${(v / 1e12).toFixed(2)}T` : a >= 1e9 ? `${(v / 1e9).toFixed(1)}B` : a >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : fmtNum(v, 0);
+};
+
+export const stockPath = (symbol: string) => `/stock/${encodeURIComponent(symbol)}`;

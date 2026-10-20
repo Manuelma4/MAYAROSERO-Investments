@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { fmtPct, fmtTime } from "../lib/format";
+import { fmtPct, fmtTime, stockPath } from "../lib/format";
 import { useLive } from "../lib/live";
 import { STATIC } from "../lib/snapshot";
 import { MARKETS, STOCKS } from "../lib/markets";
@@ -15,7 +15,7 @@ function SymbolSearch() {
   const matches = q
     ? ALL.filter((m) => m.symbol.toLowerCase().includes(q.toLowerCase()) || m.name.toLowerCase().includes(q.toLowerCase())).slice(0, 7)
     : [];
-  const go = (symbol: string) => { nav(`/charts?symbol=${encodeURIComponent(symbol)}`); setQ(""); setOpen(false); };
+  const go = (symbol: string) => { nav(stockPath(symbol)); setQ(""); setOpen(false); };
   return (
     <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); if (q.trim()) go(matches[0]?.symbol ?? q.trim().toUpperCase()); }}>
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M16 16l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>

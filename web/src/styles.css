@@ -518,3 +518,39 @@ tbody tr:hover { background: var(--surface-2); }
 .vprofile li.poc .vbar span { background: var(--text); }
 .vprofile li.here .num { color: var(--up); font-weight: 600; }
 @media (max-width: 860px) { .fc-stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* Stock page */
+.stock-price { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.sp-price { font: 500 34px/1 var(--font); }
+.verdict { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.verdict p { margin: 0; line-height: 1.5; }
+.figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
+.fig { display: flex; flex-direction: column; gap: 6px; }
+.fig strong { font: 500 20px var(--font); }
+
+/* Watchlists and price alerts */
+.between { justify-content: space-between; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--text-3); }
+.btn.ghost:hover { color: var(--text); border-color: var(--line-strong); }
+.alert-form { margin-bottom: 8px; }
+.alert-form-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.alert-form-row input, .alert-form-row select { min-width: 0; }
+.alert-form-row input[type="number"] { width: 110px; }
+.alert-form-row input:not([type]) { flex: 1 1 140px; }
+.alert-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
+.alert-dot.on { background: var(--up); box-shadow: 0 0 0 4px var(--up-soft); }
+.feed-row.fired { opacity: 0.7; }
+.watchlists { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 12px; }
+.watchlist { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.watchlist h3 { margin: 0; font-size: 14px; }
+.watchlist form { margin-top: 8px; }
+.watchlist form input { flex: 1; min-width: 0; }
+.stock-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+@media (max-width: 640px) {
+  .watchlists { grid-template-columns: 1fr; }
+  .watchlist .feed-row svg { display: none; }
+}
+.alert-details > summary { list-style: none; cursor: pointer; }
+.alert-details > summary::-webkit-details-marker { display: none; }
+.alert-details[open] { flex-basis: 100%; }
+.alert-details[open] > summary { margin-bottom: 10px; }

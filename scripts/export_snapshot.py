@@ -88,6 +88,17 @@ def main(out: Path) -> None:
             except Exception as exc:
                 print("forecast failed", s, h, exc)
         print(f"predictions + {n_fc} forecasts: ok")
+        (out / "stocks").mkdir(exist_ok=True)
+        picks_now = [p["symbol"] for p in get("/api/picks/latest")["picks"]]
+        popular = [s.symbol for s in STOCKS if "Most popular" in s.themes]
+        n_st = 0
+        for s in dict.fromkeys(picks_now + popular + MARKETS):
+            try:
+                save(f"stocks/{safe(s)}.json", get("/api/stock", symbol=s))
+                n_st += 1
+            except Exception as exc:
+                print("stock page failed", s, exc)
+        print(f"stock pages: {n_st}")
         for risk in ("cautious", "balanced", "bold"):
             save(f"portfolio_{risk}.json", post("/api/portfolio", {"amount": 10000, "currency": "EUR", "risk": risk}))
         print("picks + today: ok")

@@ -26,6 +26,7 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
   const url = new URL(path, "https://x");
   const p = url.pathname;
   const body = init.body ? JSON.parse(String(init.body)) : {};
+  if (/^\/api\/(watchlists|alerts)\/\d+/.test(p)) return limit("Editing watchlists and alerts");
   switch (p) {
     case "/api/strategies": return load("strategies.json");
     case "/api/universe": return load("universe.json");
@@ -56,6 +57,14 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
       const sym = url.searchParams.get("symbol") ?? "";
       try { return await load(`forecasts/${safeName(sym)}_${url.searchParams.get("horizon") ?? "5"}.json`); } catch { return limit(`The forecast for ${sym}`); }
     }
+    case "/api/stock": {
+      const sym = url.searchParams.get("symbol") ?? "";
+      try { return await load(`stocks/${safeName(sym)}.json`); } catch { return limit(`The page for ${sym}`); }
+    }
+    case "/api/watchlists": return init.method && init.method !== "GET" ? limit("Saving watchlists")
+      : [{ id: 1, name: "Magnificent 7", symbols: ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA"] }];
+    case "/api/alerts": return init.method === "POST" ? limit("Price alerts")
+      : { kinds: { above: "Price rises to or above", below: "Price falls to or below", move: "Moves at least this % in one day (up or down)" }, alerts: [] };
     case "/api/ai/status": return { enabled: false, how_to_enable: "Runs on the live app with a Claude API key." };
     case "/api/ai/analyze": return limit("The AI analyst");
     case "/api/picks/latest": {

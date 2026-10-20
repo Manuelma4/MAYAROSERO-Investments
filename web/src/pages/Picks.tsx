@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtNum, fmtPct, fmtPrice } from "../lib/format";
+import { fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
 import { useQuotes } from "../lib/quotes";
 import { STATIC } from "../lib/snapshot";
 import type { PicksResult } from "../lib/types";
@@ -132,7 +132,7 @@ export default function Picks() {
                   <li key={p.symbol}>
                     <div className="pc-top">
                       <span className="muted small">{String(i + 1).padStart(2, "0")}</span>
-                      <Link to={`/charts?symbol=${encodeURIComponent(p.symbol)}`} className="pc-name"><strong>{p.name}</strong><span className="muted small">{p.symbol} · {fmtNum(100 / res.picks.length, 1)}% of the money</span></Link>
+                      <Link to={stockPath(p.symbol)} className="pc-name"><strong>{p.name}</strong><span className="muted small">{p.symbol} · {fmtNum(100 / res.picks.length, 1)}% of the money</span></Link>
                       <span className="pc-num"><span className="num">{fmtPrice(q?.price ?? p.price)}</span>{q?.change_pct !== undefined && <Delta v={q.change_pct} digits={2} />}</span>
                     </div>
                     {p.reason && <p className="muted small">{p.reason}</p>}
@@ -148,7 +148,7 @@ export default function Picks() {
                     return (
                       <tr key={p.symbol}>
                         <td className="muted">{String(i + 1).padStart(2, "0")}</td>
-                        <td><Link className="asset" to={`/charts?symbol=${encodeURIComponent(p.symbol)}`}><span className="avatar">{p.symbol.slice(0, 2)}</span><span><strong>{p.name}</strong><span className="muted small">{p.symbol}</span></span></Link>
+                        <td><Link className="asset" to={stockPath(p.symbol)}><span className="avatar">{p.symbol.slice(0, 2)}</span><span><strong>{p.name}</strong><span className="muted small">{p.symbol}</span></span></Link>
                           {p.reason && <div className="muted small pick-reason">{p.reason}</div>}</td>
                         <td className="muted hide-sm">{p.sector}</td>
                         <td><ScoreBar v={p.score} /></td>
@@ -174,20 +174,33 @@ export default function Picks() {
             <ol className="ranking">
               {res.ranking.slice(0, 30).map((p) => (
                 <li key={p.symbol} className={p.eligible ? "" : "ineligible"} title={p.eligible ? "" : "Below its 200-day average: excluded by the uptrend filter"}>
-                  <Link to={`/charts?symbol=${encodeURIComponent(p.symbol)}`}>{p.symbol}</Link>
+                  <Link to={stockPath(p.symbol)}>{p.symbol}</Link>
                   <span className="muted small ellipsis">{p.name}</span>
                   <ScoreBar v={p.score} />
                   <Delta v={p["momentum_12_1_%"]} digits={0} />
                 </li>))}
             </ol>
           </Card>
-          <Card title="Recent changes to the picks">
+          <Card title={<>Picks history<Hint>At every review the engine re-ranks all stocks. Green = bought (entered the list), red = sold (left it). The rest were kept. You get a notification each time this list changes.</Hint></>}>
             <ul className="timeline">
-              {res.holdings.slice(0, 12).map((h) => (
-                <li key={h.date}>
-                  <span className="tl-date">{h.date}</span>
-                  <span className="tl-body">{h.risk_off ? <em className="muted">Cash (bear-market filter)</em> : h.symbols.join(" · ")}</span>
-                </li>))}
+              {res.holdings.slice(0, 12).map((h, i) => {
+                const prev = res.holdings[i + 1];
+                const bought = prev ? h.symbols.filter((x) => !prev.symbols.includes(x)) : h.symbols;
+                const sold = prev ? prev.symbols.filter((x) => !h.symbols.includes(x)) : [];
+                return (
+                  <li key={h.date}>
+                    <span className="tl-date">{h.date}</span>
+                    <span className="tl-body">
+                      {h.risk_off ? <em className="muted">Cash (bear-market filter)</em>
+                        : !bought.length && !sold.length ? <span className="muted">No change · {h.symbols.length} kept</span>
+                        : <>
+                            {bought.map((x) => <span key={`b${x}`} className="pill up">+ {x}</span>)}
+                            {sold.map((x) => <span key={`s${x}`} className="pill down">− {x}</span>)}
+                            <span className="muted small"> {h.symbols.length - bought.length} kept</span>
+                          </>}
+                    </span>
+                  </li>);
+              })}
             </ul>
           </Card>
         </div>

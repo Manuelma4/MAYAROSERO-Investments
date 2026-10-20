@@ -1,3 +1,9 @@
+import os
+
+# One OpenMP thread per test process: the ML models otherwise oversubscribe the CPU and slow to a crawl
+# when several processes share a small machine. Must be set before numpy / scikit-learn load.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import numpy as np
 import pandas as pd
 import pytest

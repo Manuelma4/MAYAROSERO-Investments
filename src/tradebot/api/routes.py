@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -15,7 +16,7 @@ from ..strategies import REGISTRY, get_strategy
 from . import serialize as ser
 from .market import DataUnavailable
 from .schemas import (BacktestRequest, DataQuery, PaperOrder, PicksRequest, PortfolioRequest, PredictionsRequest,
-                      PredictRequest)
+                      PredictRequest, WatchlistBody, AlertBody)
 
 router = APIRouter(prefix="/api")
 
@@ -71,7 +72,7 @@ def picks(request: Request, body: PicksRequest):
     from .services import ServiceError, compute_picks
 
     try:
-        return compute_picks(_state(request).market, body)
+        return _trim_ranking(compute_picks(_state(request).market, body))
     except ServiceError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
 
@@ -86,7 +87,12 @@ def picks_latest(request: Request, preset: str = "quality_momentum"):
     data = _state(request).precompute.get(f"picks:{preset}")
     if data is None:
         raise HTTPException(503, "Picks are being computed. They will be ready in about a minute.")
-    return data
+    return _trim_ranking(data)
+
+
+def _trim_ranking(data: dict, n: int = 60) -> dict:
+    """The full ranking stays server-side (stock pages use it); the picks page shows the top 60."""
+    return {**data, "ranking": data.get("ranking", [])[:n]}
 
 
 @router.get("/today")
@@ -303,6 +309,83 @@ def forecast(request: Request, symbol: str = Query(..., max_length=20), horizon:
                       "ranking": ranked})
 
 
+_FUND_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _fundamentals_cached(symbol: str) -> dict:
+    import time as _t
+
+    from ..ai.analyst import fundamentals
+
+    hit = _FUND_CACHE.get(symbol)
+    if hit and _t.time() - hit[0] < (6 * 3600 if hit[1] else 300):   # retry failed lookups after 5 min
+        return hit[1]
+    data = fundamentals(symbol) if "/" not in symbol and not symbol.startswith("^") else {}
+    if len(_FUND_CACHE) >= 600:   # bounded: drop the oldest entries
+        for k, _ in sorted(_FUND_CACHE.items(), key=lambda kv: kv[1][0])[:100]:
+            _FUND_CACHE.pop(k, None)
+    _FUND_CACHE[symbol] = (_t.time(), data)
+    return data
+
+
+def pick_verdict(symbol: str, core: dict | None) -> dict:
+    """Plain-English answer to 'is this stock one of the engine's picks, and why (not)?'"""
+    if not core:
+        return {"status": "unknown", "text": "The engine's ranking is being computed."}
+    ranking = core.get("ranking", [])
+    pos = next((i for i, r in enumerate(ranking) if r["symbol"] == symbol), None)
+    picks = {p["symbol"] for p in core.get("picks", [])}
+    if pos is None:
+        return {"status": "not_covered", "text": "Not covered by the monthly engine, which ranks the S&P 500 leaders list."}
+    r = ranking[pos]
+    if core.get("risk_off"):
+        return {"status": "risk_off", "rank": pos + 1,
+                "text": "The engine is in cash this month: the S&P 500 is below its 200-day average (bear-market filter), "
+                        "so it holds no stocks until the trend turns up."}
+    rank = f"#{pos + 1} of {core.get('universe_size', len(ranking))}"
+    if symbol in picks:
+        return {"status": "pick", "rank": pos + 1, "text": f"In this month's picks, ranked {rank}. {r.get('reason', '')}"}
+    if not r["eligible"]:
+        return {"status": "excluded", "rank": pos + 1,
+                "text": f"Not a pick: it is below its 200-day average (a downtrend), and the engine only buys uptrends. Ranked {rank}."}
+    return {"status": "ranked", "rank": pos + 1,
+            "text": f"Ranked {rank}: good, but only the top {len(picks) or 10} are held. {r.get('reason', '')}"}
+
+
+@router.get("/stock")
+def stock(request: Request, symbol: str = Query(..., max_length=20)):
+    """Everything about one stock in one call (instant parts; the chart and forecast load separately)."""
+    from ..universe import CRYPTO, STOCKS, by_symbol
+
+    symbol = _known_symbol(symbol)
+    st = _state(request)
+    info = by_symbol().get(symbol)
+    crypto_name = dict(CRYPTO).get(symbol)
+    q = st.market.quote(symbol)
+    if q.get("price") is None and info is None and crypto_name is None:
+        raise HTTPException(404, f"Unknown symbol {symbol}.")
+    core = st.precompute.get("picks:quality_momentum")
+    pred = st.precompute.get("predictions:5") or {}
+    ranked = next((i for i in pred.get("items", []) if i["symbol"] == symbol), None)
+    opps = (st.precompute.get("opportunities") or {}).get("items", [])
+    idea = next((o for o in opps if o["symbol"] == symbol), None)
+    similar = []
+    if info:
+        same = [s for s in STOCKS if s.symbol != symbol and (s.industry == info.industry or s.sector == info.sector)]
+        same.sort(key=lambda s: (s.industry != info.industry, s.symbol))
+        similar = [{"symbol": s.symbol, "name": s.name, "industry": s.industry} for s in same[:6]]
+    fund = _fundamentals_cached(symbol)
+    return ser.clean({
+        "symbol": symbol,
+        "name": (info.name if info else crypto_name) or fund.get("longName") or symbol,
+        "sector": info.sector if info else ("Crypto" if crypto_name else fund.get("sector")),
+        "industry": info.industry if info else fund.get("industry"),
+        "region": info.region if info else None, "themes": list(info.themes) if info else [],
+        "quote": q, "fundamentals": fund, "verdict": pick_verdict(symbol, core),
+        "ranking": ranked, "idea": idea, "similar": similar,
+    })
+
+
 @router.get("/ai/status")
 def ai_status(request: Request):
     a = _state(request).analyst
@@ -443,6 +526,90 @@ def paper(request: Request):
     st = _state(request)
     s = _paper_summary(st)
     return ser.clean({"enabled": True, **s, "history": list(reversed(st.paper.history[-200:]))})
+
+
+_SYMBOL = re.compile(r"^[A-Z0-9^][A-Z0-9.\-=^]{0,14}(/[A-Z]{2,6})?$")
+
+
+def _known_symbol(symbol: str) -> str:
+    """Stocks, ETFs, indices (^GSPC) and crypto pairs (BTC/USDT) in Yahoo / exchange format."""
+    sym = symbol.strip().upper()
+    if not _SYMBOL.match(sym):
+        raise HTTPException(422, f"Not a valid symbol: {symbol!r}")
+    return sym
+
+
+@router.get("/watchlists")
+def watchlists(request: Request):
+    return _state(request).store.watchlists()
+
+
+@router.post("/watchlists")
+def create_watchlist(request: Request, body: WatchlistBody):
+    return _state(request).store.save_watchlist(body.name, [_known_symbol(s) for s in body.symbols])
+
+
+@router.put("/watchlists/{id_}")
+def update_watchlist(request: Request, id_: int, body: WatchlistBody):
+    w = _state(request).store.save_watchlist(body.name, [_known_symbol(s) for s in body.symbols], id_)
+    if w is None:
+        raise HTTPException(404, "No such watchlist")
+    return w
+
+
+@router.delete("/watchlists/{id_}")
+def delete_watchlist(request: Request, id_: int):
+    if not _state(request).store.delete_watchlist(id_):
+        raise HTTPException(404, "No such watchlist")
+    return {"ok": True}
+
+
+@router.get("/alerts")
+def price_alerts(request: Request):
+    from ..live.alerts import KINDS
+
+    return {"kinds": KINDS, "alerts": _state(request).store.alerts()}
+
+
+def _already_met(st, alert: dict) -> None:
+    """Price levels must be crossed: refuse a level the price is already past (it would fire instantly)."""
+    from ..live.alerts import due
+
+    if alert["kind"] == "move":
+        return
+    q = st.market.quote(alert["symbol"])
+    if q.get("price") is None:
+        raise HTTPException(404, f"No price for {alert['symbol']}. Check the symbol (AAPL, ^GSPC, BTC/USDT).")
+    if due({**alert, "active": True}, q):
+        word = "above" if alert["kind"] == "above" else "below"
+        raise HTTPException(422, f"{alert['symbol']} is already {word} {alert['value']:g} (now {q['price']:.2f}), "
+                                 f"so the alert would fire right away. Choose a level it has not reached yet.")
+
+
+@router.post("/alerts")
+def create_alert(request: Request, body: AlertBody):
+    st = _state(request)
+    a = {"symbol": _known_symbol(body.symbol), "kind": body.kind, "value": body.value}
+    _already_met(st, a)
+    return st.store.add_alert(a["symbol"], body.kind, body.value, body.note)
+
+
+@router.post("/alerts/{id_}/rearm")
+def rearm_alert(request: Request, id_: int):
+    st = _state(request)
+    a = next((x for x in st.store.alerts() if x["id"] == id_), None)
+    if a is None:
+        raise HTTPException(404, "No such alert")
+    _already_met(st, a)
+    st.store.set_alert_active(id_, True)
+    return {"ok": True}
+
+
+@router.delete("/alerts/{id_}")
+def delete_alert(request: Request, id_: int):
+    if not _state(request).store.delete_alert(id_):
+        raise HTTPException(404, "No such alert")
+    return {"ok": True}
 
 
 ws_router = APIRouter()

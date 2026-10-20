@@ -5,6 +5,8 @@ import react from "@vitejs/plugin-react";
 // FastAPI server on :8000 (`tradebot serve`). In production FastAPI serves dist/.
 export default defineConfig({
   plugins: [react()],
+  // The static preview is published as a single inlined page, so it must stay one bundle.
+  build: process.env.VITE_STATIC ? { rolldownOptions: { output: { inlineDynamicImports: true } } } : {},
   server: {
     proxy: {
       "/api": "http://127.0.0.1:8000",

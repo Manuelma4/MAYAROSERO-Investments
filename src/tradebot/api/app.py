@@ -11,6 +11,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -42,6 +43,12 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
         app.state.engine.stop()
 
     app = FastAPI(title="tradebot", version="0.2.0", lifespan=lifespan)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_request: Request, exc: RequestValidationError):
+        # Echoing the rejected input back can itself fail (e.g. inf / NaN are not valid JSON).
+        return JSONResponse(status_code=422, content={"detail": [
+            {"loc": list(e.get("loc", ())), "msg": e.get("msg", "invalid"), "type": e.get("type")} for e in exc.errors()]})
     app.state.settings = settings
     app.state.market = MarketData(provider_factory, ttl=settings.cache_seconds)
     app.state.store = EventStore(settings.db_path)
@@ -66,13 +73,39 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
         except Exception as exc:
             log.warning("notify failed: %s", exc)
 
+    def on_alert(a: dict, q: dict) -> None:
+        from ..live.alerts import message
+
+        ev = app.state.store.add("alert", a["symbol"], {"kind": a["kind"], "value": a["value"], "note": a["note"],
+                                                         "alert_id": a["id"], "price": q.get("price"),
+                                                         "change_pct": q.get("change_pct")})
+        app.state.broadcaster.publish(ev)
+        try:
+            for n in app.state.engine._ensure_scanner().notifiers:
+                n.send(message(a, q))
+        except Exception as exc:
+            log.warning("notify failed: %s", exc)
+
+    def on_picks_change(ev: dict) -> None:
+        app.state.broadcaster.publish(ev)
+        text = (f"[PICKS UPDATE] Beat-the-S&P review of {str(ev['date'])[:10]}\n"
+                f"  BUY:  {', '.join(ev['buy']) or 'nothing new'}\n"
+                f"  SELL: {', '.join(ev['sell']) or 'nothing'}\n"
+                f"  KEEP: {', '.join(ev['keep']) or '-'}")
+        try:
+            for n in app.state.engine._ensure_scanner().notifiers:
+                n.send(text)
+        except Exception as exc:
+            log.warning("notify failed: %s", exc)
+
     from ..ai.analyst import AIAnalyst
     from ..live.news import NewsSource
 
     app.state.analyst = AIAnalyst(app.state.market, NewsSource(), client=analyst_client)
     app.state.precompute = Precomputer(app.state.market, interval=settings.precompute_seconds,
                                        on_opportunity=on_opportunity, paper=app.state.paper,
-                                       paper_lock=app.state.paper_lock)
+                                       paper_lock=app.state.paper_lock, store=app.state.store,
+                                       on_alert=on_alert, on_picks_change=on_picks_change)
     app.state.broadcaster = Broadcaster()
     kw = {"scanner_factory": scanner_factory} if scanner_factory else {}
     app.state.engine = LiveEngine(config, app.state.store, app.state.broadcaster, **kw)

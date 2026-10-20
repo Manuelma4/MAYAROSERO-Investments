@@ -13,6 +13,7 @@ import threading
 import time
 from datetime import datetime, timezone
 
+from ..live import alerts
 from ..picker import PRESETS
 from ..universe import by_symbol, sp500_symbols
 from . import serialize as ser
@@ -25,13 +26,18 @@ log = logging.getLogger(__name__)
 
 class Precomputer:
     def __init__(self, market: MarketData, interval: int = 1800, opportunities_interval: int = 300,
-                 on_opportunity=None, paper=None, paper_lock=None):
+                 on_opportunity=None, paper=None, paper_lock=None, store=None, on_alert=None,
+                 on_picks_change=None, alert_preset: str = "quality_momentum"):
         self.market = market
         self.interval = interval
         self.opportunities_interval = opportunities_interval
         self.on_opportunity = on_opportunity   # callback(dict) for each NEW qualified opportunity
         self.paper = paper                     # PaperBroker for automatic exits of "Invest" positions
         self.paper_lock = paper_lock or threading.Lock()
+        self.store = store                     # EventStore holding the user's price alerts
+        self.on_alert = on_alert               # callback(alert, quote) for each alert that fires
+        self.on_picks_change = on_picks_change # callback(event) when the main picks list changes
+        self.alert_preset = alert_preset
         self._seen: set[tuple] = set()
         self._scanner = None
         self._data: dict[str, dict] = {}
@@ -57,6 +63,10 @@ class Precomputer:
                 self.put(f"picks:{preset}", compute_picks(self.market, PicksRequest(preset=preset), ew_cache))
             except Exception as exc:  # keep the previous result if a refresh fails
                 errors.append(f"picks {preset}: {exc}")
+        try:
+            self.record_picks_change()
+        except Exception as exc:
+            errors.append(f"picks alert: {exc}")
         try:
             self.put("today", self.build_today())
         except Exception as exc:
@@ -161,6 +171,44 @@ class Precomputer:
                     closed.append(rec)
         return closed
 
+    def record_picks_change(self) -> dict | None:
+        """Once per completed review: store and announce what to buy / sell (deduplicated in the DB,
+        so a restart never repeats the alert)."""
+        picks = self.get(f"picks:{self.alert_preset}")
+        ch = (picks or {}).get("changes") or {}
+        if self.store is None or not ch.get("date") or not (ch.get("buy") or ch.get("sell")):
+            return None
+        seen = self.store.list("picks", limit=50)
+        if any(e.get("date") == ch["date"] and e.get("preset") == self.alert_preset for e in seen):
+            return None
+        ev = self.store.add("picks", "PICKS", {"preset": self.alert_preset, "date": ch["date"],
+                                               "buy": ch.get("buy", []), "sell": ch.get("sell", []),
+                                               "keep": ch.get("keep", [])})
+        age = datetime.now(timezone.utc).date() - datetime.fromisoformat(str(ch["date"])[:10]).date()
+        if age.days <= 35 and self.on_picks_change:   # an old review (first start) is recorded, not announced
+            self.on_picks_change(ev)
+        return ev
+
+    def check_alerts(self) -> list[dict]:
+        """Fire every active price alert whose condition is met (each fires once, then deactivates)."""
+        if self.store is None:
+            return []
+        active = self.store.alerts(active_only=True)
+        if not active:
+            return []
+        quotes = {q["symbol"]: q for q in self.market.quotes(sorted({a["symbol"] for a in active}), spark_bars=1)}
+        fired = []
+        for a in active:
+            q = quotes.get(a["symbol"]) or {}
+            if alerts.due(a, q) and self.store.set_alert_active(a["id"], False, q["price"], q.get("time")):
+                fired.append(a)
+                try:
+                    if self.on_alert:
+                        self.on_alert(a, q)
+                except Exception as exc:   # one failed delivery must not stop the other alerts
+                    log.warning("alert %s delivery failed: %s", a["id"], exc)
+        return fired
+
     def _loop(self) -> None:
         while not self._stop.is_set():
             started = time.time()
@@ -178,6 +226,10 @@ class Precomputer:
                 self.manage_paper_exits()   # stops must fire even if the scan failed
             except Exception as exc:
                 log.warning("paper exits failed: %s", exc)
+            try:
+                self.check_alerts()
+            except Exception as exc:
+                log.warning("price alerts failed: %s", exc)
             self._stop.wait(max(60.0, self.opportunities_interval - (time.time() - started)))
 
     def start(self) -> None:

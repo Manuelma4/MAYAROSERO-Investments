@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { fmtNum, fmtPct, fmtPrice, fmtTime, tone } from "../lib/format";
 import type { LiveEvent, PaperState } from "../lib/types";
 import { useLive } from "../lib/live";
 import { Badge, Card, Empty, ErrorBox, Spinner, Stat } from "../components/ui";
+import { MyAlerts, Watchlists } from "../components/MyAlerts";
+import { alertText } from "../lib/browserNotify";
 
 function MoveRow({ e }: { e: LiveEvent }) {
   const up = e.direction === "SURGE";
@@ -59,6 +61,16 @@ export default function Live() {
   };
 
   const moves = events.filter((e) => e.type === "move");
+  // Own alerts are fetched by type so busy days of market moves never push them out of the feed.
+  const [own, setOwn] = useState<LiveEvent[]>([]);
+  useEffect(() => {
+    Promise.all([api.events("alert", 20), api.events("picks", 10)])
+      .then(([a, p]) => setOwn([...a, ...p])).catch(() => undefined);
+  }, []);
+  const fired = useMemo(() => {
+    const byId = new Map([...own, ...events.filter((e) => e.type === "alert" || e.type === "picks")].map((e) => [e.id, e]));
+    return [...byId.values()].sort((a, b) => b.id - a.id);
+  }, [own, events]);
   const signals = events.filter((e) => e.type === "signal");
 
   return (
@@ -66,7 +78,7 @@ export default function Live() {
       <div className="page-head">
         <div>
           <h1>Alerts</h1>
-          <p className="muted">Real-time notifications: sudden surges and crashes, and your setups triggering. Also delivered to your browser, email and WhatsApp.</p>
+          <p className="muted">Your price alerts and watchlists, plus real-time notifications: sudden surges and crashes, and setups triggering. Also delivered to your browser, email and WhatsApp.</p>
         </div>
         <div className="row gap">
           <span className={`live-pill ${connected ? "on" : ""}`}><span className="dot" />{connected ? "Connected" : "Reconnecting"}</span>
@@ -79,6 +91,28 @@ export default function Live() {
         </div>
       </div>
       <ErrorBox error={error ?? status?.last_error ?? null} />
+
+      {fired.length > 0 && (
+        <Card title={<>Your alerts <Badge>{fired.length}</Badge></>}>
+          <ul className="feed">{fired.slice(0, 20).map((e) => (
+            <li key={e.id} className="feed-row">
+              <span className="feed-icon" aria-hidden>{e.type === "picks" ? "★" : "🔔"}</span>
+              {e.type === "picks" ? <>
+                <div className="feed-main"><strong>Beat-the-S&amp;P picks updated</strong><span className="muted small">Buy {e.buy?.join(", ") || "nothing new"} · Sell {e.sell?.join(", ") || "nothing"}</span></div>
+                <div className="feed-num"><span className="muted small">{fmtTime(e.created_at)}</span></div>
+              </> : <>
+                <div className="feed-main"><strong>{e.symbol}</strong><span className="muted small">{alertText(e)}{e.note ? ` · ${e.note}` : ""}</span></div>
+                <div className="feed-num"><span>{fmtPrice(e.price)}</span><span className="muted small">{fmtTime(e.created_at)}</span></div>
+              </>}
+            </li>))}
+          </ul>
+        </Card>
+      )}
+
+      <div className="grid-2">
+        <MyAlerts />
+        <Watchlists />
+      </div>
 
       <div className="stats">
         <Stat label="Engine" value={status?.running ? "Running" : "Stopped"} tone={status?.running ? "up" : ""} />

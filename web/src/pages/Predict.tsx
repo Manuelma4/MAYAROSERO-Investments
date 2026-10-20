@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtPct, fmtPrice } from "../lib/format";
+import { fmtPct, fmtPrice, stockPath } from "../lib/format";
 import { STATIC } from "../lib/snapshot";
 import type { PredictionsResult, RankedItem } from "../lib/types";
 import { ForecastPanel } from "../components/Forecast";
@@ -23,7 +23,7 @@ function Row({ it, side, horizon }: { it: RankedItem; side: "up" | "down"; horiz
       {open && (
         <div className="pred-detail">
           <ForecastPanel symbol={it.symbol} horizon={horizon} />
-          <Link className="link" to={`/charts?symbol=${encodeURIComponent(it.symbol)}`}>Open chart</Link>
+          <Link className="link" to={stockPath(it.symbol)}>Open stock page</Link>
         </div>
       )}
     </li>

@@ -65,14 +65,14 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
          with probability, expected range, confidence badge and a one-line reason (momentum, volume,
          news). Tap a row: fan chart + volume profile + what drives the prediction. Model quality shown as
          one plain sentence ("right 56% of the time on unseen data, better than chance"), details collapsed.
-1. [ ] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
+1. [x] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
        dividend yield, 52-week range, sector), engine score and factor breakdown, "why / why not
        a pick", similar stocks. Link every symbol in the app to it.
 2. [ ] **Full S&P 500 universe**: load all ~500 constituents (bundled list with sector, refreshable),
        picker and Discover use it; keep curated themes.
-3. [ ] **Watchlists and custom price alerts**: create / edit lists, price-above / below and
+3. [x] **Watchlists and custom price alerts**: create / edit lists, price-above / below and
        % move alerts stored in SQLite, checked by the live engine, delivered via notifiers + bell.
-4. [ ] **Monthly picks alert**: when the picker's holdings change (buy / sell list), notify;
+4. [x] **Monthly picks alert**: when the picker's holdings change (buy / sell list), notify;
        "Picks history" view.
 5. [ ] **S&P 500 real-time movers**: scan all constituents intraday in batches; surge / crash feed
        on Overview and Alerts.

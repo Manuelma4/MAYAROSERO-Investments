@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 Provider = Literal["yahoo", "ccxt"]
 
@@ -69,3 +69,26 @@ class PredictionsRequest(BaseModel):
     horizon: Literal[1, 5, 21] = 5
     universe: Literal["us", "sp500", "custom"] = "us"
     symbols: list[str] | None = Field(None, max_length=300)
+
+
+class WatchlistBody(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    symbols: list[str] = Field(default_factory=list, max_length=200)
+
+
+class AlertBody(BaseModel):
+    symbol: str = Field(min_length=1, max_length=20)
+    kind: Literal["above", "below", "move"]
+    value: float = Field(gt=0, lt=1e9, allow_inf_nan=False)
+    note: str = Field("", max_length=200)
+
+    @field_validator("note")
+    @classmethod
+    def _one_line(cls, v: str) -> str:   # goes verbatim into email / WhatsApp
+        return " ".join("".join(c if c.isprintable() else " " for c in v).split())
+
+    @model_validator(mode="after")
+    def _sane_move(self):
+        if self.kind == "move" and self.value > 100:
+            raise ValueError("A daily move alert must be between 0 and 100%")
+        return self

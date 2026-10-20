@@ -115,7 +115,7 @@ def compute_picks(market: MarketData, body: PicksRequest, ew_cache: dict | None 
         "as_of": res.equity.index[-1].isoformat(),
         "risk_off": risk_off,
         "picks": [] if risk_off else current,
-        "ranking": ranking[:60],
+        "ranking": ranking,
         "changes": changes,
         "stats": res.stats,
         "equity": ser.line(res.equity),

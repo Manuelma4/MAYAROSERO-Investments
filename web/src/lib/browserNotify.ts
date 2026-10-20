@@ -23,6 +23,14 @@ export function notifyEvent(e: LiveEvent) {
     } catch { /* ignore */ }
     return;
   }
+  if (e.type === "picks") {
+    try { new Notification("Beat the S&P: picks updated", { body: `Buy ${e.buy?.join(", ") || "nothing new"} · Sell ${e.sell?.join(", ") || "nothing"}`, tag: `mri-${e.id}` }); } catch { /* ignore */ }
+    return;
+  }
+  if (e.type === "alert") {
+    try { new Notification(`Price alert: ${e.symbol} ${e.price?.toFixed(2) ?? ""}`, { body: e.note || alertText(e), tag: `mri-${e.id}` }); } catch { /* ignore */ }
+    return;
+  }
   const title = e.type === "move"
     ? `${e.direction === "SURGE" ? "▲" : "▼"} ${e.symbol} ${e.move_pct && e.move_pct > 0 ? "+" : ""}${e.move_pct?.toFixed(2)}%`
     : `${e.side === "long" ? "LONG" : "SHORT"} setup: ${e.symbol}`;
@@ -30,4 +38,9 @@ export function notifyEvent(e: LiveEvent) {
     ? `${e.direction === "SURGE" ? "Sudden surge" : "Sudden drop"} on ${e.volume_ratio ? `${e.volume_ratio.toFixed(1)}x volume` : "high volume"}`
     : `${e.strategy} · price ${e.price} · stop ${e.stop}`;
   try { new Notification(title, { body, tag: `mri-${e.id}` }); } catch { /* ignore */ }
+}
+
+export function alertText(e: { kind?: string; value?: number; change_pct?: number }): string {
+  if (e.kind === "move") return `Moved ${(e.change_pct ?? 0) > 0 ? "+" : ""}${e.change_pct?.toFixed(1)}% today (your alert: ${e.value}%)`;
+  return `Price went ${e.kind === "above" ? "above" : "below"} ${e.value}`;
 }

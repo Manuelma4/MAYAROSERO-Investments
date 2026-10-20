@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { AIAnalysis, BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, ForecastResult, PicksResult, PortfolioPlan, PredictionsResult, PredictResult, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
+import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, ForecastResult, PicksResult, PortfolioPlan, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -52,6 +52,7 @@ export const api = {
   predictions: (horizon: number) => request<PredictionsResult>(`/api/predictions?${qs({ horizon })}`),
   predictionsCustom: (body: object) => request<PredictionsResult>("/api/predictions/custom", { method: "POST", body: JSON.stringify(body) }),
   forecast: (symbol: string, horizon: number) => request<ForecastResult>(`/api/forecast?${qs({ symbol, horizon })}`),
+  stock: (symbol: string) => request<StockInfo>(`/api/stock?${qs({ symbol })}`),
   today: () => request<TodayBoard>("/api/today"),
   picksLatest: (preset: string) => request<PicksResult>(`/api/picks/latest?${qs({ preset })}`),
   picks: (body: object) => request<PicksResult>("/api/picks", { method: "POST", body: JSON.stringify(body) }),
@@ -67,6 +68,14 @@ export const api = {
   liveScan: () => request<{ events: LiveEvent[]; status: LiveStatus }>("/api/live/scan", { method: "POST" }),
   events: (type?: string, limit = 200) => request<LiveEvent[]>(`/api/events?${qs({ type, limit })}`),
   paper: () => request<PaperState>("/api/paper"),
+  watchlists: () => request<Watchlist[]>("/api/watchlists"),
+  saveWatchlist: (w: { id?: number; name: string; symbols: string[] }) =>
+    request<Watchlist>(w.id ? `/api/watchlists/${w.id}` : "/api/watchlists", { method: w.id ? "PUT" : "POST", body: JSON.stringify({ name: w.name, symbols: w.symbols }) }),
+  deleteWatchlist: (id: number) => request<{ ok: boolean }>(`/api/watchlists/${id}`, { method: "DELETE" }),
+  alerts: () => request<AlertsResult>("/api/alerts"),
+  addAlert: (a: { symbol: string; kind: string; value: number; note?: string }) => request<PriceAlert>("/api/alerts", { method: "POST", body: JSON.stringify(a) }),
+  rearmAlert: (id: number) => request<{ ok: boolean }>(`/api/alerts/${id}/rearm`, { method: "POST" }),
+  deleteAlert: (id: number) => request<{ ok: boolean }>(`/api/alerts/${id}`, { method: "DELETE" }),
 };
 
 export function eventsSocketUrl(): string {

@@ -64,7 +64,11 @@ export interface LiveStatus {
 }
 
 export interface LiveEvent {
-  id: number; created_at: string; type: "signal" | "move" | "opportunity"; symbol: string; time: string;
+  id: number; created_at: string; type: "signal" | "move" | "opportunity" | "alert" | "picks"; symbol: string; time: string;
+  // alert (one of the user's own price alerts fired)
+  kind?: AlertKind; value?: number; note?: string;
+  // picks (the Beat-the-S&P list changed at a review)
+  date?: string; buy?: string[]; sell?: string[]; keep?: string[];
   // opportunity
   name?: string; change_pct?: number; headline?: string | null; entry?: number; rel_volume?: number;
   // signal
@@ -151,3 +155,18 @@ export interface ForecastResult {
   volume_profile: { bins: { price: number; volume: number; share: number }[]; poc: number | null; value_area: [number | null, number | null] };
   ranking: (RankedItem & { horizon: number }) | null;
 }
+
+export interface StockInfo {
+  symbol: string; name: string; sector: string | null; industry: string | null; region: string | null; themes: string[];
+  quote: Quote; fundamentals: Record<string, number | string>;
+  verdict: { status: "pick" | "ranked" | "excluded" | "not_covered" | "unknown"; rank?: number; text: string };
+  ranking: RankedItem | null; idea: Opportunity | null; similar: { symbol: string; name: string; industry: string }[];
+}
+
+export interface Watchlist { id: number; name: string; symbols: string[] }
+export type AlertKind = "above" | "below" | "move";
+export interface PriceAlert {
+  id: number; created_at: string; symbol: string; kind: AlertKind; value: number; note: string;
+  active: boolean; triggered_at: string | null; triggered_price: number | null;
+}
+export interface AlertsResult { kinds: Record<AlertKind, string>; alerts: PriceAlert[] }

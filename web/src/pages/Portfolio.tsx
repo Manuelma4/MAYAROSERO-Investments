@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtNum, fmtPct } from "../lib/format";
+import { fmtNum, fmtPct, stockPath } from "../lib/format";
 import type { PortfolioPlan } from "../lib/types";
 import { Hint } from "../components/Hint";
 import { Badge, Card, ErrorBox, Spinner } from "../components/ui";
@@ -88,7 +88,7 @@ export default function Portfolio() {
                 <li key={l.symbol}>
                   <div className="pc-top">
                     <Badge tone={l.role === "satellite" ? "up" : ""}>{ROLE[l.role]}</Badge>
-                    <Link to={`/charts?symbol=${encodeURIComponent(l.symbol)}`} className="pc-name"><strong>{l.name}</strong><span className="muted small">{l.symbol}{l.sector ? ` · ${l.sector}` : ""}</span></Link>
+                    <Link to={stockPath(l.symbol)} className="pc-name"><strong>{l.name}</strong><span className="muted small">{l.symbol}{l.sector ? ` · ${l.sector}` : ""}</span></Link>
                     <span className="pc-num"><span className="num">{money(l.invested)}</span><span className="muted small">{fmtNum(l.shares, 4)} sh × ${fmtNum(l.price, 2)}</span></span>
                   </div>
                   <p className="muted small">{fmtNum(l.invested / plan.amount * 100, 1)}% of the portfolio{l.stop ? ` · stop-loss $${fmtNum(l.stop, 2)}` : ""}{l.note ? ` · ${l.note}` : ""}</p>

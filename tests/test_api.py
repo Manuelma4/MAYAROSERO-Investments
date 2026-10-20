@@ -328,3 +328,29 @@ def test_predictions_and_forecast(client):
     assert len(f["monte_carlo"]["fan"]["p50"]) == 6 == len(f["monte_carlo"]["fan_times"])
     assert f["volume_profile"]["poc"] is not None
     assert f["ranking"] is not None and f["ranking"]["symbol"] == "AAPL"
+
+
+def test_stock_page_endpoint(client, monkeypatch):
+    import tradebot.api.routes as routes
+
+    monkeypatch.setattr(routes, "_fundamentals_cached", lambda s: {"trailingPE": 30.5})  # offline
+    client.app.state.precompute.run_once(predictions=False)
+    d = client.get("/api/stock", params={"symbol": "AAPL"}).json()
+    assert d["name"] == "Apple" and d["sector"] == "Information Technology"
+    assert d["verdict"]["status"] in {"pick", "ranked", "excluded"} and d["verdict"]["text"]
+    assert d["similar"] and all(s["symbol"] != "AAPL" for s in d["similar"])
+    assert d["fundamentals"]["trailingPE"] == 30.5 and d["quote"]["price"] > 0
+    assert client.get("/api/stock", params={"symbol": "MISSING"}).status_code == 404
+
+
+def test_pick_verdict_texts():
+    from tradebot.api.routes import pick_verdict
+
+    core = {"universe_size": 3, "picks": [{"symbol": "A"}],
+            "ranking": [{"symbol": "A", "eligible": True, "reason": "Strong."},
+                        {"symbol": "B", "eligible": True, "reason": "Good."},
+                        {"symbol": "C", "eligible": False, "reason": ""}]}
+    assert pick_verdict("A", core)["status"] == "pick"
+    assert "only the top" in pick_verdict("B", core)["text"]
+    assert "200-day" in pick_verdict("C", core)["text"]
+    assert pick_verdict("Z", core)["status"] == "not_covered"

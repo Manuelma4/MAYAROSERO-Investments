@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtPct, fmtPrice, fmtTime } from "../lib/format";
+import { fmtPct, fmtPrice, fmtTime, stockPath } from "../lib/format";
 import { useLive } from "../lib/live";
 import { MARKETS, STOCKS, marketName } from "../lib/markets";
 import { useQuotes } from "../lib/quotes";
@@ -58,7 +58,7 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
             <ol className="hold-list">
               {core.picks.slice(0, 5).map((p) => (
                 <li key={p.symbol}>
-                  <Link to={`/charts?symbol=${encodeURIComponent(p.symbol)}`} className="hold-sym">{p.symbol}</Link>
+                  <Link to={stockPath(p.symbol)} className="hold-sym">{p.symbol}</Link>
                   <div className="hold-body"><strong>{p.name}</strong><span className="muted small">{p.reason}</span></div>
                 </li>))}
               {core.picks.length > 5 && <li className="muted small hold-more"><Link to="/picks" className="link">+ {core.picks.length - 5} more picks</Link></li>}
@@ -89,11 +89,11 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
       <div className="grid-2">
         <Card title={<>Rising most today<Hint>The S&amp;P 500 leaders up the most today. A big jump is information, not a buy signal on its own: moves backed by news tend to continue, moves without news often fade.</Hint></>}>
           <ul className="movers">{t.gainers.map((q) => (
-            <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol} <span className="muted small">{q.name ?? marketName(q.symbol)}</span></Link><span className="up">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
+            <li key={q.symbol}><Link to={stockPath(q.symbol)}>{q.symbol} <span className="muted small">{q.name ?? marketName(q.symbol)}</span></Link><span className="up">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
         </Card>
         <Card title={<>Falling most today<Hint>The S&amp;P 500 leaders down the most today. If one of your picks is here, check its stop-loss rather than reacting to one day.</Hint></>}>
           <ul className="movers">{t.losers.map((q) => (
-            <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol} <span className="muted small">{q.name ?? marketName(q.symbol)}</span></Link><span className="down">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
+            <li key={q.symbol}><Link to={stockPath(q.symbol)}>{q.symbol} <span className="muted small">{q.name ?? marketName(q.symbol)}</span></Link><span className="down">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
         </Card>
       </div>
     </>
@@ -166,7 +166,7 @@ export default function Overview() {
                   const q = quotes[s];
                   return (
                     <tr key={s}>
-                      <td><Link to={`/charts?symbol=${encodeURIComponent(s)}`} className="asset"><span className="avatar">{s.replace("^", "").slice(0, 2)}</span><span><strong>{s}</strong><span className="muted small">{marketName(s)}</span></span></Link></td>
+                      <td><Link to={stockPath(s)} className="asset"><span className="avatar">{s.replace("^", "").slice(0, 2)}</span><span><strong>{s}</strong><span className="muted small">{marketName(s)}</span></span></Link></td>
                       <td className="r num">{fmtPrice(q?.price)}</td>
                       <td className={`r num ${(q?.change_pct ?? 0) >= 0 ? "up" : "down"}`}>{fmtPct(q?.change_pct, 2)}</td>
                       <td className="r hide-sm"><Sparkline data={q?.spark} width={100} height={28} /></td>

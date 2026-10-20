@@ -2,19 +2,23 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { BrandLockup } from "./components/Brand";
 import { TickerTape } from "./components/TickerTape";
 import { TopBar } from "./components/TopBar";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { Spinner } from "./components/ui";
 import { LiveProvider, useLive } from "./lib/live";
 import { STATIC, snapshotMeta } from "./lib/snapshot";
-import Backtest from "./pages/Backtest";
-import Discover from "./pages/Discover";
-import Live from "./pages/Live";
-import Markets from "./pages/Markets";
-import Opportunities from "./pages/Opportunities";
 import Overview from "./pages/Overview";
-import Picks from "./pages/Picks";
-import Portfolio from "./pages/Portfolio";
-import Predict from "./pages/Predict";
-import Settings from "./pages/Settings";
+
+// Today loads with the shell; every other page is fetched on first visit (smaller first download).
+const Backtest = lazy(() => import("./pages/Backtest"));
+const Discover = lazy(() => import("./pages/Discover"));
+const Live = lazy(() => import("./pages/Live"));
+const Markets = lazy(() => import("./pages/Markets"));
+const Opportunities = lazy(() => import("./pages/Opportunities"));
+const Picks = lazy(() => import("./pages/Picks"));
+const Portfolio = lazy(() => import("./pages/Portfolio"));
+const Predict = lazy(() => import("./pages/Predict"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Stock = lazy(() => import("./pages/Stock"));
 
 const NAV = [
   { to: "/", label: "Today", mobile: true, icon: "M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" },
@@ -65,6 +69,7 @@ function Shell() {
         <TopBar />
         <TickerTape />
         <main className="content">
+          <Suspense fallback={<div className="page"><Spinner /></div>}>
           <Routes>
             <Route path="/" element={<Overview />} />
             <Route path="/discover" element={<Discover />} />
@@ -73,11 +78,13 @@ function Shell() {
             <Route path="/now" element={<Opportunities />} />
             <Route path="/alerts" element={<Live />} />
             <Route path="/charts" element={<Markets />} />
+            <Route path="/stock/:symbol" element={<Stock />} />
             <Route path="/predict" element={<Predict />} />
             <Route path="/backtest" element={<Backtest />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </main>
       </div>
     </div>
