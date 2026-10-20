@@ -15,7 +15,7 @@ from ..report import analyze_structure
 from ..strategies import REGISTRY, get_strategy
 from . import serialize as ser
 from .market import DataUnavailable
-from .schemas import (BacktestRequest, DataQuery, PaperOrder, PicksRequest, PortfolioRequest, PredictionsRequest,
+from .schemas import (BacktestRequest, Confirm, DataQuery, PaperOrder, PicksRequest, PortfolioRequest, PredictionsRequest,
                       PredictRequest, WatchlistBody, AlertBody)
 from .settings import token_matches
 
@@ -172,12 +172,12 @@ def paper_close_all(request: Request):
 @router.post("/portfolio")
 def portfolio(request: Request, body: PortfolioRequest):
     """Diversified, ready-to-buy plan built from the precomputed picks, live ideas and SPY."""
-    import numpy as np
-    import pandas as pd
+    return _portfolio(_state(request), body)
 
+
+def _portfolio(st, body: PortfolioRequest) -> dict:
     from ..portfolio import RISK_LEVELS, build_plan, plan_risk
 
-    st = _state(request)
     core = st.precompute.get("picks:quality_momentum")
     if core is None:
         raise HTTPException(503, "The picks are being computed. Try again in about a minute.")
@@ -227,6 +227,78 @@ def portfolio(request: Request, body: PortfolioRequest):
         "core_risk_off": core["risk_off"], "as_of": core["as_of"],
         "mix": dict(zip(("core", "satellite", "anchor"), RISK_LEVELS[body.risk])),
     })
+
+
+@router.get("/portfolio/drift")
+def portfolio_drift(request: Request):
+    """Saved target vs what the practice account (or the connected real broker) holds now. Read-only."""
+    try:
+        return _state(request).precompute.portfolio_drift()
+    except Exception as exc:
+        raise HTTPException(502, f"The drift check could not read your holdings: {exc}") from exc
+
+
+@router.post("/portfolio/target")
+def save_portfolio_target(request: Request, body: PortfolioRequest):
+    """Rebuild the plan with these settings on the server and save its lasting part as the target."""
+    from datetime import datetime, timezone
+
+    from ..live.drift import target_from_plan
+
+    st = _state(request)
+    plan = _portfolio(st, body)
+    target = {**target_from_plan(plan, datetime.now(timezone.utc).isoformat()), "fractional": body.fractional}
+    if not target["weights"]:
+        raise HTTPException(400, "This plan has no lasting positions to keep (the picks are in cash right now), so "
+                                 "there is nothing to save as a target.")
+    st.store.set_value(st.precompute.TARGET_KEY, target)
+    return portfolio_drift(request)
+
+
+@router.delete("/portfolio/target")
+def delete_portfolio_target(request: Request):
+    st = _state(request)
+    return {"deleted": st.store.delete_value(st.precompute.TARGET_KEY)}
+
+
+# ---- weekly digest ---------------------------------------------------------
+
+def _digest_info(st) -> dict:
+    from ..live.digest import DAYS, next_slot
+
+    sch = st.precompute.digest_schedule
+    last = st.store.last_notice("digest")
+    try:
+        channels = [type(n).__name__.replace("Notifier", "").lower() for n in st.engine._ensure_scanner().notifiers]
+    except Exception:
+        channels = []
+    return {"schedule": {"day": DAYS[sch.day].title(), "hour": sch.hour, "minute": sch.minute,
+                         "timezone": sch.timezone, "enabled": sch.enabled, "text": sch.describe(),
+                         "next": next_slot(pd.Timestamp.now(tz="UTC"), sch).isoformat() if sch.enabled else None},
+            "last_sent": last["sent_at"] if last else None, "channels": channels}
+
+
+@router.get("/digest/preview")
+def digest_preview(request: Request):
+    """This week's digest text, exactly as it would be sent now (nothing is sent)."""
+    st = _state(request)
+    text = st.precompute.digest_text()
+    return {"text": text, "chars": len(text), **_digest_info(st)}
+
+
+@router.post("/digest/send-test")
+def digest_send_test(request: Request, body: Confirm):
+    """Send this week's digest now through the configured channels (does not count as the weekly one)."""
+    from .orders import _require_confirm
+
+    _require_confirm(request, body)
+    st = _state(request)
+    text = st.precompute.digest_text()
+    try:
+        sent = st.notify(text)
+    except Exception as exc:
+        raise HTTPException(502, f"The digest could not be sent: {exc}") from exc
+    return {"sent": True, "channels": sent, "text": text, "chars": len(text)}
 
 
 @router.get("/predictions")

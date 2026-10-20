@@ -5,6 +5,7 @@ Jobs run at startup and then every `interval` seconds in a daemon thread:
 - the "Today" board: market mood, what to hold, buy/sell/keep changes, today's biggest movers
 - the live track record: one picks snapshot per preset and trading day (once the US close is known),
   and every qualified Invest-now idea (recorded by the opportunity loop)
+- the weekly digest (once per week at the configured slot) and the portfolio drift alert (at most weekly)
 """
 
 from __future__ import annotations
@@ -13,9 +14,11 @@ import logging
 import math
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from ..live import alerts
+from ..live import digest as dg
+from ..live import drift as dr
 from ..picker import PRESETS
 from ..universe import by_symbol, sp500_symbols
 from . import serialize as ser
@@ -29,7 +32,8 @@ log = logging.getLogger(__name__)
 class Precomputer:
     def __init__(self, market: MarketData, interval: int = 1800, opportunities_interval: int = 300,
                  on_opportunity=None, paper=None, paper_lock=None, store=None, on_alert=None,
-                 on_picks_change=None, alert_preset: str = "quality_momentum", broker_exits=None):
+                 on_picks_change=None, alert_preset: str = "quality_momentum", broker_exits=None,
+                 notify=None, holdings=None, digest_schedule: dg.Schedule | None = None):
         self.market = market
         self.interval = interval
         self.opportunities_interval = opportunities_interval
@@ -41,6 +45,9 @@ class Precomputer:
         self.on_picks_change = on_picks_change # callback(event) when the main picks list changes
         self.alert_preset = alert_preset
         self.broker_exits = broker_exits       # callable: time limit / target watch for real-broker positions
+        self.notify = notify                   # callable(text): send through the configured notifiers
+        self.holdings = holdings               # callable() -> what the owner holds (practice account or broker)
+        self.digest_schedule = digest_schedule or dg.Schedule()
         self._seen: set[tuple] = set()
         self._scanner = None
         self._data: dict[str, dict] = {}
@@ -82,6 +89,10 @@ class Precomputer:
             self.put("today", self.build_today())
         except Exception as exc:
             errors.append(f"today: {exc}")
+        try:
+            self.check_drift()
+        except Exception as exc:
+            errors.append(f"portfolio drift: {exc}")
         today = datetime.now(timezone.utc).date().isoformat()
         for h in ((5, 1, 21) if predictions else ()):   # heavy: recomputed once per day
             key = f"predictions:{h}"
@@ -240,6 +251,85 @@ class Precomputer:
             self.on_picks_change(ev)
         return ev
 
+    # ---- portfolio drift and weekly digest ------------------------------------------
+    TARGET_KEY = "portfolio_target"
+
+    def _fx_to(self, target_ccy: str, account_ccy: str) -> float:
+        """Multiply account-currency money by this to get the target currency (USD <-> EUR only)."""
+        a = "USD" if account_ccy in ("USD", "USDT", "USDC") else account_ccy
+        if a == target_ccy:
+            return 1.0
+        rate = self.market.quote("EURUSD=X").get("price")   # USD per 1 EUR
+        if not rate:
+            raise RuntimeError("EUR/USD rate unavailable")
+        if (a, target_ccy) == ("USD", "EUR"):
+            return 1.0 / rate
+        if (a, target_ccy) == ("EUR", "USD"):
+            return rate
+        raise RuntimeError(f"Cannot compare a {account_ccy} account with a {target_ccy} plan")
+
+    def portfolio_drift(self) -> dict:
+        """Current holdings vs the saved target (status no_target when none is saved). Never trades."""
+        target = self.store.get_value(self.TARGET_KEY) if self.store is not None else None
+        if not target:
+            return {"status": "no_target", "target": None,
+                    "message": "No target saved yet. Build a plan and press Save this plan as my target."}
+        if self.holdings is None:
+            raise RuntimeError("holdings unavailable")
+        h = self.holdings()
+        d = dr.compute_drift(target, h["positions"], float(h.get("equity") or 0.0),
+                             self._fx_to(target["currency"], h["currency"]))
+        return ser.clean({**d, "target": target, "source": h["source"], "as_of": datetime.now(timezone.utc).isoformat()})
+
+    def check_drift(self, now: datetime | None = None) -> dict | None:
+        """One alert when the portfolio drifted past the limits, at most once every 7 days (stored in SQLite)."""
+        if self.store is None or self.holdings is None or not self.store.get_value(self.TARGET_KEY):
+            return None
+        now = now or datetime.now(timezone.utc)
+        d = self.portfolio_drift()
+        self.put("drift", d)
+        if d.get("breached") and self.store.claim_notice("drift", now.date().isoformat(), now, min_gap=timedelta(days=7)):
+            if self.notify:
+                self.notify(dr.alert_text(d, d["source"]))
+            return d
+        return None
+
+    def digest_text(self, now: datetime | None = None) -> str:
+        now = now or datetime.now(timezone.utc)
+
+        def week(type_: str) -> list[dict]:
+            return dg.week_events(self.store.list(type_, limit=200), now) if self.store is not None else []
+
+        try:
+            track = self.track_record(self.alert_preset)
+        except Exception as exc:
+            log.warning("digest: track record unavailable: %s", exc)
+            track = None
+        drift = None
+        try:
+            drift = self.portfolio_drift() if self.store is not None and self.holdings is not None else None
+        except Exception as exc:
+            log.warning("digest: drift unavailable: %s", exc)
+        mood = (self.get("today") or {}).get("mood")
+        return dg.compose(now, week("picks"), week("alert"), track, mood, drift,
+                          timezone=self.digest_schedule.timezone)
+
+    def check_digest(self, now: datetime | None = None) -> str | None:
+        """Send the weekly digest once when its slot has come (deduplicated in SQLite, survives restarts)."""
+        if self.store is None:
+            return None
+        now = now or datetime.now(timezone.utc)
+        period = dg.due_period(now, self.digest_schedule)
+        last = self.store.last_notice("digest") if period else None
+        if period is None or (last and last["period"] == period):   # cheap check before composing
+            return None
+        text = self.digest_text(now)
+        if not self.store.claim_notice("digest", period, now):
+            return None
+        if self.notify:
+            self.notify(text)
+        return text
+
     def check_alerts(self) -> list[dict]:
         """Fire every active price alert whose condition is met (each fires once, then deactivates)."""
         if self.store is None:
@@ -286,6 +376,10 @@ class Precomputer:
                 self.check_alerts()
             except Exception as exc:
                 log.warning("price alerts failed: %s", exc)
+            try:
+                self.check_digest()
+            except Exception as exc:
+                log.warning("weekly digest failed: %s", exc)
             self._stop.wait(max(60.0, self.opportunities_interval - (time.time() - started)))
 
     def start(self) -> None:

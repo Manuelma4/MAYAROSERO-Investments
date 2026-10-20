@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioPlan, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, TrackRecord, Universe } from "./types";
+import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, DigestPreview, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioDrift, PortfolioPlan, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, TrackRecord, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -63,6 +63,11 @@ export const api = {
   aiStatus: () => request<{ enabled: boolean; how_to_enable: string | null }>("/api/ai/status"),
   aiAnalyze: (symbol: string) => request<AIAnalysis>(`/api/ai/analyze?${qs({ symbol })}`, { method: "POST" }),
   portfolio: (body: object) => request<PortfolioPlan>("/api/portfolio", { method: "POST", body: JSON.stringify(body) }),
+  portfolioDrift: () => request<PortfolioDrift>("/api/portfolio/drift"),
+  saveTarget: (body: object) => request<PortfolioDrift>("/api/portfolio/target", { method: "POST", body: JSON.stringify(body) }),
+  deleteTarget: () => request<{ deleted: boolean }>("/api/portfolio/target", { method: "DELETE" }),
+  digestPreview: () => request<DigestPreview>("/api/digest/preview"),
+  digestSendTest: () => request<{ sent: boolean; channels: string[]; text: string }>("/api/digest/send-test", { method: "POST", body: JSON.stringify({ confirm: true }) }),
   predictions: (horizon: number) => request<PredictionsResult>(`/api/predictions?${qs({ horizon })}`),
   predictionsCustom: (body: object) => request<PredictionsResult>("/api/predictions/custom", { method: "POST", body: JSON.stringify(body) }),
   forecast: (symbol: string, horizon: number) => request<ForecastResult>(`/api/forecast?${qs({ symbol, horizon })}`),

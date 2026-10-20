@@ -65,6 +65,21 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
     case "/api/portfolio": {
       try { return await load(`portfolio_${body.risk ?? "balanced"}.json`); } catch { return limit("Building a portfolio"); }
     }
+    case "/api/portfolio/drift": return { status: "no_target", target: null,
+      message: "Saving a target and the weekly drift check run on the live server. This preview has no saved target." };
+    case "/api/portfolio/target": return limit("Saving a target");
+    case "/api/digest/preview": {
+      try { return await load("digest.json"); } catch {
+        let mood = "Market mood: see the Today page.";
+        try { const t = await load<{ mood?: { label: string; advice?: string } | null }>("today.json"); if (t.mood) mood = `Market mood: ${t.mood.label}. ${t.mood.advice ?? ""}`.trim(); } catch { /* no snapshot */ }
+        const text = ["MAYAROSERO weekly digest · preview", mood, "Picks: no change this week. The list is reviewed at each month end.",
+          "Your price alerts: none fired this week.", "Live track record: runs on the live server, from its first market close on.",
+          "Details in the app. Information, not advice."].join("\n");
+        return { text, chars: text.length, last_sent: null, channels: [],
+          schedule: { day: "Sunday", hour: 18, minute: 0, timezone: "Europe/Paris", enabled: true, text: "Sunday at 18:00 (Europe/Paris)", next: null } };
+      }
+    }
+    case "/api/digest/send-test": return limit("Sending the digest");
     case "/api/predictions": return load(`predictions_${url.searchParams.get("horizon") ?? "5"}.json`);
     case "/api/predictions/custom": return limit("Custom rankings");
     case "/api/forecast": {

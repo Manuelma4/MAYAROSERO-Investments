@@ -627,3 +627,14 @@ tbody tr:hover { background: var(--surface-2); }
 .track-chart { margin-top: 12px; }
 .track-fold { margin-top: 14px; }
 .card .notice { margin: 0; }
+
+/* Weekly digest preview (Settings) */
+.digest-preview { flex-basis: 100%; min-width: 0; }
+.digest-preview pre { margin: 0 0 8px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); font: 13px/1.6 var(--font); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+
+/* Portfolio drift (My portfolio) */
+.drift-list { list-style: none; margin: 0; padding: 0; }
+.drift-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.drift-list li:last-child { border-bottom: 0; }
+.drift-list .num { font-variant-numeric: tabular-nums; text-align: right; }
+.drift-list .gap-big { font-weight: 600; color: var(--text); }

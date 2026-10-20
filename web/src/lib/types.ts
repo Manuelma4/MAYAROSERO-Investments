@@ -155,6 +155,22 @@ export interface PortfolioPlan {
   changes: Changes | null; core_risk_off: boolean; as_of: string; mix: Record<string, number>;
 }
 
+export interface PortfolioTarget {
+  saved_at: string; amount: number; currency: "EUR" | "USD"; risk: string; weights: Record<string, number>;
+  names: Record<string, string>; ideas_share: number; bucket_share: number;
+}
+export interface DriftRow { symbol: string | null; name: string; in_plan: boolean; "current_%": number; "target_%": number; drift: number; amount: number }
+export interface DriftTrade { symbol: string; name: string; amount: number }
+export interface PortfolioDrift {
+  status: "no_target" | "empty" | "not_invested" | "on_target" | "drifted"; message: string; target: PortfolioTarget | null;
+  source?: string; currency?: string; account_value?: number | null; rows?: DriftRow[]; buy?: DriftTrade[]; sell?: DriftTrade[];
+  max_drift?: number; total_drift?: number; breached?: boolean; suggestion?: string; position_limit?: number; total_limit?: number; as_of?: string;
+}
+export interface DigestPreview {
+  text: string; chars: number; last_sent: string | null; channels: string[];
+  schedule: { day: string; hour: number; minute: number; timezone: string; enabled: boolean; text: string; next: string | null };
+}
+
 export interface RankedItem { symbol: string; name: string; sector: string | null; score: number; decile: number; p_outperform: number; p_underperform: number; price: number; "change_1d_%": number; reason: string }
 export interface PredictionsResult {
   horizon: number; horizon_label: string; as_of: string; quality_sentence: string; edge_sentence: string; universe_size: number;

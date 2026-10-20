@@ -1,11 +1,13 @@
 """SQLite store for live events (signals, abnormal moves), watchlists, price alerts and the live
-track record (daily picks snapshots and Invest-now ideas, recorded as they happen)."""
+track record (daily picks snapshots and Invest-now ideas, recorded as they happen), the saved portfolio target
+and the "already sent" marks of the weekly digest and drift alerts (so a restart never repeats them)."""
 
 from __future__ import annotations
 
 import json
 import sqlite3
 import threading
+from datetime import datetime, timedelta
 from pathlib import Path
 
 SCHEMA = """
@@ -55,6 +57,17 @@ CREATE TABLE IF NOT EXISTS track_ideas (
     hold_days INTEGER NOT NULL DEFAULT 5,
     recorded_at TEXT NOT NULL,
     UNIQUE (symbol, direction, day)
+);
+CREATE TABLE IF NOT EXISTS notices (
+    kind TEXT NOT NULL,
+    period TEXT NOT NULL,
+    sent_at TEXT NOT NULL,
+    PRIMARY KEY (kind, period)
+);
+CREATE TABLE IF NOT EXISTS kv (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 """
 
@@ -194,3 +207,42 @@ class EventStore:
         with self._lock:
             rows = self._conn.execute("SELECT * FROM track_ideas ORDER BY as_of").fetchall()
         return [dict(r) for r in rows]
+
+    # --- once-only notices (weekly digest, drift alert) ---------------------------------------
+    def claim_notice(self, kind: str, period: str, now: datetime, min_gap: timedelta | None = None) -> bool:
+        """Atomically mark `kind` as sent for `period`. False if it was already sent for that period, or
+        (with `min_gap`) if the last one of this kind went out less than `min_gap` ago."""
+        with self._lock:
+            if min_gap is not None:
+                last = self._conn.execute("SELECT MAX(sent_at) FROM notices WHERE kind = ?", (kind,)).fetchone()[0]
+                if last and now - datetime.fromisoformat(last) < min_gap:
+                    return False
+            n = self._conn.execute("INSERT OR IGNORE INTO notices(kind, period, sent_at) VALUES (?, ?, ?)",
+                                   (kind, period, now.isoformat())).rowcount
+            self._conn.commit()
+        return bool(n)
+
+    def last_notice(self, kind: str) -> dict | None:
+        with self._lock:
+            r = self._conn.execute("SELECT * FROM notices WHERE kind = ? ORDER BY sent_at DESC LIMIT 1",
+                                   (kind,)).fetchone()
+        return dict(r) if r else None
+
+    # --- small saved settings (portfolio target) ------------------------------------------------
+    def get_value(self, key: str):
+        with self._lock:
+            r = self._conn.execute("SELECT value FROM kv WHERE key = ?", (key,)).fetchone()
+        return json.loads(r["value"]) if r else None
+
+    def set_value(self, key: str, value) -> None:
+        with self._lock:
+            self._conn.execute("INSERT INTO kv(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET "
+                               "value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+                               (key, json.dumps(value, default=str)))
+            self._conn.commit()
+
+    def delete_value(self, key: str) -> bool:
+        with self._lock:
+            n = self._conn.execute("DELETE FROM kv WHERE key = ?", (key,)).rowcount
+            self._conn.commit()
+        return bool(n)

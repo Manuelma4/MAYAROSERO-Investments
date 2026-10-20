@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { fmtDay, fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
-import type { PortfolioPlan } from "../lib/types";
+import type { PortfolioDrift, PortfolioPlan } from "../lib/types";
+import { STATIC } from "../lib/snapshot";
 import { Hint } from "../components/Hint";
 import { Badge, Card, Empty, ErrorBox, Spinner } from "../components/ui";
 
@@ -36,6 +37,21 @@ export default function Portfolio() {
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { build(); }, []);
+
+  const [drift, setDrift] = useState<PortfolioDrift | null>(null);
+  const [tBusy, setTBusy] = useState(false);
+  const [tErr, setTErr] = useState<string | null>(null);
+  useEffect(() => { api.portfolioDrift().then(setDrift).catch((e) => setTErr((e as Error).message)); }, []);
+  const saveTarget = async () => {
+    setTBusy(true); setTErr(null);
+    // The plan on screen, not unsaved edits in the form.
+    const body = plan ? { amount: plan.amount, currency: plan.currency, risk: plan.risk, fractional: inp.fractional } : { ...inp, amount: Number(inp.amount) };
+    try { setDrift(await api.saveTarget(body)); } catch (e) { setTErr(`The target could not be saved. ${(e as Error).message}`); } finally { setTBusy(false); }
+  };
+  const removeTarget = async () => {
+    setTBusy(true); setTErr(null);
+    try { await api.deleteTarget(); setDrift(await api.portfolioDrift()); } catch (e) { setTErr((e as Error).message); } finally { setTBusy(false); }
+  };
 
   const lines = (plan?.lines ?? []).filter((l) => l.invested > 0);
   const m = plan?.risk_metrics ?? {};
@@ -98,6 +114,8 @@ export default function Portfolio() {
             </ul>}
           </Card>
 
+          <DriftCard drift={drift} busy={tBusy} err={tErr} onSave={saveTarget} onRemove={removeTarget} />
+
           <div className="grid-2">
             <Card title={<>Risk compared with the S&amp;P 500<Hint>Measured on the last 12 months of prices of exactly this mix. Volatility = how much it swings; beta = how much it moves when the S&amp;P 500 moves 1% (1.2 means about 1.2%).</Hint></>}>
               <dl className="kv">
@@ -139,5 +157,54 @@ export default function Portfolio() {
         </>
       )}
     </div>
+  );
+}
+
+const RISK_LABEL: Record<string, string> = { cautious: "Cautious", balanced: "Balanced", bold: "Bold" };
+
+function DriftCard({ drift, busy, err, onSave, onRemove }: { drift: PortfolioDrift | null; busy: boolean; err: string | null; onSave: () => void; onRemove: () => void }) {
+  const t = drift?.target;
+  const cur = (v: number, c = drift?.currency ?? t?.currency ?? "EUR") => v.toLocaleString("en-GB", { style: "currency", currency: c, maximumFractionDigits: 0 });
+  const rows = (drift?.rows ?? []).filter((r) => r["target_%"] > 0.05 || r["current_%"] > 0.05);
+  const limit = drift?.position_limit ?? 5;
+  const live = drift && (drift.status === "on_target" || drift.status === "drifted");
+  return (
+    <Card title={<>My target and drift<Hint>Save the plan you actually bought as your target. Prices move, so over time some positions grow bigger than planned and others smaller: that gap is the drift. The app compares what you hold with your target every 30 minutes and sends you one alert (at most once a week) when it drifts too far, with what to sell and buy to get back on plan. It never buys or sells for you.</Hint></>}
+      actions={t ? <button className="btn small ghost" onClick={onRemove} disabled={busy || STATIC}>Remove target</button> : undefined}>
+      {t ? (
+        <p className="muted small">Target saved {fmtDay(t.saved_at)}: {cur(t.amount, t.currency)}, {RISK_LABEL[t.risk] ?? t.risk}, {Object.keys(t.weights).length} positions kept for the long term.
+          {" "}Live ideas ({fmtNum(t.ideas_share * 100, 0)}%) come and go within days, so they count with cash.</p>
+      ) : (
+        <p className="muted small">No target yet. When you have bought this plan, save it here so the app can tell you when it needs a rebalance.</p>
+      )}
+      {drift && drift.status !== "no_target" && (
+        <div className={drift.status === "drifted" ? "notice" : ""} style={{ margin: "12px 0" }}>
+          <p style={{ margin: 0 }}>{drift.message}</p>
+          {drift.status === "drifted" && drift.suggestion && <p style={{ margin: "8px 0 0" }}><strong>Suggestion:</strong> {drift.suggestion} <Hint>Amounts are rounded and based on what your account is worth now. Place these orders yourself if you agree; nothing is traded automatically.</Hint></p>}
+        </div>
+      )}
+      {live && (
+        <>
+          <dl className="kv">
+            <dt>Compared with<Hint>The practice account inside this app, or your real broker when one is connected (BROKER=... in .env).</Hint></dt><dd>{drift.source}</dd>
+            <dt>Account value</dt><dd>{drift.account_value ? cur(drift.account_value) : "–"}</dd>
+            <dt>Largest gap<Hint>The position furthest from its target, in percentage points: 18% held instead of 10% is a gap of 8 points. An alert is sent above {fmtNum(limit, 0)} points.</Hint></dt><dd>{fmtNum(drift.max_drift, 1)} pts</dd>
+            <dt>Money off plan<Hint>The share of your money that would have to move to be exactly on plan. An alert is sent above {fmtNum(drift.total_limit ?? 10, 0)}%.</Hint></dt><dd>{fmtNum(drift.total_drift, 1)}%</dd>
+          </dl>
+          <ul className="drift-list" aria-label="Holdings compared with the target">
+            {rows.map((r) => (
+              <li key={r.symbol ?? "bucket"}>
+                <span>{r.symbol ? <Link to={stockPath(r.symbol)}><strong>{r.symbol}</strong></Link> : <strong>{r.name}</strong>}{r.symbol && <span className="muted small"> · {r.in_plan ? r.name : "not in your plan"}</span>}</span>
+                <span className="num muted small">{fmtNum(r["current_%"], 1)}% <span className="muted">vs {fmtNum(r["target_%"], 1)}%</span></span>
+                <span className={`num ${Math.abs(r.drift) > limit && r.symbol ? "gap-big" : "muted"}`}>{r.drift >= 0 ? "+" : "−"}{fmtNum(Math.abs(r.drift), 1)} pts</span>
+              </li>))}
+          </ul>
+        </>
+      )}
+      <ErrorBox error={err} />
+      <div className="row gap" style={{ marginTop: 12 }}>
+        <button className="btn" onClick={onSave} disabled={busy || STATIC}>{busy ? <><Spinner /> Saving</> : t ? "Replace target with this plan" : "Save this plan as my target"}</button>
+      </div>
+    </Card>
   );
 }

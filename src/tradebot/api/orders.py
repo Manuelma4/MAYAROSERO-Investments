@@ -222,6 +222,18 @@ def _live_block_reason(st, broker: Broker) -> str | None:
     return None
 
 
+def current_holdings(st) -> dict:
+    """What the owner really holds: the connected real broker's positions when one is configured (not paper),
+    else the practice account. Read-only."""
+    b = get_broker(st)
+    if b is None or b.name == "paper":
+        b = st.paper_adapter
+    acct, pos = b.account(), b.positions()
+    return {"source": "practice account" if b.name == "paper" else f"{b.name} ({b.mode})", "broker": b.name,
+            "mode": b.mode, "currency": (acct.get("currency") or "USD").upper(), "equity": acct.get("equity"),
+            "positions": pos}
+
+
 def _require_confirm(request: Request, body: Confirm) -> None:
     if "application/json" not in (request.headers.get("content-type") or ""):
         raise HTTPException(415, 'Send {"confirm": true} as JSON.')

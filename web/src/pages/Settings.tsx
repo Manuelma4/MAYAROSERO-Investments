@@ -9,7 +9,7 @@ import { Badge, Card } from "../components/ui";
 import { Hint } from "../components/Hint";
 import { KillSwitch, ModeBadge, brokerLabel } from "../components/Trading";
 import { fmtNum, fmtPrice } from "../lib/format";
-import type { BrokerStatus } from "../lib/types";
+import type { BrokerStatus, DigestPreview } from "../lib/types";
 
 export default function Settings() {
   const { pref } = useTheme();
@@ -22,6 +22,19 @@ export default function Settings() {
   const loadBroker = useCallback(() => { api.brokerStatus().then(setBroker).catch(() => undefined); }, []);
   useEffect(() => { loadBroker(); }, [loadBroker]);
   const lim = broker?.limits;
+  const [digest, setDigest] = useState<DigestPreview | null>(null);
+  const [digestBusy, setDigestBusy] = useState(false);
+  const [digestMsg, setDigestMsg] = useState<string | null>(null);
+  const previewDigest = async () => {
+    if (digest) { setDigest(null); setDigestMsg(null); return; }
+    setDigestBusy(true); setDigestMsg(null);
+    try { setDigest(await api.digestPreview()); } catch (e) { setDigestMsg(`The preview could not be built. ${(e as Error).message}`); } finally { setDigestBusy(false); }
+  };
+  const sendDigest = async () => {
+    setDigestBusy(true); setDigestMsg(null);
+    try { const r = await api.digestSendTest(); setDigestMsg(`Sent now to: ${r.channels.join(", ") || "console"}. The weekly one still goes out as scheduled.`); }
+    catch (e) { setDigestMsg((e as Error).message); } finally { setDigestBusy(false); }
+  };
 
   return (
     <div className="page narrow">
@@ -93,6 +106,20 @@ export default function Settings() {
             <div><strong>{label}</strong><Hint>Set up once on the server: {how}, then add it to the notifiers list in config.yaml.</Hint><p className="muted small">Receive {what}.</p></div>
             {channels.includes(k) ? <Badge>Active</Badge> : <Badge>Not set up</Badge>}
           </div>))}
+        <div className="setting">
+          <div><strong>Weekly digest</strong><Hint>One short message a week, Sunday around 18:00 Paris time, through the channels above (email, WhatsApp, or the server log if none is set up). It sums up the week: changes to the picks, the price alerts that fired, the live track record, how far your portfolio drifted from its target, and the market mood. Change the day or hour with DIGEST_DAY and DIGEST_HOUR in .env.</Hint>
+            <p className="muted small">{digest ? `${digest.schedule.enabled ? `Sent ${digest.schedule.text}` : "Switched off (DIGEST_ENABLED)"}${digest.last_sent ? ` · last sent ${new Date(digest.last_sent).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}` : ""}` : "Sent every Sunday around 18:00 (Paris time)."}</p>
+          </div>
+          <span className="row gap">
+            <button className="btn small" onClick={previewDigest} disabled={digestBusy} aria-expanded={!!digest}>{digest ? "Hide preview" : "Preview"}</button>
+            {!STATIC && digest && <button className="btn small" onClick={sendDigest} disabled={digestBusy}>Send it now</button>}
+          </span>
+          {digest && <div className="digest-preview">
+            <pre aria-label="This week's digest">{digest.text}</pre>
+            <p className="muted small">{digest.chars} characters, exactly what would be sent right now. It updates by itself until Sunday.</p>
+          </div>}
+          {digestMsg && <p className="small muted" role="status" style={{ flexBasis: "100%", margin: 0 }}>{digestMsg}</p>}
+        </div>
       </Card>
 
       <Card title="Access">

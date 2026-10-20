@@ -12,6 +12,8 @@ What you will receive:
 | Picks update | The Beat-the-S&P list changes at a monthly review | `[PICKS UPDATE] BUY: TMO  SELL: UNH  KEEP: ...` |
 | Invest now | A stock or coin moves hard on news and heavy volume | `[INVEST NOW] HAS RISING +6.8% on 4.9x volume` |
 | Big mover | A sudden surge or crash on the watched markets | `[SURGE] BTC/USDT +3.2% in 5m` |
+| Portfolio drift | Your holdings moved far from the plan you saved as your target (at most once a week) | `[PORTFOLIO DRIFT] ... Sell about €300 of NVDA, buy about €250 of JNJ.` |
+| Weekly digest | Sunday ~18:00 Paris time: the week in one short message | see section 6 |
 
 All settings go in the `.env` file next to `docker-compose.yml` (copy `.env.example` to `.env` the
 first time). Never commit `.env`: it holds passwords.
@@ -90,3 +92,53 @@ Settings → Notifications in the app then shows Email and WhatsApp as configure
 - Invest now ideas are strict on purpose (a few a week). Big-mover alerts are tuned in
   `config/config.yaml` under `movers:` (raise `min_zscore` / `min_move_pct` for fewer messages).
 - Browser pop-ups: Settings → Notifications → Browser notifications.
+
+## 6. Weekly digest
+
+One short message a week (under 1,200 characters, so it fits a WhatsApp message) through the same
+channels: what changed in the picks, the price alerts that fired, the live track record (picks vs the
+S&P 500 and the Invest-now ideas), your portfolio drift if you saved a target, and the market mood.
+
+```
+MAYAROSERO weekly digest · 18 Oct 2026
+Market mood: Neutral. Mixed signals: stay invested but respect stop-losses.
+Picks: no change this week. The list is reviewed at each month end.
+Your price alerts: 1 fired (AAPL above 250).
+Live track record since 1 Oct (12 trading days): picks +2.4% vs S&P 500 +1.1% (ahead of). Too early to judge: it takes months.
+Portfolio: on plan (largest gap 1.8 points).
+Details in the app. Information, not advice.
+```
+
+- **When**: Sunday at 18:00 Europe/Paris by default (summer and winter time handled). If the server was
+  off at that moment, it still goes out within the next 12 hours; otherwise that week is skipped. It is
+  sent once per week: the "sent" mark is kept in the database, so a restart never sends it twice.
+- **Change it** in `config/config.yaml`, or with environment variables in `.env` (these win):
+
+  ```yaml
+  digest:
+    enabled: true
+    day: sunday             # monday ... sunday
+    hour: 18                # or "18:30"
+    timezone: Europe/Paris
+  ```
+
+  ```
+  DIGEST_DAY=friday
+  DIGEST_HOUR=19
+  DIGEST_ENABLED=false      # switch it off
+  ```
+
+- **Preview / test**: Settings → Notifications → Weekly digest → Preview shows the exact text; "Send it
+  now" sends it immediately (a test send does not replace the weekly one). From a terminal:
+  `curl localhost:8000/api/digest/preview` and
+  `curl -X POST -H 'Content-Type: application/json' -d '{"confirm": true}' localhost:8000/api/digest/send-test`
+  (add `-H "Authorization: Bearer $TRADEBOT_API_TOKEN"` when a token is set).
+
+### Portfolio drift alert
+
+On My portfolio, build your plan and press **Save this plan as my target** once you have bought it.
+The app then compares what you hold (the practice account, or your real broker when `BROKER` is set)
+with that target every 30 minutes. When one position is more than 5 percentage points away from its
+target, or more than 10% of your money is off plan, you get one alert (at most once a week) with a
+plain-English rebalance in amounts. Invest-now positions are left out of the advice: they close by
+themselves at their stop, target or time limit. Nothing is ever bought or sold automatically.

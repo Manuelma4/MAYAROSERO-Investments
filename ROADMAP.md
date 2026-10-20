@@ -103,9 +103,9 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
 14. [x] **Live track record from today**: record the engine's picks (and Invest-now ideas) every day from
         now on and show their real forward performance vs SPY (no backtest, no hindsight) on Today and Picks.
-15. [ ] **Weekly digest**: one short Sunday-evening message (email / WhatsApp) with the week's picks changes,
+15. [x] **Weekly digest**: one short Sunday-evening message (email / WhatsApp) with the week's picks changes,
         your alerts, portfolio drift and the live track record; previewable in Settings.
-16. [ ] **Portfolio drift alert**: when My portfolio's real weights drift far from the plan, suggest a simple
+16. [x] **Portfolio drift alert**: when My portfolio's real weights drift far from the plan, suggest a simple
         rebalance (plain-English, with amounts).
 
 ## Later research track

@@ -61,7 +61,7 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
     import threading
 
     app.state.paper_lock = threading.Lock()   # one order / exit at a time
-    from .orders import init_trading, manage_broker_exits
+    from .orders import current_holdings, init_trading, manage_broker_exits
 
     init_trading(app, settings.db_path.parent, broker_factory)   # BROKER / TRADING_MODE from the environment
 
@@ -102,6 +102,23 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
         except Exception as exc:
             log.warning("notify failed: %s", exc)
 
+    def notify(text: str) -> list[str]:
+        """Send through every configured notifier (console by default). Returns the channel names used."""
+        sent = []
+        for n in app.state.engine._ensure_scanner().notifiers:
+            n.send(text)
+            sent.append(type(n).__name__.replace("Notifier", "").lower())
+        return sent
+
+    app.state.notify = notify
+    from ..live.digest import Schedule, schedule_from
+
+    try:
+        digest_schedule = schedule_from(config)
+    except ValueError as exc:   # a typo in DIGEST_* must not stop the app
+        log.warning("weekly digest: %s; using Sunday 18:00 Europe/Paris", exc)
+        digest_schedule = Schedule()
+
     from ..ai.analyst import AIAnalyst
     from ..live.news import NewsSource
 
@@ -110,7 +127,9 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
                                        on_opportunity=on_opportunity, paper=app.state.paper,
                                        paper_lock=app.state.paper_lock, store=app.state.store,
                                        on_alert=on_alert, on_picks_change=on_picks_change,
-                                       broker_exits=lambda: manage_broker_exits(app.state))
+                                       broker_exits=lambda: manage_broker_exits(app.state),
+                                       notify=notify, holdings=lambda: current_holdings(app.state),
+                                       digest_schedule=digest_schedule)
     app.state.broadcaster = Broadcaster()
     kw = {"scanner_factory": scanner_factory} if scanner_factory else {}
     app.state.engine = LiveEngine(config, app.state.store, app.state.broadcaster, **kw)

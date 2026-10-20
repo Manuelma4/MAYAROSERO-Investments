@@ -4,6 +4,15 @@ history_bars: 400         # candles loaded per symbol for indicator warm-up
 
 notifiers: [console]      # add "email" and/or "whatsapp" (credentials via env vars, see .env.example)
 
+# Weekly digest: one short message with the week's picks changes, alerts, live track record, portfolio drift
+# and market mood, sent through the notifiers above. Env vars DIGEST_DAY / DIGEST_HOUR / DIGEST_TIMEZONE /
+# DIGEST_ENABLED override these.
+digest:
+  enabled: true
+  day: sunday             # monday ... sunday
+  hour: 18                # 0-23, or "18:30"
+  timezone: Europe/Paris
+
 risk:
   risk_per_trade: 0.01    # 1% of equity per trade
   fee: 0.001
