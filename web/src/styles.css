@@ -439,3 +439,12 @@ tbody tr:hover { background: var(--surface-2); }
 .hint-list { margin: 14px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .changes.inline { flex-direction: row; flex-wrap: wrap; gap: 14px 32px; }
 .pick-reason { white-space: normal; max-width: 420px; margin-top: 4px; line-height: 1.4; }
+
+.pick-cards { display: none; list-style: none; margin: 0; padding: 0; }
+.pick-cards li { padding: 12px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.pick-cards li:last-child { border-bottom: 0; }
+.pick-cards p { margin: 0; line-height: 1.45; }
+.pc-top { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; }
+.pc-name { display: flex; flex-direction: column; text-decoration: none; min-width: 0; }
+.pc-num { display: flex; flex-direction: column; align-items: flex-end; font-weight: 600; }
+@media (max-width: 860px) { .pick-cards { display: block; } .picks-table { display: none; } }

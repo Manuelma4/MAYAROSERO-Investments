@@ -124,7 +124,22 @@ export default function Picks() {
           {res.risk_off ? (
             <div className="notice">The S&amp;P 500 is below its 200-day average, so the bear-market filter says to hold cash until the trend recovers.</div>
           ) : (
-            <div className="table-wrap">
+            <>
+            <ul className="pick-cards">
+              {res.picks.map((p, i) => {
+                const q = quotes[p.symbol];
+                return (
+                  <li key={p.symbol}>
+                    <div className="pc-top">
+                      <span className="muted small">{String(i + 1).padStart(2, "0")}</span>
+                      <Link to={`/charts?symbol=${encodeURIComponent(p.symbol)}`} className="pc-name"><strong>{p.name}</strong><span className="muted small">{p.symbol} · {fmtNum(100 / res.picks.length, 1)}% of the money</span></Link>
+                      <span className="pc-num"><span className="num">{fmtPrice(q?.price ?? p.price)}</span>{q?.change_pct !== undefined && <Delta v={q.change_pct} digits={2} />}</span>
+                    </div>
+                    {p.reason && <p className="muted small">{p.reason}</p>}
+                  </li>);
+              })}
+            </ul>
+            <div className="table-wrap picks-table">
               <table className="picks">
                 <thead><tr><th>#</th><th>Company</th><th className="hide-sm">Sector</th><th>Score<Hint>The engine's overall grade combining momentum, trend, strength vs the S&amp;P 500 and calmness. Longer bar = stronger candidate.</Hint></th><th className="r">Price</th><th className="r">Today</th><th className="r">1M</th><th className="r hide-sm">12M ex-1M<Hint>Return over the last 12 months, leaving out the most recent month (recent moves often reverse briefly). The core momentum signal.</Hint></th><th className="r hide-sm">vs S&amp;P 6M<Hint>How much better (or worse) the stock did than the S&amp;P 500 over 6 months.</Hint></th><th className="r">Weight<Hint>Share of your money for this stock. Equal weights keep the portfolio diversified.</Hint></th></tr></thead>
                 <tbody>
@@ -148,6 +163,7 @@ export default function Picks() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </Card>
       )}
@@ -180,7 +196,7 @@ export default function Picks() {
       {res && s && (
         <section className="history">
           <button className="history-toggle" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}>
-            <span>Track record: how this strategy would have done since {s.start}</span>
+            <span>Track record: how this strategy would have done since {s.start} ({topN} stocks, {rebalance === "ME" ? "monthly" : rebalance === "QE" ? "quarterly" : "weekly"} review)</span>
             <span className="muted">{fmtPct(s["cagr_%"], 1)} / yr vs S&amp;P 500 {fmtPct(s["benchmark_cagr_%"], 1)} · {showHistory ? "Hide" : "Show"}</span>
           </button>
           {showHistory && (

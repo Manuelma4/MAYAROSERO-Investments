@@ -12,7 +12,7 @@ function baseChart(el: HTMLElement): IChartApi {
     layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: css("--text-2"), fontFamily: "inherit", attributionLogo: false },
     grid: { vertLines: { color: css("--grid") }, horzLines: { color: css("--grid") } },
     rightPriceScale: { borderColor: css("--line") },
-    timeScale: { borderColor: css("--line"), timeVisible: true },
+    timeScale: { borderColor: css("--line"), timeVisible: true, minBarSpacing: 0.05 },
     crosshair: { mode: 0 },
   });
 }

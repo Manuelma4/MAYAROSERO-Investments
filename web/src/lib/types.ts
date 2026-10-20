@@ -99,11 +99,11 @@ export interface PicksResult {
 }
 
 export interface Mood { label: "Risk-on" | "Neutral" | "Risk-off"; explanation: string; advice: string; "spy_vs_200d_%": number; "spy_1m_%": number; "breadth_%": number | null; vix: number | null }
-export interface MoverLite { symbol: string; price: number; change_pct: number }
+export interface MoverLite { symbol: string; name?: string; price: number; change_pct: number }
 export interface Changes { date: string | null; buy: string[]; sell: string[]; keep: string[]; provisional_skipped?: boolean }
 export interface TodayBoard {
   as_of: string; mood: Mood | null;
   core: null | { preset: string; risk_off: boolean; picks: PickRow[]; changes: Changes; as_of: string;
-    edge: { "cagr_%": number; "benchmark_cagr_%": number; "skill_vs_universe_%": number; start: string } };
+    edge: { "cagr_%": number; "benchmark_cagr_%": number; "skill_vs_universe_%": number; start: string }; settings?: string };
   gainers: MoverLite[]; losers: MoverLite[];
 }

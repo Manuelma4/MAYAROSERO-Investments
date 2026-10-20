@@ -66,7 +66,7 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
           )}
           {core && !core.risk_off && (
             <p className="muted small edge-line">
-              Tested since {core.edge.start}: {fmtPct(core.edge["cagr_%"], 1)} a year vs {fmtPct(core.edge["benchmark_cagr_%"], 1)} for the S&amp;P 500.
+              Tested since {core.edge.start} with {core.settings ?? "the default settings"}: {fmtPct(core.edge["cagr_%"], 1)} a year vs {fmtPct(core.edge["benchmark_cagr_%"], 1)} for the S&amp;P 500.
               <Hint>How this strategy would have done in the past (not a guarantee). Part of that lead comes from using today's index members; the honest "selection skill" is {fmtPct(core.edge["skill_vs_universe_%"], 1)} a year. Details in Picks › Track record.</Hint>
             </p>
           )}
@@ -89,11 +89,11 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
       <div className="grid-2">
         <Card title={<>Rising most today<Hint>The S&amp;P 500 leaders up the most today. A big jump is information, not a buy signal on its own: moves backed by news tend to continue, moves without news often fade.</Hint></>}>
           <ul className="movers">{t.gainers.map((q) => (
-            <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol} <span className="muted small">{marketName(q.symbol)}</span></Link><span className="up">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
+            <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol} <span className="muted small">{q.name ?? marketName(q.symbol)}</span></Link><span className="up">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
         </Card>
         <Card title={<>Falling most today<Hint>The S&amp;P 500 leaders down the most today. If one of your picks is here, check its stop-loss rather than reacting to one day.</Hint></>}>
           <ul className="movers">{t.losers.map((q) => (
-            <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol} <span className="muted small">{marketName(q.symbol)}</span></Link><span className="down">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
+            <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol} <span className="muted small">{q.name ?? marketName(q.symbol)}</span></Link><span className="down">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
         </Card>
       </div>
     </>

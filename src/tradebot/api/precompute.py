@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone
 
 from ..picker import PRESETS
-from ..universe import sp500_symbols
+from ..universe import by_symbol, sp500_symbols
 from . import serialize as ser
 from .market import MarketData
 from .schemas import PicksRequest
@@ -69,6 +69,9 @@ class Precomputer:
         quotes = [q for q in self.market.quotes(sp500_symbols())
                   if isinstance(q.get("change_pct"), (int, float)) and math.isfinite(q["change_pct"])]
         quotes.sort(key=lambda q: q["change_pct"], reverse=True)
+        names = {k: v.name for k, v in by_symbol().items()}
+        for q in quotes:
+            q["name"] = names.get(q["symbol"], q["symbol"])
         return ser.clean({
             "as_of": datetime.now(timezone.utc).isoformat(),
             "mood": mood,
@@ -76,9 +79,10 @@ class Precomputer:
                 "preset": core["preset"], "risk_off": core["risk_off"], "picks": core["picks"],
                 "changes": core["changes"], "as_of": core["as_of"],
                 "edge": {k: core["stats"].get(k) for k in ("cagr_%", "benchmark_cagr_%", "skill_vs_universe_%", "start")},
+                "settings": "10 stocks, monthly review, uptrends only (Quality momentum)",
             },
-            "gainers": [{k: q[k] for k in ("symbol", "price", "change_pct")} for q in quotes[:6]],
-            "losers": [{k: q[k] for k in ("symbol", "price", "change_pct")} for q in quotes[::-1][:6]],
+            "gainers": [{k: q[k] for k in ("symbol", "name", "price", "change_pct")} for q in quotes[:6]],
+            "losers": [{k: q[k] for k in ("symbol", "name", "price", "change_pct")} for q in quotes[::-1][:6]],
         })
 
     def _loop(self) -> None:

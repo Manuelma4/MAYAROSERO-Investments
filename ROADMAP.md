@@ -16,7 +16,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Real data: Yahoo (stocks) + Binance data mirror (crypto)
 
 ## Next
-0. [ ] **UX overhaul: everything already computed, nothing to "run"** (Manuel's top priority, Oct 20):
+0. [x] **UX overhaul: everything already computed, nothing to "run"** (Manuel's top priority, Oct 20):
        - A background job precomputes picks (all 4 strategies), ML predictions for every S&P 500 /
          popular stock, and market analysis on a schedule; pages just show results instantly.
          Results show without pressing anything; buttons stay available to customize (time period,
