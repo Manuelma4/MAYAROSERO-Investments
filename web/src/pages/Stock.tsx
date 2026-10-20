@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtBig, fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
+import { ccySign, fmtBig, fmtNum, fmtPct, listingCurrency, stockPath } from "../lib/format";
+import { FxHint, Price } from "../lib/currency";
 import { useQuotes } from "../lib/quotes";
 import { EARNINGS_HINT, TIMING_SHORT, daysUntil, fmtEarnDay, whenText } from "../lib/earnings";
 import type { ChartData, EarningsRecord, StockInfo } from "../lib/types";
@@ -17,8 +18,8 @@ import { AddToWatchlist, AlertForm } from "../components/MyAlerts";
 const VERDICT_TONE = { pick: "up", ranked: "", excluded: "down", not_covered: "", unknown: "" } as const;
 const VERDICT_LABEL = { pick: "In the picks", ranked: "Ranked, not held", excluded: "Excluded (downtrend)", not_covered: "Not covered", unknown: "…" } as const;
 
-const FIELDS: { key: string; label: string; fmt: (v: number) => string; hint: string; term?: TermId }[] = [
-  { key: "marketCap", term: "market-cap", label: "Market value", fmt: (v) => `$${fmtBig(v)}`, hint: "What the whole company is worth on the stock market (price × number of shares)." },
+const FIELDS: { key: string; label: string; fmt: (v: number, symbol: string) => string; hint: string; term?: TermId }[] = [
+  { key: "marketCap", term: "market-cap", label: "Market value", fmt: (v, s) => { const c = listingCurrency(s); return `${c ? ccySign(c) : ""}${fmtBig(v)}`; }, hint: "What the whole company is worth on the stock market (price × number of shares), in the currency its shares trade in." },
   { key: "trailingPE", term: "pe-ratio", label: "P/E (last 12 months)", fmt: (v) => fmtNum(v, 1), hint: "Price ÷ profit per share. How many years of current profits you pay for. The S&P 500 average is usually around 20-25; high means the market expects strong growth." },
   { key: "forwardPE", label: "P/E (next 12 months)", fmt: (v) => fmtNum(v, 1), hint: "Same ratio using analysts' expected profits. Lower than the current P/E means profits are expected to grow." },
   { key: "priceToSalesTrailing12Months", label: "Price / sales", fmt: (v) => fmtNum(v, 1), hint: "Company value ÷ yearly revenue. Useful when profits are small or negative." },
@@ -111,7 +112,7 @@ export default function Stock() {
         <p className="eyebrow">{info ? [info.sector, info.industry, info.region].filter(Boolean).join(" · ") : symbol}</p>
         <h1 className="display">{info?.name ?? symbol}</h1>
         <div className="stock-price">
-          <span className="sp-price">{fmtPrice(q?.price)}</span>
+          <span className="sp-wrap"><Price className="sp-price" v={q?.price} symbol={symbol} /><FxHint from={listingCurrency(symbol)} /></span>
           {q?.change_pct !== undefined && <span className={`pill ${q.change_pct >= 0 ? "up" : "down"}`}>{fmtPct(q.change_pct, 2)} today</span>}
           <span className="muted">{symbol}</span>
         </div>
@@ -150,7 +151,7 @@ export default function Stock() {
           {target && (
             <Card title={<>Analysts<Hint>Average 12-month price target from the analysts covering the stock, and their consensus. Analysts are often too optimistic; treat it as one opinion.</Hint></>}>
               <dl className="kv">
-                <dt>Average target</dt><dd>{fmtPrice(target)} <span className={(upside ?? 0) >= 0 ? "up" : "down"}>({fmtPct(upside, 0)})</span></dd>
+                <dt>Average target</dt><dd><Price v={target} symbol={symbol} /> <span className={(upside ?? 0) >= 0 ? "up" : "down"}>({fmtPct(upside, 0)})</span></dd>
                 <dt>Consensus</dt><dd style={{ textTransform: "capitalize" }}>{String(f.recommendationKey ?? "–").replace("_", " ")}</dd>
                 <dt>Analysts</dt><dd>{f.numberOfAnalystOpinions ?? "–"}</dd>
               </dl>
@@ -163,7 +164,7 @@ export default function Stock() {
         <Card title={<>Key figures<Hint>From the company's latest reports, via Yahoo Finance. Hover or tap "?" on each for what it means.</Hint></>}>
           <div className="figs">
             {FIELDS.filter((x) => typeof f[x.key] === "number").map((x) => (
-              <div key={x.key} className="fig"><span className="kpi-label">{x.label}<Hint term={x.term}>{x.hint}</Hint></span><strong>{x.fmt(f[x.key] as number)}</strong></div>))}
+              <div key={x.key} className="fig"><span className="kpi-label">{x.label}<Hint term={x.term}>{x.hint}</Hint></span><strong>{x.fmt(f[x.key] as number, symbol)}</strong></div>))}
           </div>
         </Card>
       )}
@@ -182,7 +183,7 @@ export default function Stock() {
                   <span className="avatar">{s.symbol.replace(/[-.^/].*/, "").slice(0, 4)}</span>
                   <span className="srow-name"><strong>{s.name}</strong><span className="muted small">{s.symbol} · {s.industry}</span></span>
                   <Sparkline data={sq?.spark} width={84} height={26} className="hide-sm" />
-                  <span className="srow-num"><span className="num">{fmtPrice(sq?.price)}</span>{sq?.change_pct !== undefined && <span className={`small ${sq.change_pct >= 0 ? "up" : "down"}`}>{fmtPct(sq.change_pct, 2)}</span>}</span>
+                  <span className="srow-num"><Price className="num" v={sq?.price} symbol={s.symbol} alt="stack" />{sq?.change_pct !== undefined && <span className={`small ${sq.change_pct >= 0 ? "up" : "down"}`}>{fmtPct(sq.change_pct, 2)}</span>}</span>
                 </Link>);
             })}
           </div>

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { fmtPct, fmtPrice } from "../lib/format";
+import { fmtListed, fmtPct } from "../lib/format";
 import { MARKETS } from "../lib/markets";
 import { useQuotes } from "../lib/quotes";
 
@@ -13,7 +13,7 @@ export function TickerTape() {
     return (
       <Link key={m.symbol} to={`/charts?symbol=${encodeURIComponent(m.symbol)}`} className="tick" tabIndex={copy ? -1 : undefined}>
         <span className="tick-name">{m.name}</span>
-        <span className="tick-price">{fmtPrice(q.price)}</span>
+        <span className="tick-price">{fmtListed(q.price, m.symbol)}</span>
         <span className={(q.change_pct ?? 0) >= 0 ? "up" : "down"}>{fmtPct(q.change_pct, 2)}</span>
       </Link>
     );

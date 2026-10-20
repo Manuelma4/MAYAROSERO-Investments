@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtNum, fmtPct, fmtPrice, fmtTime } from "../lib/format";
+import { asCcy, fmtNum, fmtPct, fmtTime } from "../lib/format";
+import { FxHint, Money, Price } from "../lib/currency";
 import { STATIC } from "../lib/snapshot";
 import type { BrokerPositions, BrokerStatus, Opportunity, OpportunitiesResult, PaperAccount } from "../lib/types";
 import { AIDesk } from "../components/AIDesk";
@@ -28,7 +29,7 @@ function OppCard({ o, onDone }: { o: Opportunity; onDone: (m: string) => void })
         </div>
         <div className="opp-move">
           <span className={`opp-pct ${long ? "up" : "down"}`}>{fmtPct(o.change_pct, 1)}</span>
-          <span className="muted small">{fmtPrice(o.price)}</span>
+          <Price className="muted small" v={o.price} symbol={o.symbol} />
         </div>
       </header>
       <div className="opp-tags">
@@ -44,9 +45,9 @@ function OppCard({ o, onDone }: { o: Opportunity; onDone: (m: string) => void })
       )}
       <ul className="opp-reasons muted small">{o.reasons.slice(0, 3).map((r) => <li key={r}>{r}</li>)}</ul>
       <div className="opp-plan">
-        <div><span className="kpi-label">Entry<Hint>The price to buy at (or sell short at), close to the current price.</Hint></span><span>{fmtPrice(o.entry)}</span></div>
-        <div><span className="kpi-label">Stop<Hint term="stop-loss">Where you exit if wrong. Placed beyond today's {long ? "low" : "high"} or 1.5x the normal daily range.</Hint></span><span className="down">{fmtPrice(o.stop)}</span></div>
-        <div><span className="kpi-label">Target<Hint term="target">Twice the risk: if the stop is 3% away, the target is 6% away. You can be right less than half the time and still come out ahead.</Hint></span><span className="up">{fmtPrice(o.target)}</span></div>
+        <div><span className="kpi-label">Entry<Hint>The price to buy at (or sell short at), close to the current price.</Hint></span><Price v={o.entry} symbol={o.symbol} alt="hover" /></div>
+        <div><span className="kpi-label">Stop<Hint term="stop-loss">Where you exit if wrong. Placed beyond today's {long ? "low" : "high"} or 1.5x the normal daily range.</Hint></span><Price className="down" v={o.stop} symbol={o.symbol} alt="hover" /></div>
+        <div><span className="kpi-label">Target<Hint term="target">Twice the risk: if the stop is 3% away, the target is 6% away. You can be right less than half the time and still come out ahead.</Hint></span><Price className="up" v={o.target} symbol={o.symbol} alt="hover" /></div>
         <div><span className="kpi-label">Hold max<Hint>A short-term idea: if neither the stop nor the target is reached, close it after this many trading days.</Hint></span><span>{o.hold_days} days</span></div>
       </div>
       <p className="muted small opp-meta">Reward/risk {fmtNum(rr, 1)} · score {fmtNum(o.score, 0)}/100 · valid until {fmtTime(o.expires_at)}
@@ -89,6 +90,7 @@ export default function Opportunities() {
   const items = data?.items ?? [];
   const qualified = items.filter((o) => o.qualified && (showShort || o.direction === "long"));
   const watch = items.filter((o) => !o.qualified);
+  const brokerCcy = asCcy(broker?.currency) ?? "USD";   // the broker account's currency (the practice account is in dollars)
   const oppPositions = (account?.positions ?? []).filter((p) => p.strategy === "opportunity");
 
   return (
@@ -127,30 +129,30 @@ export default function Opportunities() {
       )}
 
       {broker && broker.broker !== "paper" && (
-        <Card title={<><ModeBadge mode={broker.mode} /> Your positions at {brokerLabel(broker.broker)}<Hint>Everything held in your {broker.mode === "live" ? "real" : "paper (test)"} account at the broker, including positions bought outside this app. Ideas opened with Invest close at their stop-loss, target or after about 5 trading days. P&amp;L means profit or loss so far, not yet locked in.</Hint></>}
-          actions={broker.connected && <span className="muted small">Account {fmtPrice(broker.equity ?? null)} {broker.currency}</span>}>
+        <Card title={<><ModeBadge mode={broker.mode} /> Your positions at {brokerLabel(broker.broker)}<Hint>Everything held in your {broker.mode === "live" ? "real" : "paper (test)"} account at the broker, including positions bought outside this app. Ideas opened with Invest close at their stop-loss, target or after about 5 trading days. P&amp;L means profit or loss so far, not yet locked in, shown in your display currency; prices are in each stock's own currency.</Hint></>}
+          actions={broker.connected && <span className="muted small">Account <Money v={broker.equity} from={brokerCcy} /><FxHint from={brokerCcy} /></span>}>
           {!broker.connected ? <div className="error">Not connected: {broker.error}</div>
             : held?.positions.length ? (
               <div className="table-wrap"><table>
                 <thead><tr><th>Symbol</th><th>Side</th><th className="r">Qty</th><th className="r">Entry</th><th className="r">Now</th><th className="r">P&amp;L</th></tr></thead>
                 <tbody>{held.positions.map((p) => (
                   <tr key={p.symbol}><td><strong>{p.symbol}</strong></td><td className={p.side === "long" ? "up" : "down"}>{p.side}</td><td className="r num">{fmtNum(p.qty, 4)}</td>
-                    <td className="r num">{fmtPrice(p.entry)}</td><td className="r num">{fmtPrice(p.price)}</td><td className={`r num ${(p.pnl ?? 0) >= 0 ? "up" : "down"}`}>{fmtPrice(p.pnl)}</td></tr>))}
+                    <td className="r num"><Price v={p.entry} symbol={p.symbol} alt="hover" /></td><td className="r num"><Price v={p.price} symbol={p.symbol} alt="hover" /></td><td className={`r num ${(p.pnl ?? 0) >= 0 ? "up" : "down"}`}><Money v={p.pnl} from={brokerCcy} digits={2} /></td></tr>))}
                 </tbody></table></div>
             ) : <Empty>No positions at {brokerLabel(broker.broker)} yet.</Empty>}
         </Card>
       )}
 
-      <Card title={<>Your practice positions<Hint>Positions opened with the Invest button, using practice (paper) money. They close automatically at the stop-loss, the target, or after about 5 trading days.</Hint></>}
-        actions={account && <span className="row gap"><span className="muted small">Practice account {fmtPrice(account.equity)}</span>
+      <Card title={<>Your practice positions<Hint>Positions opened with the Invest button, using practice (paper) money. They close automatically at the stop-loss, the target, or after about 5 trading days. Prices are in each stock's own currency; the account value and P&amp;L are in your display currency (the practice account itself is kept in dollars).</Hint></>}
+        actions={account && <span className="row gap"><span className="muted small">Practice account <Money v={account.equity} from="USD" /><FxHint from="USD" /></span>
           {oppPositions.length > 0 && !STATIC && <button className="btn small" onClick={async () => { await api.paperCloseAll(); load(); setToast("All practice positions closed."); }}>Close all</button>}</span>}>
         {oppPositions.length ? (
           <div className="table-wrap"><table>
             <thead><tr><th>Stock</th><th>Side</th><th className="r">Qty</th><th className="r">Entry</th><th className="r">Now</th><th className="r">Stop</th><th className="r">Target</th><th className="r">P&amp;L</th></tr></thead>
             <tbody>{oppPositions.map((p) => (
               <tr key={p.symbol}><td><strong>{p.symbol}</strong></td><td className={p.side === "long" ? "up" : "down"}>{p.side}</td><td className="r num">{fmtNum(p.qty, 4)}</td>
-                <td className="r num">{fmtPrice(p.entry)}</td><td className="r num">{fmtPrice(p.price ?? null)}</td><td className="r num">{fmtPrice(p.stop)}</td><td className="r num">{fmtPrice(p.target)}</td>
-                <td className={`r num ${(p.pnl ?? 0) >= 0 ? "up" : "down"}`}>{fmtPrice(p.pnl ?? null)}</td></tr>))}
+                <td className="r num"><Price v={p.entry} symbol={p.symbol} alt="hover" /></td><td className="r num"><Price v={p.price} symbol={p.symbol} alt="hover" /></td><td className="r num"><Price v={p.stop} symbol={p.symbol} alt="hover" /></td><td className="r num"><Price v={p.target} symbol={p.symbol} alt="hover" /></td>
+                <td className={`r num ${(p.pnl ?? 0) >= 0 ? "up" : "down"}`}><Money v={p.pnl} from="USD" digits={2} /></td></tr>))}
             </tbody></table></div>
         ) : <Empty>No practice positions yet. Press Invest on an idea to try it with practice money.</Empty>}
       </Card>

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtPct, fmtPrice, fmtTime, stockPath, tone } from "../lib/format";
+import { fmtListed, fmtPct, fmtTime, stockPath, tone } from "../lib/format";
+import { Price } from "../lib/currency";
 import { useQuotes } from "../lib/quotes";
 import type { AlertKind, PriceAlert, Watchlist } from "../lib/types";
 import { Hint } from "./Hint";
@@ -11,7 +12,7 @@ import { Card, Empty, ErrorBox, Spinner } from "./ui";
 const KIND_LABEL: Record<AlertKind, string> = { above: "Goes above", below: "Falls below", move: "Moves more than" };
 
 function describe(a: PriceAlert) {
-  return a.kind === "move" ? `${KIND_LABEL.move} ${a.value}% in a day` : `${KIND_LABEL[a.kind]} ${fmtPrice(a.value)}`;
+  return a.kind === "move" ? `${KIND_LABEL.move} ${a.value}% in a day` : `${KIND_LABEL[a.kind]} ${fmtListed(a.value, a.symbol)}`;
 }
 
 /** Inline form: "Tell me when SYMBOL goes above / falls below / moves X%". */
@@ -81,12 +82,12 @@ export function MyAlerts() {
                 <div className="feed-main">
                   <strong><Link className="link" to={stockPath(a.symbol)}>{a.symbol}</Link> <span className="muted small">{describe(a)}</span></strong>
                   <span className="muted small">
-                    {a.active ? "Watching" : `Fired ${a.triggered_at ? fmtTime(a.triggered_at) : ""} at ${fmtPrice(a.triggered_price)}`}
+                    {a.active ? "Watching" : `Fired ${a.triggered_at ? fmtTime(a.triggered_at) : ""} at ${fmtListed(a.triggered_price, a.symbol)}`}
                     {a.note ? ` · ${a.note}` : ""}
                   </span>
                 </div>
                 <div className="feed-num">
-                  <span>{fmtPrice(q?.price)}</span>
+                  <Price v={q?.price} symbol={a.symbol} alt="hover" />
                   <span className={`small ${tone(q?.change_pct)}`}>{q?.change_pct !== undefined ? fmtPct(q.change_pct, 2) : ""}</span>
                 </div>
                 <div className="row gap">
@@ -125,7 +126,7 @@ function WatchlistCard({ w, onChange }: { w: Watchlist; onChange: () => void }) 
                 <div className="feed-main"><strong><Link className="link" to={stockPath(s)}>{s}</Link></strong></div>
                 {q?.spark && <Sparkline data={q.spark} />}
                 <div className="feed-num">
-                  <span>{fmtPrice(q?.price)}</span>
+                  <Price v={q?.price} symbol={s} alt="hover" />
                   <span className={`small ${tone(q?.change_pct)}`}>{q?.change_pct !== undefined ? fmtPct(q.change_pct, 2) : ""}</span>
                 </div>
                 <button className="btn small ghost" aria-label={`Remove ${s}`} onClick={() => save(w.symbols.filter((x) => x !== s))}>✕</button>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtDay, fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
+import { asCcy, ccySign, fmtDay, fmtMoney, fmtNum, fmtPct, stockPath, type Ccy } from "../lib/format";
+import { FxHint, Money, Price, useCurrency } from "../lib/currency";
 import type { PortfolioDrift, PortfolioPlan, PortfolioRiskView } from "../lib/types";
 import { STATIC } from "../lib/snapshot";
 import { Hint } from "../components/Hint";
@@ -18,9 +19,14 @@ const ROLE = { core: "Picks", satellite: "Live idea", anchor: "S&P 500", cash: "
 // Monochrome on purpose: green and red are reserved for price direction (BRAND.md).
 const ROLE_COLOR = { core: "var(--text)", satellite: "var(--text-2)", anchor: "var(--text-3)", cash: "var(--surface-3)" } as const;
 
-function load(): { amount: string; currency: "EUR" | "USD"; risk: string; fractional: boolean } {
-  try { return { amount: "10000", currency: "EUR", risk: "balanced", fractional: true, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; }
-  catch { return { amount: "10000", currency: "EUR", risk: "balanced", fractional: true }; }
+// The plan's currency follows Settings > Display currency ("as listed" builds it in dollars, like its US stocks).
+interface Inputs { amount: string; risk: string; fractional: boolean }
+function load(): Inputs {
+  const base: Inputs = { amount: "10000", risk: "balanced", fractional: true };
+  try {
+    const { amount, risk, fractional } = { ...base, ...JSON.parse(localStorage.getItem(KEY) || "{}") };
+    return { amount: String(amount), risk, fractional: !!fractional };
+  } catch { return base; }
 }
 
 export default function Portfolio() {
@@ -28,16 +34,19 @@ export default function Portfolio() {
   const [plan, setPlan] = useState<PortfolioPlan | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const money = (v: number | null | undefined) => v === null || v === undefined ? "–"
-    : v.toLocaleString("en-GB", { style: "currency", currency: plan?.currency ?? inp.currency, maximumFractionDigits: 0 });
+  const cur = useCurrency();
+  const planCcy: "EUR" | "USD" = cur.pref === "EUR" ? "EUR" : "USD";
+  const pc: Ccy = plan?.currency ?? planCcy;   // the currency the plan's amounts come back in
+  const money = (v: number | null | undefined) => <Money v={v} from={pc} />;
 
   const build = async (next = inp) => {
     setBusy(true); setErr(null);
     try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
-    try { setPlan(await api.portfolio({ ...next, amount: Number(next.amount) })); } catch (e) { setErr(`Your plan could not be built. ${(e as Error).message}`); } finally { setBusy(false); }
+    try { setPlan(await api.portfolio({ ...next, currency: planCcy, amount: Number(next.amount) })); } catch (e) { setErr(`Your plan could not be built. ${(e as Error).message}`); } finally { setBusy(false); }
   };
+  // Built on arrival, and again if the display currency changes (the server converts at its live rate).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { build(); }, []);
+  useEffect(() => { build(); }, [planCcy]);
 
   const [drift, setDrift] = useState<PortfolioDrift | null>(null);
   const [tBusy, setTBusy] = useState(false);
@@ -46,7 +55,7 @@ export default function Portfolio() {
   const saveTarget = async () => {
     setTBusy(true); setTErr(null);
     // The plan on screen, not unsaved edits in the form.
-    const body = plan ? { amount: plan.amount, currency: plan.currency, risk: plan.risk, fractional: inp.fractional } : { ...inp, amount: Number(inp.amount) };
+    const body = plan ? { amount: plan.amount, currency: plan.currency, risk: plan.risk, fractional: inp.fractional } : { ...inp, currency: planCcy, amount: Number(inp.amount) };
     try { setDrift(await api.saveTarget(body)); } catch (e) { setTErr(`The target could not be saved. ${(e as Error).message}`); } finally { setTBusy(false); }
   };
   const removeTarget = async () => {
@@ -69,11 +78,9 @@ export default function Portfolio() {
 
       <Card>
         <form className="form" onSubmit={(e) => { e.preventDefault(); build(); }}>
-          <label className="field"><span>Amount to invest</span>
+          <label className="field" style={{ minWidth: 200 }}><span>Amount to invest, {ccySign(planCcy)}<Hint term="exchange-rate">The money you want to put in, in {planCcy === "EUR" ? "euros" : "US dollars"}{cur.pref === "listed" ? " (the currency of the plan's US stocks)" : ""}. Change it in Settings, Display currency.{planCcy === "EUR" ? " The US stocks are bought in dollars, so the plan converts at today's EUR/USD rate." : ""}</Hint></span>
             <input id="pf-amount" type="number" min="100" step="100" value={inp.amount} onChange={(e) => setInp({ ...inp, amount: e.target.value })} /></label>
-          <label className="field"><span>Currency</span>
-            <select id="pf-cur" value={inp.currency} onChange={(e) => setInp({ ...inp, currency: e.target.value as "EUR" | "USD" })}><option>EUR</option><option>USD</option></select></label>
-          <div className="field"><span>Risk level<Hint>{RISKS.map((r) => <span key={r.id} style={{ display: "block" }}><strong>{r.label}:</strong> {r.hint}</span>)}</Hint></span>
+          <div className="field" style={{ minWidth: "fit-content" }}><span>Risk level<Hint>{RISKS.map((r) => <span key={r.id} style={{ display: "block" }}><strong>{r.label}:</strong> {r.hint}</span>)}</Hint></span>
             <div className="segmented" role="radiogroup" aria-label="Risk level">
               {RISKS.map((r) => <button type="button" key={r.id} role="radio" aria-checked={inp.risk === r.id} className={inp.risk === r.id ? "active" : ""} onClick={() => setInp({ ...inp, risk: r.id })}>{r.label}</button>)}
             </div>
@@ -99,17 +106,17 @@ export default function Portfolio() {
             </div>
           </section>
 
-          <Card title={<>What to buy · {lines.length} positions<Hint>Your shopping list. Prices are in US dollars on US exchanges; amounts are converted to {plan.currency}. Place these orders at your broker, then come back monthly for the changes.</Hint></>}
-            actions={<span className="muted small">{plan.currency === "EUR" ? `1 EUR = ${fmtNum(plan.fx_usd_per_unit, 4)} USD` : ""}</span>}>
+          <Card title={<>What to buy · {lines.length} positions<Hint term="exchange-rate">Your shopping list. Each share price is in the currency the stock trades in (dollars for US stocks), with the converted value next to it; the amounts are in {cur.target(pc) === "EUR" ? "euros" : "dollars"}{plan.currency === "EUR" ? `, converted at 1 € = ${fmtMoney(plan.fx_usd_per_unit, "USD", 4)}` : ""}. Your broker's rate and fees may differ a little. Place these orders at your broker, then come back monthly for the changes.</Hint></>}
+            actions={plan.currency === "EUR" ? <span className="muted small fx-rate">1 € = {fmtMoney(plan.fx_usd_per_unit, "USD", 4)}</span> : <FxHint from={pc} />}>
             {!lines.length && plan.cash <= 0.5 ? <Empty>Nothing to buy with this amount. Try a larger amount or tick "Fractional shares".</Empty> : <ul className="pick-cards always">
               {lines.map((l) => (
                 <li key={l.symbol}>
                   <div className="pc-top">
                     <Badge>{ROLE[l.role]}</Badge>
                     <Link to={stockPath(l.symbol)} className="pc-name"><strong>{l.name}</strong><span className="muted small">{l.symbol}{l.sector ? ` · ${l.sector}` : ""}</span></Link>
-                    <span className="pc-num"><span className="num">{money(l.invested)}</span><span className="muted small">{fmtNum(l.shares, 4)} shares × ${fmtPrice(l.price)}</span></span>
+                    <span className="pc-num"><span className="num">{money(l.invested)}</span><span className="muted small">{fmtNum(l.shares, 4)} shares × <Price v={l.price} symbol={l.symbol} alt="hover" /></span></span>
                   </div>
-                  <p className="muted small">{fmtNum(l.invested / plan.amount * 100, 1)}% of the portfolio{l.stop ? ` · stop-loss $${fmtNum(l.stop, 2)}` : ""}{l.note ? ` · ${l.note}` : ""}</p>
+                  <p className="muted small">{fmtNum(l.invested / plan.amount * 100, 1)}% of the portfolio{l.stop ? <> · stop-loss <Price v={l.stop} symbol={l.symbol} /></> : ""}{l.note ? ` · ${l.note}` : ""}</p>
                 </li>))}
               {plan.cash > 0.5 && <li><div className="pc-top"><Badge>Cash</Badge><span className="pc-name"><strong>Keep in cash</strong><span className="muted small">{[
                 (plan.weighting?.to_cash ?? 0) > 0.005 ? "Kept out of the market by the risk limit" : "",
@@ -185,7 +192,19 @@ const RISK_LABEL: Record<string, string> = { cautious: "Cautious", balanced: "Ba
 
 function DriftCard({ drift, busy, err, onSave, onRemove }: { drift: PortfolioDrift | null; busy: boolean; err: string | null; onSave: () => void; onRemove: () => void }) {
   const t = drift?.target;
-  const cur = (v: number, c = drift?.currency ?? t?.currency ?? "EUR") => v.toLocaleString("en-GB", { style: "currency", currency: c, maximumFractionDigits: 0 });
+  const dc: Ccy = asCcy(drift?.currency ?? t?.currency) ?? "EUR";   // drift amounts come in the target's currency
+  const fx = useCurrency();
+  const cur = (v: number, c: string = dc) => <Money v={v} from={asCcy(c) ?? dc} />;
+  // Rebuilt here rather than the server's sentence, so the amounts follow the display currency (largest trades first).
+  const pick = (xs: { symbol: string; amount: number }[] | undefined, verb: string) =>
+    (xs ?? []).slice().sort((a, b) => b.amount - a.amount).map((x) => ({ ...x, verb }));
+  const sells = pick(drift?.sell, "sell"), buys = pick(drift?.buy, "buy");
+  const top = [...sells.slice(0, 3), ...buys.slice(0, 3)];
+  const more = sells.length + buys.length - top.length;
+  const suggestion = top.length
+    ? (top.map((x) => `${x.verb} about ${fx.money(x.amount, dc)} of ${x.symbol}`).join(", ")
+      + (more > 0 ? ` (and ${more} smaller trade${more > 1 ? "s" : ""})` : "") + ".").replace(/^./, (c) => c.toUpperCase())
+    : drift?.suggestion;
   const rows = (drift?.rows ?? []).filter((r) => r["target_%"] > 0.05 || r["current_%"] > 0.05);
   const limit = drift?.position_limit ?? 5;
   const live = drift && (drift.status === "on_target" || drift.status === "drifted");
@@ -212,14 +231,14 @@ function DriftCard({ drift, busy, err, onSave, onRemove }: { drift: PortfolioDri
       {drift && drift.status !== "no_target" && (
         <div className={drift.status === "drifted" ? "notice" : ""} style={{ margin: "12px 0" }}>
           <p style={{ margin: 0 }}>{drift.message}</p>
-          {drift.status === "drifted" && drift.suggestion && <p style={{ margin: "8px 0 0" }}><strong>Suggestion:</strong> {drift.suggestion} <Hint>Amounts are rounded and based on what your account is worth now. Place these orders yourself if you agree; nothing is traded automatically.</Hint></p>}
+          {drift.status === "drifted" && suggestion && <p style={{ margin: "8px 0 0" }}><strong>Suggestion:</strong> {suggestion} <Hint term={fx.converts(dc) ? "exchange-rate" : undefined}>Amounts are rounded and based on what your account is worth now.{fx.converts(dc) ? ` ${fx.fxNote(dc)}` : ""} Place these orders yourself if you agree; nothing is traded automatically.</Hint></p>}
         </div>
       )}
       {live && (
         <>
           <dl className="kv">
             <dt>Compared with<Hint>The practice account inside this app, or your real broker when one is connected (BROKER=... in .env).</Hint></dt><dd>{drift.source}</dd>
-            <dt>Account value</dt><dd>{drift.account_value ? cur(drift.account_value) : "–"}</dd>
+            <dt>Account value<FxHint from={dc} /></dt><dd>{drift.account_value ? cur(drift.account_value) : "–"}</dd>
             <dt>Largest gap<Hint>The position furthest from its target, in percentage points: 18% held instead of 10% is a gap of 8 points. An alert is sent above {fmtNum(limit, 0)} points.</Hint></dt><dd>{fmtNum(drift.max_drift, 1)} pts</dd>
             <dt>Money off plan<Hint>The share of your money that would have to move to be exactly on plan. An alert is sent above {fmtNum(drift.total_limit ?? 10, 0)}%.</Hint></dt><dd>{fmtNum(drift.total_drift, 1)}%</dd>
           </dl>

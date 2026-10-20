@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { fmtNum, fmtPrice, fmtTime } from "../lib/format";
+import { asCcy, fmtListed, fmtMoney, fmtNum, fmtTime } from "../lib/format";
+import { Money, Price, useCurrency } from "../lib/currency";
 import { STATIC } from "../lib/snapshot";
 import type { BrokerStatus, Opportunity, OrderPreviewResult } from "../lib/types";
 import { Hint } from "./Hint";
@@ -14,8 +15,6 @@ export function ModeBadge({ mode }: { mode: string }) {
   return mode === "live" ? <span className="badge live" title="Real money">Live</span> : <Badge>Paper</Badge>;
 }
 
-const money = (v: number | null | undefined, ccy: string) => ccy === "USD" ? `$${fmtPrice(v)}` : `${fmtPrice(v)} ${ccy}`;
-const eur = (v: number | null | undefined) => `€${fmtPrice(v)}`;
 
 /** Order ticket for one live idea: server-side plan, short-lived confirmation, extra step for real money. */
 export function OrderTicket({ o, onDone }: { o: Opportunity; onDone: (msg: string) => void }) {
@@ -24,6 +23,7 @@ export function OrderTicket({ o, onDone }: { o: Opportunity; onDone: (msg: strin
   const [busy, setBusy] = useState(false);
   const [ack, setAck] = useState(false);
   const [left, setLeft] = useState(0);
+  const fx = useCurrency();
   const body = { symbol: o.symbol, side: o.direction }; // prices, size and stop come from the server
 
   const review = useCallback(() => {
@@ -46,12 +46,16 @@ export function OrderTicket({ o, onDone }: { o: Opportunity; onDone: (msg: strin
     try {
       const r = await api.orderPlace({ ...body, confirm_token: pv.confirm_token });
       const what = `${o.direction === "long" ? "buy" : "short"} ${fmtNum(r.plan.qty, 4)} ${o.symbol}`;
-      onDone(r.placed ? `${live ? "LIVE" : "Paper"} order sent to ${brokerLabel(r.broker)}: ${what} near ${fmtPrice(r.plan.entry)}, stop-loss ${fmtPrice(r.plan.stop)}.`
+      onDone(r.placed ? `${live ? "LIVE" : "Paper"} order sent to ${brokerLabel(r.broker)}: ${what} near ${fmtListed(r.plan.entry, o.symbol)}, stop-loss ${fmtListed(r.plan.stop, o.symbol)}.`
         : `The order to ${what} was not filled (the price moved). Nothing was bought.`);
     } catch (e) { setErr((e as Error).message); setPv(null); } finally { setBusy(false); }
   };
 
-  const ccy = pv?.currency ?? "USD";
+  // Account money (cost, risk, equity) is in the broker account's currency; shown in the display currency,
+  // with the account-currency figure in brackets when converted. Prices stay in the stock's listing currency.
+  const ccy = asCcy(pv?.currency) ?? "USD";
+  const conv = fx.converts(ccy);
+  const orig = (v: number | null | undefined) => conv ? <span className="muted fx-orig">({fmtMoney(v, ccy, 2)} at the broker)</span> : null;
   const plan = pv?.plan;
   return (
     <div className={`invest-panel ticket ${live ? "ticket-live" : ""}`}>
@@ -71,24 +75,24 @@ export function OrderTicket({ o, onDone }: { o: Opportunity; onDone: (msg: strin
           <dl className="kv">
             <dt>{o.direction === "long" ? "Buy" : "Sell short"}<Hint>The number of shares (or coins) is calculated for you: hitting the stop-loss would lose about {fmtNum(plan.risk_pct_of_equity, 1)}% of your account, and one idea never takes more than 10% of it.</Hint></dt>
             <dd>{fmtNum(plan.qty, 4)} {o.symbol}</dd>
-            <dt>Estimated cost<Hint>Quantity times the current price. The real fill can differ a little because prices move.</Hint></dt>
-            <dd>{money(plan.value, ccy)}{pv.eur && <span className="muted"> ≈ {eur(pv.eur.value)}</span>}</dd>
-            <dt>Stop-loss<Hint term="stop-loss">If the price reaches this level, the position is closed to limit the loss. {pv.broker === "paper" ? "The app watches it." : "It is placed at the broker, so it works even if this app is off."}</Hint></dt>
-            <dd className="down">{fmtPrice(plan.stop)}</dd>
+            <dt>Estimated cost<Hint term={conv ? "exchange-rate" : undefined}>Quantity times the current price. The real fill can differ a little because prices move.{conv ? ` The broker account is in ${ccy === "USD" ? "dollars" : ccy}, shown here in ${fx.target(ccy) === "EUR" ? "euros" : fx.target(ccy)}. ${fx.fxNote(ccy)}` : ""}</Hint></dt>
+            <dd><Money v={plan.value} from={ccy} digits={2} />{orig(plan.value)}</dd>
+            <dt>Stop-loss<Hint term="stop-loss">If the price reaches this level, the position is closed to limit the loss. {pv.broker === "paper" ? "The app watches it." : "It is placed at the broker, so it works even if this app is off."} Prices are in the currency {o.symbol} trades in.</Hint></dt>
+            <dd className="down"><Price v={plan.stop} symbol={o.symbol} /></dd>
             <dt>Target<Hint>The price where the gain is taken. It is about twice as far as the stop-loss. Reaching it is not guaranteed.</Hint></dt>
-            <dd className="up">{fmtPrice(plan.target)}</dd>
-            <dt>Risk if stopped<Hint>The most you should lose if the stop-loss is hit, in money and as a share of your account. A gap (price jumping past the stop overnight) can make it bigger.</Hint></dt>
-            <dd className="down">{pv.eur ? eur(pv.eur.max_loss) : money(plan.max_loss, ccy)} · {fmtNum(plan.risk_pct_of_equity, 2)}%{pv.eur && <span className="muted"> ({money(plan.max_loss, ccy)})</span>}</dd>
+            <dd className="up"><Price v={plan.target} symbol={o.symbol} /></dd>
+            <dt>Risk if stopped<Hint>The most you should lose if the stop-loss is hit, in money and as a share of your account. A gap (price jumping past the stop overnight) can make it bigger.{conv ? ` ${fx.fxNote(ccy)}` : ""}</Hint></dt>
+            <dd className="down"><Money v={plan.max_loss} from={ccy} digits={2} /> · {fmtNum(plan.risk_pct_of_equity, 2)}%{orig(plan.max_loss)}</dd>
             <dt>Time limit<Hint>Short-term idea: if neither the stop nor the target is hit, the position is closed after about {pv.hold_days ?? 5} trading days.</Hint></dt>
             <dd>{pv.hold_days ?? 5} days{pv.expires_at && <span className="muted"> · idea valid until {fmtTime(pv.expires_at)}</span>}</dd>
-            <dt>Account<Hint>Your account value at {brokerLabel(pv.broker)}. Buying power is how much you can still invest.</Hint></dt>
-            <dd>{money(pv.equity, ccy)}{pv.buying_power != null && <span className="muted"> · buying power {money(pv.buying_power, ccy)}</span>}</dd>
+            <dt>Account<Hint>Your account value at {brokerLabel(pv.broker)}. Buying power is how much you can still invest.{conv ? ` ${fx.fxNote(ccy)}` : ""}</Hint></dt>
+            <dd><Money v={pv.equity} from={ccy} />{pv.buying_power != null && <span className="muted"> · buying power <Money v={pv.buying_power} from={ccy} /></span>}</dd>
             <dt>Order type<Hint term="limit-vs-market">How the order is sent. A limit order will not fill at a worse price than shown, so a sudden jump cannot surprise you.</Hint></dt>
             <dd className="small">{pv.order_type}</dd>
           </dl>
           {!pv.can_place && <div className="error" role="alert">{pv.block_reason}</div>}
           {live && pv.can_place && !expired && (
-            <label className="check ticket-ack"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> I understand this is a real order with real money, and I can lose up to {pv.eur ? eur(pv.eur.max_loss) : money(plan.max_loss, ccy)} or more.</label>
+            <label className="check ticket-ack"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> I understand this is a real order with real money, and I can lose up to {fx.money(plan.max_loss, ccy, 2)}{conv ? ` (${fmtMoney(plan.max_loss, ccy, 2)})` : ""} or more.</label>
           )}
           <div className="row gap wrap-row">
             {expired ? <button className="btn" onClick={review}>Prices may have moved · Review again</button> : (

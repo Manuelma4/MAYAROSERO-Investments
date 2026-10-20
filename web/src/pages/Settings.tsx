@@ -8,11 +8,13 @@ import { setThemePref, useTheme, type ThemePref } from "../lib/theme";
 import { Badge, Card } from "../components/ui";
 import { Hint } from "../components/Hint";
 import { KillSwitch, ModeBadge, brokerLabel } from "../components/Trading";
-import { fmtNum, fmtPrice } from "../lib/format";
+import { asCcy, fmtMoney, fmtNum, fmtTime } from "../lib/format";
+import { DISPLAY_OPTIONS, FxHint, Money, useCurrency } from "../lib/currency";
 import type { BrokerStatus, DigestPreview } from "../lib/types";
 
 export default function Settings() {
   const { pref } = useTheme();
+  const cur = useCurrency();
   const { status } = useLive();
   const [notify, setNotify] = useState(browserNotifyEnabled());
   const [token, setTok] = useState(getToken() ?? "");
@@ -22,6 +24,7 @@ export default function Settings() {
   const loadBroker = useCallback(() => { api.brokerStatus().then(setBroker).catch(() => undefined); }, []);
   useEffect(() => { loadBroker(); }, [loadBroker]);
   const lim = broker?.limits;
+  const acct = asCcy(broker?.currency) ?? "USD";
   const [digest, setDigest] = useState<DigestPreview | null>(null);
   const [digestBusy, setDigestBusy] = useState(false);
   const [digestMsg, setDigestMsg] = useState<string | null>(null);
@@ -41,7 +44,7 @@ export default function Settings() {
       <section className="hero-x">
         <p className="eyebrow">Settings · {broker ? (broker.mode === "live" ? "real money on" : "practice money only") : "checking the broker"}</p>
         <h1 className="display">Settings</h1>
-        <p className="muted lead">Trading safety, appearance, notifications and access.</p>
+        <p className="muted lead">Trading safety, currency, appearance, notifications and access.</p>
       </section>
 
       <Card title="Tools" className="mobile-only">
@@ -59,7 +62,7 @@ export default function Settings() {
       <Card title="Trading">
         <div className="setting">
           <div><strong>Broker</strong><Hint>Where Invest orders go. Practice account = fake money inside this app. Alpaca and exchanges start on their paper (test) account. Change it with BROKER=... in the server's .env file.</Hint>
-            <p className="muted small">{broker ? (broker.connected ? `Connected · account ${fmtPrice(broker.equity ?? null)} ${broker.currency ?? ""} · buying power ${fmtPrice(broker.buying_power ?? null)}` : `Not connected: ${broker.error ?? "unknown"}`) : "Checking…"}</p>
+            <p className="muted small">{broker ? (broker.connected ? <>Connected · account <Money v={broker.equity} from={acct} /> · buying power <Money v={broker.buying_power} from={acct} /><FxHint from={acct} /></> : `Not connected: ${broker.error ?? "unknown"}`) : "Checking…"}</p>
           </div>
           {broker && <span className="row gap"><ModeBadge mode={broker.mode} /><Badge>{brokerLabel(broker.broker)}</Badge></span>}
         </div>
@@ -76,14 +79,28 @@ export default function Settings() {
                 <li>Risk per idea: {fmtNum(lim.risk_per_trade_pct, 1)}% of the account<Hint term="risk-per-trade">The loss if the stop-loss is hit. 1% means a 10,000 account loses about 100 on a bad idea.</Hint></li>
                 <li>Max per position: {fmtNum(lim.max_position_pct, 0)}% of the account<Hint term="position-size">No single idea can take more than this share of your money.</Hint></li>
                 <li>Max open ideas: {lim.max_open_positions}<Hint>How many Invest positions can be open at the same time.</Hint></li>
-                <li>Daily loss stop: {fmtNum(lim.max_daily_loss_pct, 0)}%{lim.max_daily_loss_value ? ` or ${fmtNum(lim.max_daily_loss_value, 0)}` : ""}<Hint>After losing this much in one day (open losses included), new orders are refused until tomorrow.</Hint></li>
-                {lim.max_order_value ? <li>Max order size: {fmtNum(lim.max_order_value, 0)}<Hint>No single order can cost more than this, in the account's currency.</Hint></li> : null}
+                <li>Daily loss stop: {fmtNum(lim.max_daily_loss_pct, 0)}%{lim.max_daily_loss_value ? ` or ${fmtMoney(lim.max_daily_loss_value, acct, 0)}` : ""}<Hint>After losing this much in one day (open losses included), new orders are refused until tomorrow.</Hint></li>
+                {lim.max_order_value ? <li>Max order size: {fmtMoney(lim.max_order_value, acct, 0)}<Hint>No single order can cost more than this, in the account's currency (it is checked by the broker account, so it is not converted).</Hint></li> : null}
                 <li>Short positions: at most {fmtNum(lim.max_short_exposure_pct, 0)}% of the account<Hint term="short-selling">Betting on a fall (short) is riskier, so it is capped.</Hint></li>
               </ul>
             </div>
           </div>
         )}
         <KillSwitch status={broker} onChange={loadBroker} />
+      </Card>
+
+      <Card title={<>Display currency<Hint term="exchange-rate">The currency money is shown in across the app: your plan, order costs, profits and losses, account values. Stock prices always stay in the currency they trade in (dollars for Apple, euros for LVMH), with the converted value next to them. Changing it never changes what you own.</Hint></>}>
+        <div className="segmented wide" role="radiogroup" aria-label="Display currency">
+          {DISPLAY_OPTIONS.map((o) => (
+            <button key={o.id} role="radio" aria-checked={cur.pref === o.id} className={cur.pref === o.id ? "active" : ""} onClick={() => cur.setPref(o.id)}>
+              {o.label}
+            </button>))}
+        </div>
+        <p className="muted small">{DISPLAY_OPTIONS.find((o) => o.id === cur.pref)?.hint}</p>
+        <p className="muted small fx-rate">{cur.perEur.USD
+          ? <>Live rate: <strong>1 € = {fmtMoney(cur.perEur.USD, "USD", 4)}</strong>{cur.updated ? ` · updated ${fmtTime(cur.updated / 1000)}` : ""}, refreshed every 5 minutes.
+            <Hint>Converted amounts use this mid-market rate. Your broker converts at its own rate and usually adds a fee (often 0.1% to 1%), so what you really pay can differ a little.</Hint></>
+          : "Live rate loading… Until it arrives, amounts are shown in their original currency."}</p>
       </Card>
 
       <Card title="Appearance">

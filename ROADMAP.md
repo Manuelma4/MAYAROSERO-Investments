@@ -117,7 +117,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         move together, its worst historical drop, compared with simply holding the S&P 500.
 20. [x] **Screener**: filter the S&P 500 by sector, size, valuation (P/E), dividend yield, momentum and trend
         on Discover, with fundamentals cached once a day.
-21. [ ] **Euro everywhere**: show amounts in € (live EUR/USD) with the dollar price on hover, set in Settings.
+21. [x] **Euro everywhere**: show amounts in € (live EUR/USD) with the dollar price on hover, set in Settings.
 
 ## Later research track
 - Microsoft Qlib + RD-Agent to discover better ranking factors for the monthly core picks

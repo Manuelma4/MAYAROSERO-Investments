@@ -1,18 +1,20 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { fmtDay, fmtNum } from "../lib/format";
+import { asCcy, fmtDay, fmtNum } from "../lib/format";
+import { FxHint, useCurrency } from "../lib/currency";
 import type { PortfolioRiskView, WorstDrop } from "../lib/types";
 import { Hint } from "./Hint";
 import { Card } from "./ui";
 
 /** "How risky is this plan?": plain-English sentences first, then the numbers side by side with the S&P 500. */
 export function RiskCard({ risk }: { risk: PortfolioRiskView | undefined }) {
+  const fx = useCurrency();
   if (!risk) return null;
   const title = <>How risky is this plan?<Hint>What this exact mix could lose in a bad month, how it fell in the past, and how well its holdings spread the risk, always next to simply putting the same money in the S&amp;P&nbsp;500.</Hint></>;
   if (risk.status !== "ok" || !risk.month || !risk.worst_drop || !risk.diversification) {
     return <Card title={title}><p className="muted small">{risk.message ?? "The risk view is not available right now."}</p></Card>;
   }
-  const ccy = risk.currency ?? "EUR";
-  const money = (v: number) => v.toLocaleString("en-GB", { style: "currency", currency: ccy, maximumFractionDigits: 0 });
+  const ccy = asCcy(risk.currency) ?? "EUR";   // the plan's currency; shown in the display currency
+  const money = (v: number) => fx.money(v, ccy);
   const { plan, spy } = risk.month;
   const dp = risk.worst_drop.plan, ds = risk.worst_drop.spy;
   const d = risk.diversification;
@@ -47,7 +49,7 @@ export function RiskCard({ risk }: { risk: PortfolioRiskView | undefined }) {
 
       <div className="table-wrap">
         <table className="risk-table">
-          <thead><tr><th scope="col"><span className="sr-only">Measure</span></th><th scope="col">This plan</th><th scope="col">S&amp;P 500</th></tr></thead>
+          <thead><tr><th scope="col"><span className="sr-only">Measure</span></th><th scope="col">This plan<FxHint from={ccy} /></th><th scope="col">S&amp;P 500</th></tr></thead>
           <tbody>{rows.map(([label, a, b], i) => <tr key={i}><td>{label}</td><td>{a}</td><td>{b}</td></tr>)}</tbody>
         </table>
       </div>

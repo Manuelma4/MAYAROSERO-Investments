@@ -6,6 +6,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { Spinner } from "./components/ui";
 import { Tour } from "./components/Tour";
 import { LiveProvider, useLive } from "./lib/live";
+import { CurrencyProvider } from "./lib/currency";
 import { STATIC, snapshotMeta } from "./lib/snapshot";
 import Overview from "./pages/Overview";
 
@@ -97,5 +98,5 @@ function Shell() {
 }
 
 export default function App() {
-  return <LiveProvider><Shell /></LiveProvider>;
+  return <LiveProvider><CurrencyProvider><Shell /></CurrencyProvider></LiveProvider>;
 }

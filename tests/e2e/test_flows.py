@@ -438,6 +438,39 @@ def test_screener_preset_filters_sorts_and_opens_a_stock(ui):
         assert "size=mega" in ui.page.url
     ui.page.get_by_role("button", name="Clear filters").click()
     expect(title).to_contain_text(f"{len(STOCKS)} of {len(STOCKS)} stocks")
+
+
+def test_display_currency_switch_changes_amounts_and_persists(ui):
+    # Default: euros. Plan amounts in €, a US stock's price in $ with the euro value next to it,
+    # a Paris listing in € with nothing to convert.
+    ui.goto("/portfolio")
+    amount = ui.page.locator(".pick-cards .pc-num > .num").first
+    expect(amount).to_contain_text("€", timeout=30_000)
+    ui.goto("/stock/AAPL")
+    price = ui.page.locator(".sp-price")
+    expect(price).to_contain_text("$")
+    expect(price.locator(".fx-alt")).to_contain_text("≈ €")
+    ui.goto("/stock/MC.PA")
+    expect(ui.page.locator(".sp-price")).to_contain_text("€")
+    expect(ui.page.locator(".sp-price .fx-alt")).to_have_count(0)
+
+    # Switch to dollars in Settings: the plan is rebuilt in dollars, the Paris stock gets a "≈ $" value.
+    ui.goto("/settings")
+    group = ui.page.get_by_role("radiogroup", name="Display currency")
+    expect(group.get_by_role("radio", name="Euro €")).to_have_attribute("aria-checked", "true")
+    group.get_by_role("radio", name="Dollar $").click()
+    expect(group.get_by_role("radio", name="Dollar $")).to_have_attribute("aria-checked", "true")
+    expect(ui.page.get_by_text("Live rate: 1 € = $")).to_be_visible()
+    ui.goto("/portfolio")
+    expect(amount).to_contain_text("$", timeout=30_000)
+    expect(amount).not_to_contain_text("€")
+    ui.page.reload()                                   # remembered in this browser
+    expect(amount).to_contain_text("$", timeout=30_000)
+    ui.goto("/stock/MC.PA")
+    expect(ui.page.locator(".sp-price .fx-alt")).to_contain_text("≈ $")
+    ui.goto("/settings")
+    expect(ui.page.get_by_role("radiogroup", name="Display currency").get_by_role("radio", name="Dollar $")) \
+        .to_have_attribute("aria-checked", "true")
     ui.check()
 
 

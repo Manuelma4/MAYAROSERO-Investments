@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtDay, fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
+import { fmtDay, fmtNum, fmtPct, stockPath } from "../lib/format";
+import { Price } from "../lib/currency";
 import { useQuotes } from "../lib/quotes";
 import { STATIC } from "../lib/snapshot";
 import type { PicksResult } from "../lib/types";
@@ -134,7 +135,7 @@ export default function Picks() {
                     <div className="pc-top">
                       <span className="muted small">{String(i + 1).padStart(2, "0")}</span>
                       <Link to={stockPath(p.symbol)} className="pc-name"><strong>{p.name}</strong><span className="muted small">{p.symbol} · {fmtNum(100 / res.picks.length, 1)}% of the money</span></Link>
-                      <span className="pc-num"><span className="num">{fmtPrice(q?.price ?? p.price)}</span>{q?.change_pct !== undefined && <Delta v={q.change_pct} digits={2} />}</span>
+                      <span className="pc-num"><Price className="num" v={q?.price ?? p.price} symbol={p.symbol} alt="stack" />{q?.change_pct !== undefined && <Delta v={q.change_pct} digits={2} />}</span>
                     </div>
                     {p.reason && <p className="muted small">{p.reason}</p>}
                   </li>);
@@ -153,7 +154,7 @@ export default function Picks() {
                           {p.reason && <div className="muted small pick-reason">{p.reason}</div>}</td>
                         <td className="muted hide-sm">{p.sector}</td>
                         <td><ScoreBar v={p.score} /></td>
-                        <td className="r num">{fmtPrice(q?.price ?? p.price)}</td>
+                        <td className="r num"><Price v={q?.price ?? p.price} symbol={p.symbol} alt="stack" /></td>
                         <td className="r num">{q?.change_pct !== undefined ? <Delta v={q.change_pct} digits={2} /> : "–"}</td>
                         <td className="r num"><Delta v={p["return_1m_%"]} /></td>
                         <td className="r num hide-sm"><Delta v={p["momentum_12_1_%"]} /></td>

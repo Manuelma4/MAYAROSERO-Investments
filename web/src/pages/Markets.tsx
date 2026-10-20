@@ -4,6 +4,7 @@ import { STATIC } from "../lib/snapshot";
 import { isCrypto, marketName } from "../lib/markets";
 import { api } from "../lib/api";
 import { fmtNum, fmtPrice } from "../lib/format";
+import { Price } from "../lib/currency";
 import type { ChartData } from "../lib/types";
 import { LinesChart, PriceChart, SERIES, downColor, upColor, type Marker, type Overlay } from "../components/charts";
 import { MarketPicker, PRESETS, type MarketSel } from "../components/MarketPicker";
@@ -118,7 +119,7 @@ export default function Markets() {
           </Card>
           <Card title={<>Structure<Hint>An automatic reading of the chart. The quickest check: trend "Uptrend" and price above the 200-day average (EMA200) means the long-term wind is at its back.</Hint></>}>
             <div className="stats tight">
-              <Stat label="Last" value={fmtPrice(a.close)} hint="The latest price on this chart." />
+              <Stat label="Last" value={<Price v={a.close} symbol={data.symbol} alt="stack" />} hint="The latest price on this chart, in the currency it trades in (indices are in points)." />
               <Stat label="Trend" term="uptrend" value={trendLabel} tone={trendTone} hint="Uptrend = higher highs and higher lows; downtrend = the opposite; range = neither (Dow theory)." />
               <Stat label="RSI 14" term="rsi" value={fmtNum(a.rsi, 1)} tone={a.rsi > 70 ? "down" : a.rsi < 30 ? "up" : ""} hint="Momentum from 0 to 100. Above 70 = stretched after a strong rise (overbought), below 30 = stretched after a fall (oversold)." />
               <Stat label="Daily range" term="atr" value={`${fmtNum(a.atr_pct, 2)}%`} hint="ATR: how much the price typically moves in one candle, as a % of the price. Useful to place a stop-loss outside normal noise." />

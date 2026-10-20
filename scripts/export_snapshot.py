@@ -21,6 +21,7 @@ from tradebot.universe import CRYPTO, CURATED, STOCKS
 
 MARKETS = ["^GSPC", "^NDX", "^DJI", "^FCHI", "^GDAXI", "^STOXX50E", "BTC/USDT", "ETH/USDT", "SOL/USDT",
            "GC=F", "CL=F", "EURUSD=X"]
+FX = ["EURCHF=X", "EURGBP=X"]   # display-currency conversion (EURUSD=X is in MARKETS)
 PRESETS = ["quality_momentum", "momentum", "trend_following", "low_volatility"]
 
 
@@ -51,7 +52,7 @@ def main(out: Path) -> None:
 
         save("strategies.json", get("/api/strategies"))
         save("universe.json", get("/api/universe"))
-        symbols = list(dict.fromkeys(MARKETS + [s.symbol for s in STOCKS] + [s for s, _ in CRYPTO]))
+        symbols = list(dict.fromkeys(MARKETS + FX + [s.symbol for s in STOCKS] + [s for s, _ in CRYPTO]))
         quotes = get("/api/quotes", symbols=",".join(symbols))
         save("quotes.json", {q["symbol"]: q for q in quotes})
         print(f"quotes: {sum('price' in q for q in quotes)}/{len(quotes)}")

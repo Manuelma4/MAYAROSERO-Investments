@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { fmtNum, fmtPct, fmtPrice, fmtTime, tone } from "../lib/format";
+import { fmtListed, fmtNum, fmtPct, fmtTime, tone } from "../lib/format";
+import { FxHint, Money } from "../lib/currency";
 import type { LiveEvent, PaperState } from "../lib/types";
 import { useLive } from "../lib/live";
 import { Badge, Card, Empty, ErrorBox, Spinner, Stat } from "../components/ui";
@@ -37,8 +38,8 @@ function SignalRow({ e }: { e: LiveEvent }) {
         <span className="muted small">{e.strategy} · {fmtTime(e.time)}</span>
       </div>
       <div className="feed-num">
-        <span>{fmtPrice(e.price)}</span>
-        <span className="muted small">SL {fmtPrice(e.stop)} · TP {fmtPrice(e.target ?? null)}{rr ? ` · ${rr.toFixed(1)}R` : ""}</span>
+        <span>{fmtListed(e.price, e.symbol)}</span>
+        <span className="muted small">SL {fmtListed(e.stop, e.symbol)} · TP {fmtListed(e.target ?? null, e.symbol)}{rr ? ` · ${rr.toFixed(1)}R` : ""}</span>
       </div>
     </li>
   );
@@ -106,7 +107,7 @@ export default function Live() {
                 <div className="feed-num"><span className="muted small">{fmtTime(e.created_at)}</span></div>
               </> : <>
                 <div className="feed-main"><strong>{e.symbol}</strong><span className="muted small">{alertText(e)}{e.note ? ` · ${e.note}` : ""}</span></div>
-                <div className="feed-num"><span>{fmtPrice(e.price)}</span><span className="muted small">{fmtTime(e.created_at)}</span></div>
+                <div className="feed-num"><span>{fmtListed(e.price, e.symbol)}</span><span className="muted small">{fmtTime(e.created_at)}</span></div>
               </>}
             </li>))}
           </ul>
@@ -131,7 +132,7 @@ export default function Live() {
       </div>
 
       {paper?.enabled && (
-        <Card title={<>Practice trades from signals<Hint>The engine trades its own setup signals with practice (paper) money, to show how they would do. No real money is involved.</Hint></>} actions={<span className="muted small">Cash {fmtPrice(paper.cash)}</span>}>
+        <Card title={<>Practice trades from signals<Hint>The engine trades its own setup signals with practice (paper) money, to show how they would do. No real money is involved.</Hint></>} actions={<span className="muted small">Cash <Money v={paper.cash} from="USD" /><FxHint from="USD" /></span>}>
           <div className="table-wrap">
             <table>
               <thead><tr><th>Symbol</th><th>Strategy</th><th>Side</th><th>Entry</th><th>Stop</th><th>Target</th><th>Opened</th></tr></thead>
@@ -139,7 +140,7 @@ export default function Live() {
                 {paper.positions.length ? paper.positions.map((p) => (
                   <tr key={`${p.symbol}${p.strategy}`}>
                     <td>{p.symbol}</td><td>{p.strategy}</td><td className={p.side === "long" ? "up" : "down"}>{p.side}</td>
-                    <td>{fmtPrice(p.entry)}</td><td>{fmtPrice(p.stop)}</td><td>{fmtPrice(p.target)}</td><td>{fmtTime(p.entry_time)}</td>
+                    <td>{fmtListed(p.entry, p.symbol)}</td><td>{fmtListed(p.stop, p.symbol)}</td><td>{fmtListed(p.target, p.symbol)}</td><td>{fmtTime(p.entry_time)}</td>
                   </tr>)) : <tr><td colSpan={7} className="muted">No open positions</td></tr>}
               </tbody>
             </table>
@@ -149,8 +150,8 @@ export default function Live() {
               <table>
                 <thead><tr><th>Closed</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th><th>Reason</th><th>PnL</th></tr></thead>
                 <tbody>{paper.history.slice(0, 50).map((h, i) => (
-                  <tr key={i}><td>{fmtTime(h.exit_time)}</td><td>{h.symbol}</td><td>{h.side}</td><td>{fmtPrice(h.entry)}</td>
-                    <td>{fmtPrice(h.exit)}</td><td>{h.reason}</td><td className={tone(h.pnl)}>{fmtPrice(h.pnl)}</td></tr>))}
+                  <tr key={i}><td>{fmtTime(h.exit_time)}</td><td>{h.symbol}</td><td>{h.side}</td><td>{fmtListed(h.entry, h.symbol)}</td>
+                    <td>{fmtListed(h.exit, h.symbol)}</td><td>{h.reason}</td><td className={tone(h.pnl)}><Money v={h.pnl} from="USD" digits={2} /></td></tr>))}
                 </tbody>
               </table>
             </div>

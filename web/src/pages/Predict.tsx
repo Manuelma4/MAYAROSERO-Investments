@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtDay, fmtPct, fmtPrice, stockPath } from "../lib/format";
+import { fmtDay, fmtListed, fmtPct, stockPath } from "../lib/format";
 import { STATIC } from "../lib/snapshot";
 import type { PredictionsResult, RankedItem } from "../lib/types";
 import { ForecastPanel } from "../components/Forecast";
@@ -18,7 +18,7 @@ function Row({ it, side, horizon }: { it: RankedItem; side: "up" | "down"; horiz
       <button className="pred-row-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
         <span className="pr-sym">{it.symbol}</span>
         <span className="pr-name"><strong>{it.name}</strong><span className="muted small">{it.reason}</span></span>
-        <span className="pr-num"><span className={side === "up" ? "up" : "down"}>{side === "up" ? `Top ${(11 - it.decile) * 10}%` : `Bottom ${it.decile * 10}%`}</span><span className="muted small">{fmtPct(p * 100, 0, false)} {side === "up" ? "to beat" : "to lag"} · {fmtPrice(it.price)}</span></span>
+        <span className="pr-num"><span className={side === "up" ? "up" : "down"}>{side === "up" ? `Top ${(11 - it.decile) * 10}%` : `Bottom ${it.decile * 10}%`}</span><span className="muted small">{fmtPct(p * 100, 0, false)} {side === "up" ? "to beat" : "to lag"} · {fmtListed(it.price, it.symbol)}</span></span>
       </button>
       {open && (
         <div className="pred-detail">

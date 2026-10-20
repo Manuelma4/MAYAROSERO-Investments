@@ -139,6 +139,13 @@ export const GLOSSARY = [
     related: ["spy", "diversification"],
   },
   {
+    id: "exchange-rate", term: "Exchange rate / currency risk", aka: ["currency risk", "EUR/USD", "FX", "euro dollar rate", "conversion"],
+    definition: "How many dollars one euro buys today. It moves every day, so a US stock can gain in dollars and still lose a little in euros, or the other way round.",
+    inApp: "Settings › Display currency shows money in euros (or dollars) at the live EUR/USD rate. Stock prices stay in their own currency with the converted value next to them, and the risk view of a euro plan includes the rate's moves.",
+    example: "At 1 € = $1.16, a $531 Apple share is about €458. If the dollar weakens to 1 € = $1.25 and Apple does not move, it is worth about €425: a 7% loss in euros from the currency alone. Your broker also adds a small conversion fee.",
+    related: ["diversification", "volatility"],
+  },
+  {
     id: "expectancy", term: "Expectancy", aka: ["average R", "avg R"],
     definition: "The average result per trade, measured in units of risk (R).",
     inApp: "Backtest stats and the Invest-now part of the live track record.",

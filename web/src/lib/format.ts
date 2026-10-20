@@ -38,3 +38,51 @@ export const fmtDay = (iso: string | null | undefined) => {
   const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 };
+
+/** Currencies the app can show money in. */
+export type Ccy = "USD" | "EUR" | "CHF" | "GBP";
+
+// Yahoo suffix -> trading currency. London (.L) is left out on purpose: Yahoo quotes it in pence.
+const SUFFIX_CCY: Record<string, Ccy> = {
+  PA: "EUR", MC: "EUR", DE: "EUR", F: "EUR", AS: "EUR", MI: "EUR", BR: "EUR", LS: "EUR", HE: "EUR", VI: "EUR", IR: "EUR",
+  SW: "CHF",
+};
+
+/**
+ * The currency a symbol's price is quoted in, or null when the price is not money:
+ * index points (^GSPC), exchange rates (EURUSD=X) and listings whose currency is unknown.
+ * "AAPL" -> USD, "MC.PA" -> EUR, "NESN.SW" -> CHF, "BTC/USDT" -> USD (a dollar stablecoin), "GC=F" -> USD.
+ */
+export function listingCurrency(symbol: string): Ccy | null {
+  const s = symbol.trim().toUpperCase();
+  if (!s || s.startsWith("^") || s.endsWith("=X")) return null;
+  if (s.includes("/")) {
+    const quote = s.slice(s.indexOf("/") + 1);
+    return quote === "EUR" ? "EUR" : /^(USD|USDT|USDC|BUSD|FDUSD)$/.test(quote) ? "USD" : null;
+  }
+  if (s.endsWith("=F")) return "USD";
+  const dot = s.lastIndexOf(".");
+  if (dot < 0) return "USD";
+  return SUFFIX_CCY[s.slice(dot + 1)] ?? null;
+}
+
+const CCY_SIGN: Record<Ccy, string> = { USD: "$", EUR: "€", CHF: "CHF ", GBP: "£" };
+export const ccySign = (c: Ccy) => CCY_SIGN[c].trim();
+export const isCcy = (c: string | null | undefined): c is Ccy => !!c && c in CCY_SIGN;
+/** Account currencies as brokers report them ("USDT" at an exchange counts as dollars). */
+export const asCcy = (c: string | null | undefined): Ccy | null => {
+  const u = (c ?? "").toUpperCase();
+  return /^(USDT|USDC|BUSD|FDUSD)$/.test(u) ? "USD" : isCcy(u) ? u : null;
+};
+
+/** "$531.13", "€10,000", "CHF 80.12", "−€300". Without `digits`: price-style precision. */
+export function fmtMoney(v: number | null | undefined, ccy: Ccy | null, digits?: number): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "–";
+  const a = Math.abs(v);
+  const body = digits === undefined ? fmtPrice(a)
+    : a.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return `${v < 0 ? "−" : ""}${ccy ? CCY_SIGN[ccy] : ""}${body}`;
+}
+
+/** A price in its listing currency: "$531.13" for AAPL, "€612.40" for MC.PA, "6,712.35" for ^GSPC. */
+export const fmtListed = (v: number | null | undefined, symbol: string) => fmtMoney(v, listingCurrency(symbol));

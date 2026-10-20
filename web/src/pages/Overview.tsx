@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtDay, fmtPct, fmtPrice, fmtTime, stockPath } from "../lib/format";
+import { fmtDay, fmtListed, fmtPct, fmtTime, stockPath } from "../lib/format";
+import { FxRate, Price } from "../lib/currency";
 import { useLive } from "../lib/live";
 import { MARKETS, STOCKS, marketName } from "../lib/markets";
 import { useQuotes } from "../lib/quotes";
@@ -22,7 +23,7 @@ function eventLine(e: LiveEvent): { title: string; what: string; value: string; 
   const when = fmtTime(e.created_at || e.time);
   if (e.type === "picks") return { title: "Picks updated", what: `Buy ${e.buy?.join(", ") || "nothing new"} · ${when}`, value: "Review", tone: "" };
   if (e.type === "earnings") return { title: e.symbol, what: `Reports ${e.phase === "today" ? "today" : "tomorrow"}${e.timing_text && e.timing !== "unknown" ? `, ${e.timing_text}` : ""} · ${when}`, value: e.avg_move_pct != null ? `±${e.avg_move_pct.toFixed(1)}%` : "Earnings", tone: "" };
-  if (e.type === "alert") return { title: e.symbol, what: `Your price alert fired · ${when}`, value: fmtPrice(e.price), tone: "" };
+  if (e.type === "alert") return { title: e.symbol, what: `Your price alert fired · ${when}`, value: fmtListed(e.price, e.symbol), tone: "" };
   if (e.type === "move") return { title: e.symbol, what: `${e.direction === "SURGE" ? "Sudden rise" : "Sudden drop"} · ${when}`, value: fmtPct(e.move_pct, 2), tone: (e.move_pct ?? 0) >= 0 ? "up" : "down" };
   // Live ideas carry "long" / "short" in direction; setup signals carry it in side.
   const long = (e.side ?? (e.direction as string | undefined)) === "long";
@@ -42,7 +43,7 @@ function MarketCard({ symbol, name, q }: { symbol: string; name: string; q?: Quo
       </div>
       {q?.error ? <div className="muted small mcard-err">Data unavailable</div> : q?.price === undefined ? <div className="skeleton" /> : (
         <div className="mcard-bottom">
-          <span className="mcard-price">{fmtPrice(q.price)}</span>
+          <Price className="mcard-price" v={q.price} symbol={symbol} alt="stack" />
           <Sparkline data={q.spark} width={110} height={38} />
         </div>
       )}
@@ -203,7 +204,7 @@ export default function Overview() {
 
       {(["Indices", "Crypto", "Commodities & FX"] as const).map((g, i) => (
         <section key={g}>
-          <h2 className="section-title">{g}{i === 0 && <Hint>Each card shows the price now, today's change (the colored box) and a line of the last 30 days. The line can fall while today is up: they cover different periods.</Hint>}</h2>
+          <h2 className="section-title">{g}{i === 0 && <Hint>Each card shows the price now, today's change (the colored box) and a line of the last 30 days. The line can fall while today is up: they cover different periods. Indices are in points; coins and commodities in dollars, with the converted value below.</Hint>}</h2>
           <div className="mcards">
             {MARKETS.filter((m) => m.group === g).map((m) => <MarketCard key={m.symbol} symbol={m.symbol} name={m.name} q={quotes[m.symbol]} />)}
           </div>
@@ -211,7 +212,7 @@ export default function Overview() {
       ))}
 
       <div className="grid-3">
-        <Card title={<>Watchlist<Hint>Live prices for the main markets and your watchlists. "Day" is the change since yesterday's close; the line shows the last 30 days. Tap a row to open its page.</Hint></>} className="span-2">
+        <Card title={<>Watchlist<Hint>Live prices for the main markets and your watchlists. "Day" is the change since yesterday's close; the line shows the last 30 days. Tap a row to open its page. Each price is in the currency the stock trades in; the smaller figure below is its value in your display currency.</Hint></>} actions={<FxRate />} className="span-2">
           <div className="table-wrap">
             <table className="watch">
               <thead><tr><th>Asset</th><th className="r">Price</th><th className="r">Day</th><th className="r hide-sm">30 days</th></tr></thead>
@@ -221,7 +222,7 @@ export default function Overview() {
                   return (
                     <tr key={s}>
                       <td><Link to={stockPath(s)} className="asset"><span className="avatar">{s.replace("^", "").slice(0, 2)}</span><span><strong>{s}</strong><span className="muted small">{marketName(s)}</span></span></Link></td>
-                      <td className="r num">{fmtPrice(q?.price)}</td>
+                      <td className="r num"><Price v={q?.price} symbol={s} alt="stack" /></td>
                       <td className={`r num ${(q?.change_pct ?? 0) >= 0 ? "up" : "down"}`}>{fmtPct(q?.change_pct, 2)}</td>
                       <td className="r hide-sm"><Sparkline data={q?.spark} width={100} height={28} /></td>
                     </tr>

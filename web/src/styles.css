@@ -821,3 +821,17 @@ th[aria-sort="ascending"] .th-sort, th[aria-sort="descending"] .th-sort { color:
   .scr-sort select { width: 100%; }
   .scr-coverage { margin-top: -4px; }
 }
+
+/* ---------- display currency: converted value next to a listing-currency price ---------- */
+.fx-alt { color: var(--text-2); font-weight: 400; font-size: 0.82em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fx-stack { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.fx-stack .fx-alt { font-size: 11.5px; }
+.sp-price .fx-alt { font-size: 15px; letter-spacing: 0.02em; }
+.mcard-price.fx-stack { align-items: flex-start; gap: 4px; }
+.mcard-price .fx-alt { font-size: 12px; }
+.fx-rate { font-variant-numeric: tabular-nums; }
+.fx-orig { margin-left: 0.35em; }
+.segmented.wide { display: flex; width: 100%; max-width: 420px; margin-bottom: 10px; }
+.segmented.wide button { flex: 1; white-space: nowrap; padding: 10px 8px; }
+.stat-value .fx-stack { align-items: flex-start; }
+.sp-wrap { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }

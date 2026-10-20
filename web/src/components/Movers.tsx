@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
+import { fmtNum, fmtPct, stockPath } from "../lib/format";
+import { Price } from "../lib/currency";
 import type { MoversBoard, MoverRow } from "../lib/types";
 import { Hint } from "./Hint";
 import { Card } from "./ui";
@@ -9,7 +10,7 @@ function Row({ m }: { m: MoverRow }) {
     <li className="mover-row">
       <Link className="mover-sym" to={stockPath(m.symbol)}>{m.symbol}</Link>
       <span className="muted small mover-name">{m.name}</span>
-      <span className="num">{fmtPrice(m.price)}</span>
+      <Price className="num" v={m.price} symbol={m.symbol} alt="hover" />
       <span className={`num ${m.change_pct >= 0 ? "up" : "down"}`}>{fmtPct(m.change_pct, 1)}</span>
       <span className={`num small ${m.rel_volume && m.rel_volume >= 1.8 ? "" : "muted"}`}>{m.rel_volume ? `${fmtNum(m.rel_volume, 1)}x vol` : "–"}</span>
     </li>
