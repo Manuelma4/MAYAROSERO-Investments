@@ -6,6 +6,7 @@ import { STATIC } from "../lib/snapshot";
 import type { Opportunity, OpportunitiesResult, OrderPlan, PaperAccount } from "../lib/types";
 import { AIDesk } from "../components/AIDesk";
 import { Hint } from "../components/Hint";
+import { SP500Movers } from "../components/Movers";
 import { Badge, Card, Empty, ErrorBox, Spinner } from "../components/ui";
 
 const CATALYST: Record<string, string> = {
@@ -132,7 +133,7 @@ export default function Opportunities() {
       </section>
       {toast && <div className="notice" role="status">{toast}</div>}
       <ErrorBox error={err} />
-      {!data && !err && <div className="empty"><Spinner /> Scanning ~150 stocks and coins…</div>}
+      {!data && !err && <div className="empty"><Spinner /> Scanning ~500 stocks and coins…</div>}
 
       {data && (
         <section>
@@ -141,6 +142,8 @@ export default function Opportunities() {
             : <Empty>Nothing qualifies right now. That is normal: the rules are strict on purpose. The scan repeats every 5 minutes and you get a notification when something appears.</Empty>}
         </section>
       )}
+
+      <SP500Movers board={data?.movers} />
 
       {watch.length > 0 && (
         <details className="customize">

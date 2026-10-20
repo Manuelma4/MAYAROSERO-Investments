@@ -122,7 +122,9 @@ export interface Opportunity {
   catalyst: string | null; headline: string | null; headline_url: string | null; headline_publisher: string | null;
   qualified: boolean; reasons: string[];
 }
-export interface OpportunitiesResult { as_of: string; us_market_open: boolean; items: Opportunity[] }
+export interface MoverRow { symbol: string; name: string; price: number; change_pct: number; rel_volume: number | null }
+export interface MoversBoard { gainers: MoverRow[]; losers: MoverRow[]; count: number; "breadth_up_%": number | null }
+export interface OpportunitiesResult { as_of: string; us_market_open: boolean; items: Opportunity[]; movers?: MoversBoard | null }
 export interface OrderPlan { symbol: string; side: string; entry: number; stop: number; target: number | null; qty: number; value: number; max_loss: number; risk_pct_of_equity: number }
 export interface PaperPosition { symbol: string; strategy: string; side: string; entry_time: string; entry: number; qty: number; stop: number; target: number | null; price?: number | null; pnl?: number | null }
 export interface PaperAccount { enabled: boolean; cash: number; equity: number; open_pnl: number; positions: PaperPosition[]; history: { symbol: string; strategy: string; side: string; entry: number; exit: number; exit_time: string; reason: string; pnl: number }[] }

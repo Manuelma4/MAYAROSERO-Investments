@@ -71,11 +71,13 @@ class Opportunity:
 
 
 def session_fraction(now: pd.Timestamp, crypto: bool) -> float:
-    """Share of the trading session elapsed (US regular hours 13:30-20:00 UTC; crypto 24h)."""
+    """Share of the trading session elapsed (US regular hours 9:30-16:00 New York time, daylight
+    saving included; crypto 24h UTC)."""
     if crypto:
         return max(0.05, (now.hour * 60 + now.minute) / 1440)
-    minutes = (now.hour * 60 + now.minute) - (13 * 60 + 30)
-    if minutes <= 0 or minutes >= 390 or now.weekday() >= 5:
+    ny = now.tz_convert("America/New_York") if now.tzinfo else now.tz_localize("UTC").tz_convert("America/New_York")
+    minutes = (ny.hour * 60 + ny.minute) - (9 * 60 + 30)
+    if minutes <= 0 or minutes >= 390 or ny.weekday() >= 5:
         return 1.0  # market closed: compare the full last session
     return max(0.05, minutes / 390)
 
@@ -159,6 +161,7 @@ class OpportunityScanner:
         self.news = news or NewsSource()
         self.rules = rules or OpportunityRules()
         self.crypto = crypto
+        self.movers: dict = {"gainers": [], "losers": [], "count": 0}   # filled by scan() from the same data
 
     def universe(self) -> tuple[list[str], list[str]]:
         from ..universe import CRYPTO, STOCKS
@@ -174,6 +177,7 @@ class OpportunityScanner:
         names = {k: v.name for k, v in by_symbol().items()} | dict(CRYPTO)
         stocks, coins = self.universe()
         found: list[Opportunity] = []
+        moves: list[dict] = []
         for provider, syms, is_crypto in (("yahoo", stocks, False), ("ccxt", coins, True)):
             if not syms:
                 continue
@@ -185,6 +189,8 @@ class OpportunityScanner:
                 if len(df) < 61:
                     continue
                 today, done = df.iloc[-1], df.iloc[:-1]  # last bar = current / latest session
+                if not is_crypto:
+                    moves.append(mover_row(sym, names.get(sym, sym), today, done, session_fraction(now, False)))
                 # Cheap pre-filter before fetching news.
                 pre = evaluate(sym, names.get(sym, sym), done, float(today["volume"]), float(today["close"]), now,
                                [], self.rules, crypto=is_crypto, today_low=float(today["low"]),
@@ -197,4 +203,20 @@ class OpportunityScanner:
                                today_high=float(today["high"]))
                 if opp:
                     found.append(opp)
+        moves = [m for m in moves if m is not None]
+        moves.sort(key=lambda m: m["change_pct"])
+        self.movers = {"gainers": moves[::-1][:15], "losers": moves[:15], "count": len(moves),
+                       "breadth_up_%": round(100 * sum(m["change_pct"] > 0 for m in moves) / len(moves), 1) if moves else None}
         return sorted(found, key=lambda o: (not o.qualified, -o.score))
+
+
+def mover_row(symbol: str, name: str, today: pd.Series, done: pd.DataFrame, elapsed: float = 1.0) -> dict | None:
+    """Today's move vs yesterday's close, and volume vs the 20-day average for the same share of the
+    session (mid-session, half a normal day's volume = 1.0x). No future data."""
+    prev = float(done["close"].iloc[-1])
+    avg_vol = float(done["volume"].iloc[-20:].mean())
+    if not prev or not np.isfinite(prev):
+        return None
+    return {"symbol": symbol, "name": name, "price": float(today["close"]),
+            "change_pct": (float(today["close"]) / prev - 1) * 100,
+            "rel_volume": float(today["volume"]) / (avg_vol * elapsed) if avg_vol > 0 else None}

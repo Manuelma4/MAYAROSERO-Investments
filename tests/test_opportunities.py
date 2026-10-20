@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from conftest import make_ohlcv
 
 from tradebot.live.news import Headline, classify, is_relevant, parse_items
 from tradebot.live.opportunities import OpportunityRules, evaluate, session_fraction
@@ -90,3 +91,24 @@ def test_headline_relevance():
     assert not is_relevant("Five stocks to watch this week", ["LLY"], "LLY", "Eli Lilly")
     assert not is_relevant("Meta Platforms expands data centers", None, "MA", "Mastercard")
     assert is_relevant("Bitcoin rallies past resistance", None, "BTC/USDT", "Bitcoin")
+
+
+def test_mover_row_uses_previous_close_and_20_day_volume():
+    from tradebot.live.opportunities import mover_row
+
+    df = make_ohlcv(80, seed=3)
+    today, done = df.iloc[-1], df.iloc[:-1]
+    m = mover_row("AAA", "Triple A", today, done)
+    assert abs(m["change_pct"] - (today["close"] / done["close"].iloc[-1] - 1) * 100) < 1e-9
+    assert abs(m["rel_volume"] - today["volume"] / done["volume"].iloc[-20:].mean()) < 1e-9
+    half = mover_row("AAA", "Triple A", today, done, elapsed=0.5)
+    assert abs(half["rel_volume"] - 2 * m["rel_volume"]) < 1e-9
+
+
+def test_session_fraction_follows_new_york_daylight_saving():
+    from tradebot.live.opportunities import session_fraction
+
+    summer = session_fraction(pd.Timestamp("2026-10-20 16:45", tz="UTC"), False)   # 12:45 in New York (EDT)
+    winter = session_fraction(pd.Timestamp("2026-11-10 17:45", tz="UTC"), False)   # 12:45 in New York (EST)
+    assert abs(summer - 195 / 390) < 1e-9 and abs(winter - 195 / 390) < 1e-9
+    assert session_fraction(pd.Timestamp("2026-11-10 14:00", tz="UTC"), False) == 1.0  # 9:00 NY: not open yet

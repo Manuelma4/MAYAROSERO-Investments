@@ -125,7 +125,7 @@ class Precomputer:
         now = pd.Timestamp.now(tz="UTC")
         items = [o.to_dict() for o in self._scanner.scan(now)]
         data = ser.clean({"as_of": now.isoformat(), "us_market_open": session_fraction(now, False) < 1.0,
-                          "items": items})
+                          "items": items, "movers": getattr(self._scanner, "movers", None)})
         self.put("opportunities", data)
         for o in items:
             key = (o["symbol"], o["direction"], o["as_of"][:10])

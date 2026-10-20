@@ -74,7 +74,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        % move alerts stored in SQLite, checked by the live engine, delivered via notifiers + bell.
 4. [x] **Monthly picks alert**: when the picker's holdings change (buy / sell list), notify;
        "Picks history" view.
-5. [ ] **S&P 500 real-time movers**: scan all constituents intraday in batches; surge / crash feed
+5. [x] **S&P 500 real-time movers**: scan all constituents intraday in batches; surge / crash feed
        on Overview and Alerts.
 6. [ ] **Quality pass**: code-split bundle, loading / empty / error states everywhere, keyboard and
        screen-reader basics, Playwright end-to-end tests of the main flows.
