@@ -47,7 +47,13 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
     }
     case "/api/today": return load("today.json");
     case "/api/opportunities": case "/api/opportunities/scan": return load("opportunities.json");
-    case "/api/paper/orders": return limit("Placing paper orders");
+    case "/api/paper/orders": case "/api/orders/preview": case "/api/orders": return limit("Placing orders");
+    case "/api/orders/close-all": case "/api/orders/resume": return limit("The kill switch");
+    case "/api/broker/positions": return { broker: "paper", mode: "paper", positions: [], orders: [] };
+    case "/api/broker/status": return {
+      broker: "paper", mode: "paper", connected: false, error: "Preview: no broker connection.", halted: null, confirm_seconds: 90,
+      limits: { risk_per_trade_pct: 1, max_position_pct: 10, max_open_positions: 5, max_short_exposure_pct: 20, max_daily_loss_pct: 3, max_order_value: null, max_daily_loss_value: null },
+    };
     case "/api/portfolio": {
       try { return await load(`portfolio_${body.risk ?? "balanced"}.json`); } catch { return limit("Building a portfolio"); }
     }

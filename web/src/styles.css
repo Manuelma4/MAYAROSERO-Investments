@@ -468,7 +468,14 @@ tbody tr:hover { background: var(--surface-2); }
 .opp-plan > div { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
 .opp-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .invest-panel { border-top: 1px dashed var(--line-strong); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
-.invest-mode { margin: 0; font-size: 13px; color: var(--text-2); }
+.invest-mode { margin: 0; font-size: 13px; color: var(--text-2); display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.invest-mode strong { color: var(--text); }
+.badge.live { background: var(--down); border-color: var(--down); color: #fff; }
+.ticket-live { border-top: 2px solid var(--down); }
+.ticket-ack { font-size: 13px; align-items: flex-start; line-height: 1.45; }
+.btn.danger { background: transparent; border-color: var(--down); color: var(--down); }
+.btn.danger:hover:not(:disabled) { background: var(--down); color: #fff; border-color: var(--down); }
+.limits { margin: 6px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 860px) { .opps { grid-template-columns: 1fr; } .opp-plan { grid-template-columns: repeat(2, 1fr); } }
 
 .ai-desk { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

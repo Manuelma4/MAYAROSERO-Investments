@@ -58,6 +58,16 @@ class PaperOrder(BaseModel):
     preview: bool = False      # True: only compute the plan (size, max loss), don't place it
 
 
+class OrderPreview(BaseModel):
+    """Only the idea is chosen by the client; prices, size, stop, target and expiry come from the server."""
+    symbol: str = Field(..., min_length=1, max_length=20)
+    side: Literal["long", "short"]
+
+
+class OrderPlace(OrderPreview):
+    confirm_token: str | None = Field(None, max_length=100)   # from /api/orders/preview; required
+
+
 class PortfolioRequest(BaseModel):
     amount: float = Field(10_000, gt=0, le=100_000_000)
     currency: Literal["EUR", "USD"] = "EUR"

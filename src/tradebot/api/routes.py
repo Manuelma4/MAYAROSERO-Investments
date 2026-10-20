@@ -132,64 +132,27 @@ def _paper_summary(app_state) -> dict:
 
 @router.post("/paper/orders")
 def paper_order(request: Request, body: PaperOrder):
-    """Practice order for a LIVE opportunity. The server uses its own plan (stop, target, expiry)
-    and a fresh price; client-sent prices are ignored."""
-    import pandas as pd
-
-    from ..trading.risk import OrderRejected, plan_order
+    """Practice order for a LIVE opportunity (always the practice account, whatever BROKER says).
+    Same risk path as /api/orders: the server uses its own plan and a fresh price; client prices are ignored."""
+    from .orders import _place, checked_plan
 
     st = _state(request)
-    opps = (st.precompute.get("opportunities") or {}).get("items", [])
-    opp = next((o for o in opps if o["symbol"] == body.symbol and o["direction"] == body.side and o["qualified"]), None)
-    if opp is None:
-        raise HTTPException(400, "This idea is no longer active. Refresh the page to see the current ideas.")
-    quote = st.market.quote(body.symbol)
-    price = quote.get("price")
-    if not price:
-        raise HTTPException(502, f"No current price for {body.symbol}. Try again in a minute.")
-    long = body.side == "long"
-    if (price <= opp["stop"]) if long else (price >= opp["stop"]):
-        raise HTTPException(400, "The price is already past the stop-loss. This idea is no longer valid.")
-    if abs(price / opp["entry"] - 1) > 0.015:
-        raise HTTPException(400, f"The price moved {abs(price / opp['entry'] - 1) * 100:.1f}% since the signal "
-                                 "(limit 1.5%). Wait for the next scan.")
-    with st.paper_lock:
-        summary = _paper_summary(st)
-        today = pd.Timestamp.now(tz="UTC").normalize()
-        opp_positions = [p for p in summary["positions"] if p["strategy"] == "opportunity"]
-        open_pnl = sum(p["pnl"] or 0 for p in opp_positions)
-        try:
-            plan = plan_order(body.symbol, body.side, float(price), opp["stop"], opp["target"], summary["equity"],
-                              opp_positions, st.paper.realized_since(today) + min(0.0, open_pnl),
-                              expires_at=opp["expires_at"])
-        except OrderRejected as exc:
-            raise HTTPException(400, str(exc)) from exc
+    with st.order_lock:
+        plan, opp, _ = checked_plan(st, st.paper_adapter, body.symbol, body.side)
         out = {"mode": "paper", "plan": vars(plan)}
         if not body.preview:
-            pos = st.paper.open(body.symbol, "opportunity", body.side, plan.entry, plan.stop, plan.target,
-                                pd.Timestamp.now(tz="UTC").isoformat(), qty=plan.qty)
-            if pos is None:
-                raise HTTPException(400, "The practice order could not be opened.")
+            _place(st, st.paper_adapter, plan, opp)
             out["placed"] = True
     return ser.clean(out)
 
 
 @router.post("/paper/close-all")
 def paper_close_all(request: Request):
-    """Kill switch: close every practice position at the current price."""
-    import pandas as pd
-
+    """Practice kill switch: close every practice position at the current price."""
     st = _state(request)
-    closed = []
-    with st.paper_lock:
-        pos = list(st.paper.positions.values())
-        quotes = {q["symbol"]: q for q in st.market.quotes([p.symbol for p in pos])} if pos else {}
-        for p in pos:
-            price = quotes.get(p.symbol, {}).get("price") or p.entry
-            rec = st.paper.close(p.symbol, p.strategy, price, pd.Timestamp.now(tz="UTC").isoformat(), "closed by you")
-            if rec:
-                closed.append(rec)
-    return ser.clean({"closed": closed})
+    with st.order_lock:
+        res = st.paper_adapter.close_all()
+    return ser.clean({"closed": res["closed"]})
 
 
 @router.post("/portfolio")

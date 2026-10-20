@@ -81,7 +81,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 7. [x] **Paid real-time stock data, ready to switch on**: provider adapters for Polygon, Alpaca and
        Finnhub (REST + websocket streaming), selected by `MARKET_DATA_PROVIDER` in `.env`, Yahoo as
        fallback; tests with mocked responses; documented in LATER.md.
-8. [ ] **Broker connection (invest from the app)**: broker interface + Alpaca adapter (paper by default),
+8. [x] **Broker connection (invest from the app)**: broker interface + Alpaca adapter (paper by default),
        IBKR and ccxt adapters; order ticket UI with confirmation, positions and P&L page, max order size,
        daily loss limit and kill switch; real money only when `TRADING_MODE=live`.
 9. [ ] **Handover**: email + WhatsApp setup walkthrough (with Manuel), hosting guide, final README.

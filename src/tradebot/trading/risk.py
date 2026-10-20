@@ -20,6 +20,33 @@ class RiskLimits:
     max_open_positions: int = 5          # opportunity (satellite) positions
     max_short_exposure_pct: float = 20.0
     max_daily_loss_pct: float = 3.0
+    max_order_value: float | None = None       # absolute cap on one order, account currency (MAX_ORDER_VALUE)
+    max_daily_loss_value: float | None = None  # absolute daily loss stop, account currency (MAX_DAILY_LOSS_VALUE)
+
+    @classmethod
+    def from_env(cls, env=None) -> "RiskLimits":
+        """Owner can only TIGHTEN the defaults from .env: values looser than the defaults are ignored."""
+        import os
+
+        env = os.environ if env is None else env
+        d = cls()
+
+        def num(key):
+            try:
+                v = float(env.get(key) or "nan")
+            except ValueError:
+                return None
+            return v if v == v and v > 0 else None
+
+        return cls(
+            risk_per_trade_pct=min(d.risk_per_trade_pct, num("RISK_PER_TRADE_PCT") or d.risk_per_trade_pct),
+            max_position_pct=min(d.max_position_pct, num("MAX_POSITION_PCT") or d.max_position_pct),
+            max_open_positions=int(min(d.max_open_positions, num("MAX_OPEN_POSITIONS") or d.max_open_positions)),
+            max_short_exposure_pct=d.max_short_exposure_pct,
+            max_daily_loss_pct=min(d.max_daily_loss_pct, num("MAX_DAILY_LOSS_PCT") or d.max_daily_loss_pct),
+            max_order_value=num("MAX_ORDER_VALUE") or num("MAX_ORDER_EUR"),
+            max_daily_loss_value=num("MAX_DAILY_LOSS_VALUE") or num("MAX_DAILY_LOSS_EUR"),
+        )
 
 
 class OrderRejected(ValueError):
@@ -58,10 +85,14 @@ def plan_order(symbol: str, side: str, entry: float, stop: float, target: float 
         raise OrderRejected(f"Limit reached: at most {lim.max_open_positions} open opportunity positions.")
     if realized_today <= -equity * lim.max_daily_loss_pct / 100:
         raise OrderRejected(f"Daily loss limit reached ({lim.max_daily_loss_pct:.0f}% of the account). New orders resume tomorrow.")
+    if lim.max_daily_loss_value and realized_today <= -lim.max_daily_loss_value:
+        raise OrderRejected(f"Daily loss limit reached ({lim.max_daily_loss_value:,.0f} lost today). New orders resume tomorrow.")
 
     risk_unit = abs(entry - stop)
     qty = equity * lim.risk_per_trade_pct / 100 / risk_unit
     qty = min(qty, equity * lim.max_position_pct / 100 / entry)
+    if lim.max_order_value:
+        qty = min(qty, lim.max_order_value / entry)
     if side == "short":
         short_now = sum(p["qty"] * (p.get("price") or p["entry"]) for p in open_positions if p["side"] == "short")
         room = equity * lim.max_short_exposure_pct / 100 - short_now

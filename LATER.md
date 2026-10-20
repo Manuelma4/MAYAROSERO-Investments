@@ -42,22 +42,72 @@ Live streaming clients (trades + 1-minute bars over WebSocket) are in `src/trade
 ready for a later push-to-browser feature; they stay off until a key is set.
 
 ## 2. Investing from the platform (broker connection)
-The app can send orders to a broker through its official API. Plan:
-1. **Paper trading first** (fake money, real prices): Alpaca paper account, free.
-2. **Real money** when you're confident, with a broker that accepts you as a French resident:
-   - **Interactive Brokers (IBKR)**: available in France, US + European stocks, full API. Recommended.
-   - **Alpaca**: simple API, mainly US stocks; check that your country is accepted.
-   - **Crypto**: Binance or Kraken API keys (trading permission only, never withdrawal).
+The connection is built (roadmap item 8). You only add keys to `.env` and restart the app.
+Until then, the Invest button uses the practice account inside the app.
 
-Safety built in: paper mode by default, real money only with `TRADING_MODE=live` in `.env`,
-an order confirmation screen, maximum order size and daily loss limits, and a kill switch.
-(Built in roadmap item 8.) In `.env`:
+**How the safety works** (you cannot switch it off by accident):
+- Real money needs BOTH a real broker (`BROKER=alpaca|ccxt|ibkr`) AND `TRADING_MODE=live`. Any other value,
+  a typo or nothing means paper / test accounts. There is no button in the app for this, on purpose.
+- Every order: a preview first (quantity, cost, stop-loss, target, risk in € and %, PAPER/LIVE badge), then a
+  confirmation that expires after 90 seconds. Live orders also need a tick box "I understand this is real money".
+- Live orders are refused unless `TRADEBOT_API_TOKEN` is set, so only you can place them.
+- Server-side limits for every broker: 1% risk per idea, max 10% of the account per position, max 5 open ideas,
+  max 20% short, daily loss stop 3% (open losses count). Optional stricter caps below.
+- The stop-loss (and target, on Alpaca) is held at the broker, so it works even if the app is off.
+  Positions are closed after about 5 trading days (time limit) by the app.
+- Kill switch: Settings → Trading → "Close everything" cancels every order and closes every position in the
+  broker account (including ones bought outside the app), then pauses new orders until you resume or tomorrow.
+
+### Step 1: Alpaca paper account (free, fake money, real prices)
+1. Sign up at https://alpaca.markets (email only for paper trading).
+2. In the dashboard, switch to **Paper Trading** (top left), then **API Keys → Generate New Key**.
+   Copy the Key ID and the Secret (shown once).
+3. In `.env` on the server:
+   ```
+   BROKER=alpaca
+   ALPACA_API_KEY_ID=PK...            # paper keys start with PK
+   ALPACA_API_SECRET_KEY=...
+   # TRADING_MODE stays unset (or TRADING_MODE=paper)
+   ```
+4. Restart (`docker compose up -d` or `tradebot serve`). Settings → Trading should show
+   **PAPER · Alpaca · Connected** with the paper balance ($100,000 by default; you can reset it to e.g. $10,000
+   in the Alpaca dashboard to match real life).
+5. Use it for a few weeks. Alpaca trades US stocks only here; crypto goes through an exchange (below).
+
+### Step 2: real money (only when you are confident)
+1. Open and fund a live account (Alpaca live: check that French residents are accepted; otherwise IBKR below).
+2. Generate **live** API keys (they start with `AK`), and replace the paper keys in `.env`.
+3. Set a long random `TRADEBOT_API_TOKEN` (required for live), and optionally stricter caps:
+   ```
+   TRADING_MODE=live
+   TRADEBOT_API_TOKEN=a-long-random-string
+   MAX_ORDER_VALUE=1000               # max cost of one order, in the account currency (USD at Alpaca)
+   MAX_DAILY_LOSS_VALUE=300           # stop new orders after losing this much today
+   RISK_PER_TRADE_PCT=0.5             # optional: risk less than the 1% default per idea
+   ```
+   These caps can only make the limits stricter, never looser than the defaults.
+4. Restart. The ticket now shows a red **LIVE** badge and "Confirm LIVE order". To go back to practice,
+   delete the `TRADING_MODE=live` line and restart.
+
+### Crypto (Binance, Kraken, ... through ccxt)
+Paper mode uses the exchange's **test network**. Binance spot testnet: log in at https://testnet.binance.vision
+with GitHub, generate an HMAC key. Exchanges without a test network are refused in paper mode.
 ```
-TRADING_MODE=paper                    # paper | live
-BROKER=alpaca                         # alpaca | ibkr | ccxt
-ALPACA_API_KEY_ID=...  ALPACA_API_SECRET_KEY=...
-MAX_ORDER_EUR=1000  MAX_DAILY_LOSS_EUR=300
+BROKER=ccxt
+CCXT_EXCHANGE=binance
+CCXT_API_KEY=...  CCXT_SECRET=...     # live: trading permission only, NEVER withdrawal
+CCXT_QUOTE=USDT
 ```
+Spot only: rising (long) ideas; short ideas are refused. The stop-loss is placed on the exchange right after the
+buy; if the exchange refuses it, the coins are sold again immediately.
+
+### Interactive Brokers (recommended for real money in France; experimental here)
+1. Open an IBKR account (paper account included), install TWS or IB Gateway, enable the API
+   (Configure → API → Settings), and `pip install ib_insync`.
+2. `.env`: `BROKER=ibkr`, `IBKR_HOST=127.0.0.1`, `IBKR_PORT=7497` (TWS paper; 4002 Gateway paper), `IBKR_CLIENT_ID=17`.
+   Live ports (7496 / 4001) are refused unless `TRADING_MODE=live`, and a paper session that lands on a
+   real account (ids not starting with "D") disconnects at once.
+
 Note: investing your own money through your own account is fine. Managing other people's
 money or selling signals as a service needs a license in France (AMF); talk to a professional first.
 

@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, ForecastResult, PicksResult, PortfolioPlan, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
+import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioPlan, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -46,6 +46,12 @@ export const api = {
   paperOrder: (body: object) => request<{ mode: string; plan: OrderPlan; placed?: boolean }>("/api/paper/orders", { method: "POST", body: JSON.stringify(body) }),
   paperCloseAll: () => request<{ closed: unknown[] }>("/api/paper/close-all", { method: "POST" }),
   paperAccount: () => request<PaperAccount>("/api/paper"),
+  brokerStatus: () => request<BrokerStatus>("/api/broker/status"),
+  brokerPositions: () => request<BrokerPositions>("/api/broker/positions"),
+  orderPreview: (body: { symbol: string; side: string }) => request<OrderPreviewResult>("/api/orders/preview", { method: "POST", body: JSON.stringify(body) }),
+  orderPlace: (body: { symbol: string; side: string; confirm_token: string }) => request<{ broker: string; mode: string; plan: OrderPlan; placed: boolean; order: { id: string; status: string; qty: number } }>("/api/orders", { method: "POST", body: JSON.stringify(body) }),
+  ordersCloseAll: () => request<{ broker: string; mode: string; cancelled: number; closed: unknown[]; errors: string[]; halted: boolean }>("/api/orders/close-all", { method: "POST" }),
+  ordersResume: () => request<{ halted: null }>("/api/orders/resume", { method: "POST" }),
   aiStatus: () => request<{ enabled: boolean; how_to_enable: string | null }>("/api/ai/status"),
   aiAnalyze: (symbol: string) => request<AIAnalysis>(`/api/ai/analyze?${qs({ symbol })}`, { method: "POST" }),
   portfolio: (body: object) => request<PortfolioPlan>("/api/portfolio", { method: "POST", body: JSON.stringify(body) }),

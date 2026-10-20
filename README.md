@@ -60,11 +60,31 @@ The workflow is:
    slippage and risk-based position sizing.
 6. **Paper trade live**: the scanner watches the market in real time, alerts
    you (console / email / WhatsApp) when a setup triggers, and simulates the trade.
-7. **Only then** connect a real broker.
+7. **Only then** connect a real broker (Alpaca, a crypto exchange via ccxt, or IBKR): paper / test
+   accounts first; real money only when the owner sets `TRADING_MODE=live` (see [LATER.md](LATER.md#2-investing-from-the-platform-broker-connection)).
 
 > **Disclaimer:** this is a research tool, not financial advice. Past
-> backtest performance does not guarantee future results. No real orders are
-> placed; live execution is intentionally not wired up yet.
+> backtest performance does not guarantee future results. By default no real
+> orders are placed: the Invest button uses a practice account (or a broker's
+> paper account). Real money needs `TRADING_MODE=live` set by the owner in `.env`.
+
+## Broker connection and order safety
+
+`src/tradebot/trading/brokers/` holds one `Broker` interface and four adapters: `PaperAdapter` (default,
+the in-app practice account), `AlpacaBroker` (REST v2, bracket orders), `CCXTBroker` (crypto spot, exchange
+testnet in paper mode) and `IBKRBroker` (ib_insync, experimental). Choose with `BROKER=paper|alpaca|ccxt|ibkr`.
+
+- `resolve_endpoint()` in `brokers/base.py` is the only place that decides paper vs real money; it returns a
+  live endpoint only when `TRADING_MODE=live`. Adapters call it themselves and accept no URL.
+- Every order, whatever the broker, goes through the same server-side path (`api/orders.py::checked_plan`):
+  active idea only, fresh price, 1.5% drift check, kill-switch pause, `plan_order` limits (1% risk per trade,
+  10% per position, 5 open ideas, 20% short, 3% daily loss incl. open losses, optional `MAX_ORDER_VALUE` /
+  `MAX_DAILY_LOSS_VALUE`), one lock.
+- `POST /api/orders/preview` returns the plan and a 90-second single-use confirm token; `POST /api/orders`
+  needs it. Live orders also require `TRADEBOT_API_TOKEN`. `GET /api/broker/status`, `GET /api/broker/positions`,
+  `POST /api/orders/close-all` (kill switch, then paused until `POST /api/orders/resume` or the next day).
+  `/api/paper/*` always uses the practice account.
+- `tradebot serve` reads `.env` from the working directory (variables already set in the shell win).
 
 ## Install
 

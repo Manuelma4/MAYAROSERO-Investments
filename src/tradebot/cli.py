@@ -125,11 +125,34 @@ def cmd_live(args) -> None:
     Scanner.from_config(cfg).run_forever(cfg.get("poll_seconds", 60))
 
 
+def load_dotenv(path: str = ".env") -> int:
+    """Read KEY=VALUE lines from .env into the environment (variables already set win). Returns the count."""
+    import os
+    from pathlib import Path
+
+    f = Path(path)
+    if not f.is_file():
+        return 0
+    n = 0
+    for line in f.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key = key.strip().removeprefix("export ").strip()
+        val = val.split(" #", 1)[0].strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = val
+            n += 1
+    return n
+
+
 def cmd_serve(args) -> None:
     import os
 
     import uvicorn
 
+    load_dotenv()
     os.environ.setdefault("TRADEBOT_CONFIG", args.config)
     uvicorn.run("tradebot.api.app:create_app", factory=True, host=args.host, port=args.port,
                 reload=args.reload)

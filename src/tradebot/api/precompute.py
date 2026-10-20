@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 class Precomputer:
     def __init__(self, market: MarketData, interval: int = 1800, opportunities_interval: int = 300,
                  on_opportunity=None, paper=None, paper_lock=None, store=None, on_alert=None,
-                 on_picks_change=None, alert_preset: str = "quality_momentum"):
+                 on_picks_change=None, alert_preset: str = "quality_momentum", broker_exits=None):
         self.market = market
         self.interval = interval
         self.opportunities_interval = opportunities_interval
@@ -38,6 +38,7 @@ class Precomputer:
         self.on_alert = on_alert               # callback(alert, quote) for each alert that fires
         self.on_picks_change = on_picks_change # callback(event) when the main picks list changes
         self.alert_preset = alert_preset
+        self.broker_exits = broker_exits       # callable: time limit / target watch for real-broker positions
         self._seen: set[tuple] = set()
         self._scanner = None
         self._data: dict[str, dict] = {}
@@ -226,6 +227,11 @@ class Precomputer:
                 self.manage_paper_exits()   # stops must fire even if the scan failed
             except Exception as exc:
                 log.warning("paper exits failed: %s", exc)
+            try:
+                if self.broker_exits:
+                    self.broker_exits()
+            except Exception as exc:
+                log.warning("broker exits failed: %s", exc)
             try:
                 self.check_alerts()
             except Exception as exc:

@@ -127,6 +127,17 @@ export interface MoversBoard { gainers: MoverRow[]; losers: MoverRow[]; count: n
 export interface OpportunitiesResult { as_of: string; us_market_open: boolean; items: Opportunity[]; movers?: MoversBoard | null }
 export interface OrderPlan { symbol: string; side: string; entry: number; stop: number; target: number | null; qty: number; value: number; max_loss: number; risk_pct_of_equity: number }
 export interface PaperPosition { symbol: string; strategy: string; side: string; entry_time: string; entry: number; qty: number; stop: number; target: number | null; price?: number | null; pnl?: number | null }
+export interface RiskLimitsInfo { risk_per_trade_pct: number; max_position_pct: number; max_open_positions: number; max_short_exposure_pct: number; max_daily_loss_pct: number; max_order_value: number | null; max_daily_loss_value: number | null }
+export interface BrokerStatus {
+  broker: string; mode: "paper" | "live"; connected: boolean; error: string | null; halted: { day: string; at: string; reason: string } | null;
+  limits: RiskLimitsInfo; confirm_seconds: number; equity?: number; buying_power?: number; cash?: number; currency?: string; blocked?: boolean; live_block?: string | null;
+}
+export interface OrderPreviewResult {
+  broker: string; mode: "paper" | "live"; plan: OrderPlan; confirm_token: string; expires_in: number; currency: string; equity: number; buying_power: number | null;
+  eur: { usd_per_eur: number; value: number; max_loss: number } | null; order_type: string; hold_days: number | null; expires_at: string | null; can_place: boolean; block_reason: string | null;
+}
+export interface BrokerPosition { symbol: string; side: string; qty: number; entry: number; price: number | null; pnl: number | null }
+export interface BrokerPositions { broker: string; mode: "paper" | "live"; positions: BrokerPosition[]; orders: { id: string; symbol: string; side: string; qty: number; stop: number; target: number | null; opened_at: string; close_by: string; status: string; reason?: string }[] }
 export interface PaperAccount { enabled: boolean; cash: number; equity: number; open_pnl: number; positions: PaperPosition[]; history: { symbol: string; strategy: string; side: string; entry: number; exit: number; exit_time: string; reason: string; pnl: number }[] }
 
 export interface AIAnalysis {

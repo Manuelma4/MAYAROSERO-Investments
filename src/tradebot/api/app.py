@@ -27,7 +27,8 @@ log = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None, provider_factory: ProviderFactory | None = None,
-               config: dict | None = None, scanner_factory=None, analyst_client=None) -> FastAPI:
+               config: dict | None = None, scanner_factory=None, analyst_client=None,
+               broker_factory=None) -> FastAPI:
     settings = settings or Settings()
     config = config if config is not None else settings.load_config()
 
@@ -60,6 +61,9 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
     import threading
 
     app.state.paper_lock = threading.Lock()   # one order / exit at a time
+    from .orders import init_trading, manage_broker_exits
+
+    init_trading(app, settings.db_path.parent, broker_factory)   # BROKER / TRADING_MODE from the environment
 
     def on_opportunity(o: dict) -> None:
         ev = app.state.store.add("opportunity", o["symbol"], {k: v for k, v in o.items() if k != "symbol"})
@@ -105,7 +109,8 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
     app.state.precompute = Precomputer(app.state.market, interval=settings.precompute_seconds,
                                        on_opportunity=on_opportunity, paper=app.state.paper,
                                        paper_lock=app.state.paper_lock, store=app.state.store,
-                                       on_alert=on_alert, on_picks_change=on_picks_change)
+                                       on_alert=on_alert, on_picks_change=on_picks_change,
+                                       broker_exits=lambda: manage_broker_exits(app.state))
     app.state.broadcaster = Broadcaster()
     kw = {"scanner_factory": scanner_factory} if scanner_factory else {}
     app.state.engine = LiveEngine(config, app.state.store, app.state.broadcaster, **kw)
@@ -121,7 +126,10 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
         return await call_next(request)
 
+    from .orders import router as orders_router
+
     app.include_router(router)
+    app.include_router(orders_router)
     app.include_router(ws_router)
 
     static = settings.static_dir

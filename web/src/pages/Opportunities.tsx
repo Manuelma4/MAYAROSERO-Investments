@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { fmtNum, fmtPct, fmtPrice, fmtTime } from "../lib/format";
 import { STATIC } from "../lib/snapshot";
-import type { Opportunity, OpportunitiesResult, OrderPlan, PaperAccount } from "../lib/types";
+import type { BrokerPositions, BrokerStatus, Opportunity, OpportunitiesResult, PaperAccount } from "../lib/types";
 import { AIDesk } from "../components/AIDesk";
+import { ModeBadge, OrderTicket, brokerLabel } from "../components/Trading";
 import { Hint } from "../components/Hint";
 import { SP500Movers } from "../components/Movers";
 import { Badge, Card, Empty, ErrorBox, Spinner } from "../components/ui";
@@ -13,43 +14,6 @@ const CATALYST: Record<string, string> = {
   earnings: "Earnings", guidance: "Guidance", analyst: "Analyst rating", deal: "Deal / M&A", contract: "Contract",
   product: "Product / approval", capital: "Buyback / dividend", legal: "Legal",
 };
-
-function InvestPanel({ o, onDone }: { o: Opportunity; onDone: (msg: string) => void }) {
-  const [plan, setPlan] = useState<OrderPlan | null>(null);
-  const [mode, setMode] = useState<string>("paper");
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const body = { symbol: o.symbol, side: o.direction }; // prices and stop come from the server
-  useEffect(() => {
-    api.paperOrder({ ...body, preview: true }).then((r) => { setPlan(r.plan); setMode(r.mode); }).catch((e) => setErr((e as Error).message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [o.symbol]);
-  const confirm = async () => {
-    setBusy(true); setErr(null);
-    try {
-      const r = await api.paperOrder(body);
-      onDone(`Paper ${o.direction === "long" ? "buy" : "short"} placed: ${fmtNum(r.plan.qty, 4)} ${o.symbol} at ${fmtPrice(r.plan.entry)}.`);
-    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
-  };
-  return (
-    <div className="invest-panel">
-      <p className="invest-mode">{mode === "paper" ? <><Badge>Paper mode</Badge> Practice money only. No real order is sent.</> : <><Badge tone="down">Live mode</Badge> Real money.</>}</p>
-      {err && <div className="error">{err}</div>}
-      {!plan && !err && <Spinner />}
-      {plan && (
-        <>
-          <dl className="kv">
-            <dt>{o.direction === "long" ? "Buy" : "Sell short"}</dt><dd>{fmtNum(plan.qty, 4)} × {fmtPrice(plan.entry)} = {fmtPrice(plan.value)}</dd>
-            <dt>Stop-loss<Hint>If the price reaches this level, the position is closed automatically to limit the loss.</Hint></dt><dd>{fmtPrice(plan.stop)}</dd>
-            <dt>Target</dt><dd>{fmtPrice(plan.target)}</dd>
-            <dt>Max loss if stopped<Hint>Sized so that hitting the stop-loss costs about 1% of your practice account. That keeps any single idea from hurting you much.</Hint></dt><dd className="down">{fmtPrice(plan.max_loss)} ({fmtNum(plan.risk_pct_of_equity, 1)}% of account)</dd>
-          </dl>
-          <div className="row gap"><button className="btn primary" onClick={confirm} disabled={busy || STATIC}>{busy ? <Spinner /> : "Confirm paper order"}</button></div>
-        </>
-      )}
-    </div>
-  );
-}
 
 function OppCard({ o, onDone }: { o: Opportunity; onDone: (m: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -90,7 +54,7 @@ function OppCard({ o, onDone }: { o: Opportunity; onDone: (m: string) => void })
         {o.qualified && <button className="btn primary small" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Close" : "Invest"}</button>}
       </footer>
       {o.qualified && <AIDesk symbol={o.symbol} />}
-      {open && <InvestPanel o={o} onDone={(m) => { setOpen(false); onDone(m); }} />}
+      {open && <OrderTicket o={o} onDone={(m) => { setOpen(false); onDone(m); }} />}
     </article>
   );
 }
@@ -100,12 +64,18 @@ export default function Opportunities() {
   const [err, setErr] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [account, setAccount] = useState<PaperAccount | null>(null);
+  const [broker, setBroker] = useState<BrokerStatus | null>(null);
+  const [held, setHeld] = useState<BrokerPositions | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showShort, setShowShort] = useState(true);
 
   const load = useCallback(() => {
     api.opportunities().then((d) => { setData(d); setErr(null); }).catch((e) => setErr((e as Error).message));
     api.paperAccount().then(setAccount).catch(() => undefined);
+    api.brokerStatus().then((b) => {
+      setBroker(b);
+      if (b.broker !== "paper" && b.connected) api.brokerPositions().then(setHeld).catch(() => undefined);
+    }).catch(() => undefined);
   }, []);
   useEffect(() => { load(); const id = setInterval(load, 60_000); return () => clearInterval(id); }, [load]);
 
@@ -153,6 +123,21 @@ export default function Opportunities() {
         </details>
       )}
 
+      {broker && broker.broker !== "paper" && (
+        <Card title={<><ModeBadge mode={broker.mode} /> Your positions at {brokerLabel(broker.broker)}<Hint>Everything held in your {broker.mode === "live" ? "real" : "paper (test)"} account at the broker, including positions bought outside this app. Ideas opened with Invest close at their stop-loss, target or after about 5 trading days. P&amp;L means profit or loss so far, not yet locked in.</Hint></>}
+          actions={broker.connected && <span className="muted small">Account {fmtPrice(broker.equity ?? null)} {broker.currency}</span>}>
+          {!broker.connected ? <div className="error">Not connected: {broker.error}</div>
+            : held?.positions.length ? (
+              <div className="table-wrap"><table>
+                <thead><tr><th>Symbol</th><th>Side</th><th className="r">Qty</th><th className="r">Entry</th><th className="r">Now</th><th className="r">P&amp;L</th></tr></thead>
+                <tbody>{held.positions.map((p) => (
+                  <tr key={p.symbol}><td><strong>{p.symbol}</strong></td><td className={p.side === "long" ? "up" : "down"}>{p.side}</td><td className="r num">{fmtNum(p.qty, 4)}</td>
+                    <td className="r num">{fmtPrice(p.entry)}</td><td className="r num">{fmtPrice(p.price)}</td><td className={`r num ${(p.pnl ?? 0) >= 0 ? "up" : "down"}`}>{fmtPrice(p.pnl)}</td></tr>))}
+                </tbody></table></div>
+            ) : <Empty>No positions at {brokerLabel(broker.broker)} yet.</Empty>}
+        </Card>
+      )}
+
       <Card title={<>Your practice positions<Hint>Positions opened with the Invest button, using practice (paper) money. They close automatically at the stop-loss, the target, or after about 5 trading days.</Hint></>}
         actions={account && <span className="row gap"><span className="muted small">Practice account {fmtPrice(account.equity)}</span>
           {oppPositions.length > 0 && !STATIC && <button className="btn small" onClick={async () => { await api.paperCloseAll(); load(); setToast("All practice positions closed."); }}>Close all</button>}</span>}>
@@ -166,7 +151,7 @@ export default function Opportunities() {
             </tbody></table></div>
         ) : <Empty>No practice positions yet. Press Invest on an idea to try it with practice money.</Empty>}
       </Card>
-      <p className="caveat">Ideas are generated by rules, not advice. Even strong news-driven moves fail often; the stop-loss and small position size are what keep losses small. Real-money trading will need a broker connection (see the plan) and stays off until you switch it on.</p>
+      <p className="caveat">Ideas are generated by rules, not advice. Even strong news-driven moves fail often; the stop-loss and small position size are what keep losses small. Orders go to {broker ? brokerLabel(broker.broker) : "the practice account"}{broker?.mode === "live" ? " with real money" : " with practice money"}; real money stays off unless you set TRADING_MODE=live on the server. The emergency "Close everything" button is in Settings.</p>
     </div>
   );
 }
