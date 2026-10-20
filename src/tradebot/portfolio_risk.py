@@ -44,6 +44,9 @@ N_PATHS = 10_000
 MIN_DAYS = 120          # below this, the numbers would be noise
 SPY = "SPY"
 INDEX_SECTOR = "S&P 500 index"
+MOMENTUM_FUND_SECTOR = "Momentum fund"
+# Funds are spread over many sectors: they get their own bucket and never count as "the largest sector".
+FUND_SECTORS = {"SPMO": MOMENTUM_FUND_SECTOR}
 BINS = np.arange(-30, 32, 2.0)   # histogram edges in % for the 1-month outcome chart
 
 
@@ -191,12 +194,12 @@ def diversification(rets: pd.DataFrame, weights: dict[str, float], sectors: dict
     sec_w: dict[str, float] = {}
     sec_r: dict[str, float] = {}
     for s, c in zip(syms, rc):
-        k = sectors.get(s) or (INDEX_SECTOR if s == SPY else "Other")
+        k = sectors.get(s) or FUND_SECTORS.get(s) or (INDEX_SECTOR if s == SPY else "Other")
         sec_w[k] = sec_w.get(k, 0.0) + weights[s] * 100
         sec_r[k] = sec_r.get(k, 0.0) + float(c * 100)
     out["sectors"] = sorted(({"sector": k, "weight_%": v, "risk_share_%": sec_r[k]} for k, v in sec_w.items()),
                             key=lambda d: -d["risk_share_%"])
-    stock_secs = [d for d in out["sectors"] if d["sector"] != INDEX_SECTOR]
+    stock_secs = [d for d in out["sectors"] if d["sector"] not in (INDEX_SECTOR, *FUND_SECTORS.values())]
     out["top_sector"] = max(stock_secs, key=lambda d: d["weight_%"]) if stock_secs else None
     return out
 

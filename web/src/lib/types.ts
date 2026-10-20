@@ -158,14 +158,15 @@ export interface PortfolioPlan {
   standard_mix?: Record<string, number>;
   weighting?: PlanWeighting;
   risk_view?: PortfolioRiskView;
+  eu_note?: string; whole_shares?: boolean;
 }
 export interface PlanTrack {
-  start: string; method?: "plan" | "approx"; "cagr_%": number; "spy_cagr_%": number; "max_drawdown_%": number; "spy_max_drawdown_%": number;
+  start: string; method?: "plan" | "approx" | "funds"; "cagr_%": number; "spy_cagr_%": number; "max_drawdown_%": number; "spy_max_drawdown_%": number;
   "volatility_%"?: number; "spy_volatility_%"?: number; "month_1in20_%"?: number; "spy_month_1in20_%"?: number;
   sharpe?: number; spy_sharpe?: number; "months_beating_spy_%"?: number; "turnover_per_year_%"?: number;
 }
 export interface PlanWeighting {
-  method: "equal_risk" | "inverse_volatility"; target_x: number; budget_applied: boolean; summary: string[];
+  method: "equal_risk" | "inverse_volatility" | "fixed_funds"; target_x: number | null; budget_applied: boolean; summary: string[];
   x_spy?: number; x_spy_start?: number; to_cash?: number; moved_to_index?: number;
 }
 

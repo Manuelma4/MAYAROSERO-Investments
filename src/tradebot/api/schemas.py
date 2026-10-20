@@ -77,7 +77,7 @@ class Confirm(BaseModel):
 class PortfolioRequest(BaseModel):
     amount: float = Field(10_000, gt=0, le=100_000_000)
     currency: Literal["EUR", "USD"] = "EUR"
-    risk: Literal["cautious", "balanced", "bold"] = "balanced"
+    risk: Literal["cautious", "balanced", "bold", "funds"] = "balanced"
     fractional: bool = True
 
 

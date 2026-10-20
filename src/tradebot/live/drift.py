@@ -41,7 +41,7 @@ def target_from_plan(plan: dict, saved_at: str) -> dict:
     weights: dict[str, float] = {}
     names: dict[str, str] = {}
     for line in plan.get("lines", []):
-        if line.get("role") in ("core", "anchor") and (line.get("invested") or 0) > 0:
+        if line.get("role") in ("core", "anchor", "fund") and (line.get("invested") or 0) > 0:
             weights[line["symbol"]] = weights.get(line["symbol"], 0.0) + float(line["invested"]) / amount
             names[line["symbol"]] = line.get("name") or line["symbol"]
     return {"saved_at": saved_at, "amount": amount, "currency": plan.get("currency", "USD"),

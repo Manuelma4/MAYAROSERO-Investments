@@ -138,3 +138,65 @@ def level_stats(eq: pd.Series, bench: pd.Series, log: list[dict] | None = None) 
         "turnover_per_year_%": float(np.mean(turns) * 12 * 100) if turns else 0.0,
         "beta": float(np.cov(r, rb)[0, 1] / rb.var()) if rb.var() > 0 else None,
     }
+
+
+def run_funds_backtest(frames: dict[str, pd.DataFrame], weights: dict[str, float] | None = None,
+                       start: str | None = None, end: str | None = None, cost_bps: float = 10.0,
+                       rebalance: str = "ME") -> dict:
+    """Fixed-weight fund mix (default 60% SPY + 40% SPMO) on real fund prices, rebalanced every month.
+
+    Starts on the first day every fund has a price (SPMO: 2015-10). At each month's last trading day t the
+    target is set (fixed weights: nothing about the future is needed), the trade fills at the NEXT day's open
+    paying `cost_bps` per unit of turnover; between reviews the weights drift with prices.
+    `frames`: {symbol: daily OHLC with dividend-adjusted open/close}. Returns equity (starts at 100), the SPY
+    benchmark, the trade log and the same stats as the risk levels."""
+    from .portfolio import FUNDS
+
+    weights = weights or FUNDS
+    syms = list(weights)
+    close = pd.DataFrame({s: frames[s]["close"] for s in syms})
+    opn = pd.DataFrame({s: (frames[s]["open"] if "open" in frames[s] else frames[s]["close"]) for s in syms})
+    for df in (close, opn):
+        df.index = pd.DatetimeIndex(df.index).normalize()
+    close = close[~close.index.duplicated(keep="last")].dropna()
+    opn = opn[~opn.index.duplicated(keep="last")].reindex(close.index)
+    if start:
+        close = close.loc[pd.Timestamp(start, tz=close.index.tz):]
+    if end:
+        close = close.loc[:pd.Timestamp(end, tz=close.index.tz)]
+    opn = opn.reindex(close.index)
+    if len(close) < 2:
+        raise ValueError("Not enough fund history")
+    dates = close.index
+    rets = close.pct_change(fill_method=None).fillna(0.0)
+    gap = (opn / close.shift(1) - 1).where(opn.notna() & close.shift(1).notna())
+    intra = (close / opn - 1).where(gap.notna())
+    gap, intra = gap.fillna(0.0), intra.fillna(rets)
+    rebal = set(pd.Series(dates, index=dates).resample(rebalance).last().dropna())
+    target = pd.Series(weights, dtype=float)
+    w = pd.Series(0.0, index=syms)
+    equity, log = [1.0], [{"date": dates[0].date().isoformat()}]
+
+    def grow(value, r):
+        nonlocal w
+        day = float((w * r).sum())
+        w = w * (1 + r) / (1 + day) if 1 + day != 0 else w
+        return value * (1 + day)
+
+    pending = True                       # buy the mix at the second day's open
+    for t in dates[1:]:
+        if pending:
+            value = grow(equity[-1], gap.loc[t])
+            turnover = float((target - w).abs().sum())
+            log[-1]["turnover"] = turnover
+            value *= 1 - turnover * cost_bps / 10_000
+            w, pending = target.copy(), False
+            equity.append(grow(value, intra.loc[t]))
+        else:
+            equity.append(grow(equity[-1], rets.loc[t]))
+        if t in rebal and t != dates[-1]:
+            pending = True
+            log.append({"date": t.date().isoformat()})
+    eq = pd.Series(equity, index=dates) * 100
+    b = close["SPY"] / close["SPY"].iloc[0] * 100 if "SPY" in close else eq
+    return {"equity": eq, "benchmark": b, "log": log, "stats": level_stats(eq, b, log)}

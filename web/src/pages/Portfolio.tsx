@@ -14,13 +14,14 @@ const RISKS = [
   { id: "cautious", label: "Cautious", hint: "Risk limit: swings at most about 0.8 times as much as the S&P 500. About 20% momentum picks and 80% the S&P 500 index (up to 5% in live ideas), and some cash when the market is jumpy. Smaller losses in bad months, but in the past it grew more slowly than the S&P 500." },
   { id: "balanced", label: "Balanced", hint: "Risk limit: swings at most about as much as the S&P 500 (1.0 times). Up to 40% momentum picks and 60% the S&P 500 index (up to 10% in live ideas). The same mix as the Beat-the-S&P strategy; the risk limit moves money to the index when the picks get jumpy, so in the past it did about as well as the S&P 500." },
   { id: "bold", label: "Bold", hint: "Risk limit: swings at most about 1.3 times as much as the S&P 500. Up to 60% momentum picks and 40% the S&P 500 index (up to 15% in live ideas). In the past the biggest edge over the S&P 500, with deeper drops." },
+  { id: "funds", label: "Simple funds", hint: "No stock picking: two funds, 60% the S&P 500 and 40% an S&P 500 momentum fund (SPMO). Rebalance back to 60/40 once a month or once a quarter. In the past a small edge over the S&P 500 with about the same swings, using real fund prices." },
 ];
 // Consistency of the backtest (sent by the server with the track record).
 type Robust = { windows?: number; "windows_beating_%"?: number; "worst_window_gap_%"?: number; years_beating?: number;
   years_total?: number; both_halves_beating?: boolean; "p_beat_5y_%"?: number; "p_beat_10y_%"?: number };
-const ROLE = { core: "Picks", satellite: "Live idea", anchor: "S&P 500", cash: "Cash" } as const;
+const ROLE = { core: "Picks", satellite: "Live idea", anchor: "S&P 500", fund: "Momentum fund", cash: "Cash" } as const;
 // Monochrome on purpose: green and red are reserved for price direction (BRAND.md).
-const ROLE_COLOR = { core: "var(--text)", satellite: "var(--text-2)", anchor: "var(--text-3)", cash: "var(--surface-3)" } as const;
+const ROLE_COLOR = { core: "var(--text)", satellite: "var(--text-2)", anchor: "var(--text-3)", fund: "var(--text)", cash: "var(--surface-3)" } as const;
 
 // The plan's currency follows Settings > Display currency ("as listed" builds it in dollars, like its US stocks).
 interface Inputs { amount: string; risk: string; fractional: boolean }
@@ -70,7 +71,8 @@ export default function Portfolio() {
   const m = plan?.risk_metrics ?? {};
   const t = plan?.track_record;
   const rb = (t as { robustness?: Robust } | undefined)?.robustness;
-  const roles = plan ? (["core", "satellite", "anchor", "cash"] as const).filter((r) => (plan.by_role[r] ?? 0) > 0.0005) : [];
+  const funds = plan?.risk === "funds";
+  const roles = plan ? (["core", "fund", "satellite", "anchor", "cash"] as const).filter((r) => (plan.by_role[r] ?? 0) > 0.0005) : [];
 
   return (
     <div className="page">
@@ -85,12 +87,12 @@ export default function Portfolio() {
           <label className="field" style={{ minWidth: 200 }}><span>Amount to invest, {ccySign(planCcy)}<Hint term="exchange-rate">The money you want to put in, in {planCcy === "EUR" ? "euros" : "US dollars"}{cur.pref === "listed" ? " (the currency of the plan's US stocks)" : ""}. Change it in Settings, Display currency.{planCcy === "EUR" ? " The US stocks are bought in dollars, so the plan converts at today's EUR/USD rate." : ""}</Hint></span>
             <input id="pf-amount" type="number" min="100" step="100" value={inp.amount} onChange={(e) => setInp({ ...inp, amount: e.target.value })} /></label>
           <div className="field" style={{ minWidth: "fit-content" }}><span>Risk level<Hint>{RISKS.map((r) => <span key={r.id} style={{ display: "block" }}><strong>{r.label}:</strong> {r.hint}</span>)}</Hint></span>
-            <div className="segmented" role="radiogroup" aria-label="Risk level">
+            <div className="segmented risk-seg" role="radiogroup" aria-label="Risk level">
               {RISKS.map((r) => <button type="button" key={r.id} role="radio" aria-checked={inp.risk === r.id} className={inp.risk === r.id ? "active" : ""} onClick={() => setInp({ ...inp, risk: r.id })}>{r.label}</button>)}
             </div>
           </div>
-          <label className="check"><input id="pf-frac" type="checkbox" checked={inp.fractional} onChange={(e) => setInp({ ...inp, fractional: e.target.checked })} /> Fractional shares
-            <Hint>Many brokers (Trade Republic, Revolut, IBKR) let you buy part of a share, so every euro gets invested. Untick if yours only sells whole shares.</Hint></label>
+          <label className="check"><input id="pf-frac" type="checkbox" checked={inp.risk === "funds" ? false : inp.fractional} disabled={inp.risk === "funds"} onChange={(e) => setInp({ ...inp, fractional: e.target.checked })} /> Fractional shares
+            <Hint>{inp.risk === "funds" ? "Simple funds is always built in whole shares of each fund; what is left over is only the rounding." : "Many brokers (Trade Republic, Revolut, IBKR) let you buy part of a share, so every euro gets invested. Untick if yours only sells whole shares."}</Hint></label>
           <button className="btn primary" disabled={busy}>{busy ? <><Spinner /> Building</> : "Build my plan"}</button>
         </form>
       </Card>
@@ -99,6 +101,7 @@ export default function Portfolio() {
 
       {plan && (
         <>
+          {plan.eu_note && <div className="notice"><strong>Buying from Europe.</strong> {plan.eu_note}</div>}
           {plan.core_risk_off && <div className="notice">The S&amp;P 500 is in a downtrend, so the engine keeps the picks part in cash until the trend recovers.</div>}
           <section className="alloc">
             <div className="alloc-bar" role="img" aria-label={`Allocation: ${roles.map((r) => `${ROLE[r]} ${fmtNum(plan.by_role[r] * 100, 0)}%`).join(", ")}`}>
@@ -122,14 +125,14 @@ export default function Portfolio() {
                   </div>
                   <p className="muted small">{fmtNum(l.invested / plan.amount * 100, 1)}% of the portfolio{l.stop ? <> · stop-loss <Price v={l.stop} symbol={l.symbol} /></> : ""}{l.note ? ` · ${l.note}` : ""}</p>
                 </li>))}
-              {plan.cash > 0.5 && <li><div className="pc-top"><Badge>Cash</Badge><span className="pc-name"><strong>Keep in cash</strong><span className="muted small">{[
+              {plan.cash > 0.5 && <li><div className="pc-top"><Badge>Cash</Badge><span className="pc-name"><strong>Keep in cash</strong><span className="muted small">{funds ? "Rounding to whole shares" : [
                 (plan.weighting?.to_cash ?? 0) > 0.005 ? "Kept out of the market by the risk limit" : "",
                 "rounding"].filter(Boolean).join(", ").replace(/^./, (c) => c.toUpperCase())}</span></span><span className="pc-num">{money(plan.cash)}</span></div></li>}
             </ul>}
           </Card>
 
           {plan.weighting && plan.weighting.summary.length > 0 && (
-            <Card title={<>Why these weights<Hint>Money is not the same as risk: 1,000 in a jumpy stock can move your plan as much as 3,000 in a calm one. So each pick gets the amount that makes its ups and downs count about equally, and each risk level has a limit on how much the whole plan may swing compared with the S&amp;P&nbsp;500. When the picks are too jumpy for that limit, money goes to the S&amp;P&nbsp;500 index first and only then to cash. Only past prices are used, never anything that happened after the plan date.</Hint></>}>
+            <Card title={<>Why these weights<Hint>{funds ? "A fixed mix: no forecasts, no stock picking, nothing to time. The momentum fund does the stock choosing by its own published rules; you only bring the two funds back to 60/40 from time to time." : <>Money is not the same as risk: 1,000 in a jumpy stock can move your plan as much as 3,000 in a calm one. So each pick gets the amount that makes its ups and downs count about equally, and each risk level has a limit on how much the whole plan may swing compared with the S&amp;P&nbsp;500. When the picks are too jumpy for that limit, money goes to the S&amp;P&nbsp;500 index first and only then to cash. Only past prices are used, never anything that happened after the plan date.</>}</Hint></>}>
               <div className="weights-why">
                 {plan.weighting.summary.map((s) => <p key={s}>{s}</p>)}
               </div>
@@ -153,12 +156,12 @@ export default function Portfolio() {
               </dl>
               <p className="muted small">Today's holdings over the past 12 months. Today's picks were chosen partly because they rose, so this flatters them.</p>
             </Card>
-            <Card title={<>Diversification by sector<Hint term="diversification">No sector gets more than 25% of the portfolio and no single stock more than 10%. When the top picks crowd into one sector, the next-best picks from other sectors are added instead.</Hint></>}>
+            {!funds && <Card title={<>Diversification by sector<Hint term="diversification">No sector gets more than 25% of the portfolio and no single stock more than 10%. When the top picks crowd into one sector, the next-best picks from other sectors are added instead.</Hint></>}>
               <ul className="sector-bars">
                 {Object.entries(plan.by_sector).map(([sec, w]) => (
                   <li key={sec}><span>{sec}</span><span className="bar"><span style={{ width: `${(w / 0.25) * 100}%` }} /></span><span className="num">{fmtNum(w * 100, 1)}%</span></li>))}
               </ul>
-            </Card>
+            </Card>}
           </div>
 
           {plan.changes?.date && (
@@ -174,14 +177,17 @@ export default function Portfolio() {
             <details className="customize">
               <summary>Track record of this mix<span className="muted small"> · since {fmtDay(t.start)}: {fmtPct(t["cagr_%"], 1)}/yr vs S&amp;P 500 {fmtPct(t["spy_cagr_%"], 1)}/yr</span></summary>
               <dl className="kv">
-                <dt>Yearly return<Hint>Average growth per year, dividends included, after trading costs. Measured on months without live ideas: their share is invested in the picks and the index, as the plan does today when there are no ideas.</Hint></dt><dd>{fmtPct(t["cagr_%"], 1)} <span className="muted">vs {fmtPct(t["spy_cagr_%"], 1)}</span></dd>
+                <dt>Yearly return<Hint>Average growth per year, dividends included, after trading costs.{funds ? "" : " Measured on months without live ideas: their share is invested in the picks and the index, as the plan does today when there are no ideas."}</Hint></dt><dd>{fmtPct(t["cagr_%"], 1)} <span className="muted">vs {fmtPct(t["spy_cagr_%"], 1)}</span></dd>
                 {t["volatility_%"] !== undefined && <><dt>Yearly swings<Hint>Volatility: how much the value typically moved up and down in a year. This is what the risk limit controls.</Hint></dt><dd>{fmtPct(t["volatility_%"], 1, false)} <span className="muted">vs {fmtPct(t["spy_volatility_%"], 1, false)}</span></dd></>}
                 {t["month_1in20_%"] !== undefined && <><dt>Bad month (1 in 20)<Hint>The loss that was exceeded in only 1 month out of 20.</Hint></dt><dd>{fmtPct(t["month_1in20_%"], 1)} <span className="muted">vs {fmtPct(t["spy_month_1in20_%"], 1)}</span></dd></>}
                 <dt>Worst drop<Hint>The biggest fall from a high point to a later low point.</Hint></dt><dd>{fmtPct(t["max_drawdown_%"], 1)} <span className="muted">vs {fmtPct(t["spy_max_drawdown_%"], 1)}</span></dd>
+                {t.sharpe !== undefined && t.spy_sharpe !== undefined && <><dt>Return per unit of risk<Hint>The Sharpe ratio: yearly return divided by yearly swings (cash counted as earning 0%). Higher means more growth for the same ups and downs.</Hint></dt><dd>{fmtNum(t.sharpe, 2)} <span className="muted">vs {fmtNum(t.spy_sharpe, 2)}</span></dd></>}
                 {rb?.["windows_beating_%"] !== undefined && <><dt>3-year periods ahead<Hint>Every 3-year stretch of the backtest, starting each month: in how many of them this mix grew faster than the S&amp;P&nbsp;500. Above 50% means it won more often than it lost; the periods overlap, so this is weaker evidence than it looks.</Hint></dt><dd>{fmtNum(rb["windows_beating_%"], 0)}% <span className="muted">of {rb.windows}</span></dd></>}
                 {rb?.["p_beat_10y_%"] !== undefined && <><dt>Odds over 10 years<Hint>We re-shuffled the backtest's months in yearly blocks thousands of times and counted how often this mix ended ahead of the S&amp;P&nbsp;500 after 5 and 10 years. It assumes the future looks like 2015-2026, so treat it as optimistic, not a promise.</Hint></dt><dd>{fmtNum(rb["p_beat_10y_%"], 0)}% <span className="muted">5 years: {fmtNum(rb["p_beat_5y_%"] ?? 0, 0)}%</span></dd></>}
               </dl>
-              {t.method === "plan"
+              {t.method === "funds"
+                ? <p className="muted small">Backtest with the real prices of the two funds (dividends included) from SPMO's first trading day, {fmtDay(t.start)}: back to 60/40 at each month end, trading at the next day's open with 0.10% costs. Real funds, so no survivorship bias, but it is one decade with a strong momentum run (big US tech), and about +1 to +2% a year over the S&amp;P&nbsp;500 is a small edge that can vanish for years. The UCITS funds a European broker offers follow different indexes, so their past differs. Not a promise of future returns.</p>
+                : t.method === "plan"
                 ? <p className="muted small">Backtest of this risk level's picks and index parts, rebuilt every month with the same rules as today (weights by risk, risk limit), using only prices known at the time, trading at the next day's open with 0.10% costs. Stocks only count from the day they joined the S&amp;P&nbsp;500, but companies that later left it are missing, which still flatters the past. Live ideas cannot be replayed, so their share is invested in the picks and the index, as the plan does on a day without ideas. Not a promise of future returns.</p>
                 : <p className="muted small">Rough estimate while the full backtest is being computed: the equal-weight picks and the index with today's mix, rebalanced daily; live ideas and cash earn nothing. Not a promise of future returns.</p>}
             </details>
@@ -193,7 +199,7 @@ export default function Portfolio() {
   );
 }
 
-const RISK_LABEL: Record<string, string> = { cautious: "Cautious", balanced: "Balanced", bold: "Bold" };
+const RISK_LABEL: Record<string, string> = { cautious: "Cautious", balanced: "Balanced", bold: "Bold", funds: "Simple funds" };
 
 function DriftCard({ drift, busy, err, onSave, onRemove }: { drift: PortfolioDrift | null; busy: boolean; err: string | null; onSave: () => void; onRemove: () => void }) {
   const t = drift?.target;

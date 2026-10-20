@@ -338,6 +338,24 @@ def test_portfolio_endpoint(client):
     assert client.post("/api/portfolio", json={"risk": "yolo"}).status_code == 422
 
 
+def test_portfolio_funds_plan_endpoint(client):
+    # needs no picks (no precompute run): two funds, whole shares, real-fund style track record, EU note
+    for ccy in ("USD", "EUR"):
+        d = client.post("/api/portfolio", json={"amount": 10000, "currency": ccy, "risk": "funds"}).json()
+        assert d["risk"] == "funds" and d["currency"] == ccy and d["whole_shares"]
+        assert [l["symbol"] for l in d["lines"]] == ["SPY", "SPMO"]
+        assert all(float(l["shares"]).is_integer() for l in d["lines"])
+        assert abs(sum(l["invested"] for l in d["lines"]) + d["cash"] - 10000) < 1e-6
+        assert 0 <= d["cash"] * d["fx_usd_per_unit"] < max(l["price"] for l in d["lines"])
+        t = d["track_record"]
+        assert t["method"] == "funds" and {"cagr_%", "spy_cagr_%", "sharpe", "month_1in20_%"} <= set(t)
+        assert "windows_beating_%" in t["robustness"]
+        assert "UCITS" in d["eu_note"] and d["risk_view"]["status"] == "ok"
+    saved = client.post("/api/portfolio/target", json={"amount": 10000, "currency": "USD", "risk": "funds"}).json()
+    assert saved["target"]["risk"] == "funds" and set(saved["target"]["weights"]) == {"SPY", "SPMO"}
+    assert client.get("/api/portfolio/risk").json()["status"] == "ok"
+
+
 def test_predictions_and_forecast(client, monkeypatch):
     import tradebot.api.services as services
     from tradebot.universe import CURATED

@@ -21,6 +21,10 @@ count as cash, exactly as in the risk card) is above the budget, money first mov
 the S&P 500 (down to CORE_FLOOR = a quarter of the picks share), and only then is the whole mix scaled down
 with the rest kept in cash. It never borrows and never adds risk when the plan is calmer than its
 budget. Only prices up to the plan date are used (`as_of`), see the truncation test.
+
+"Simple funds" (risk="funds", build_funds_plan): no stock picking, a fixed 60% SPY + 40% SPMO (S&P 500
+Momentum ETF) in whole shares, the leftover only rounding; its real-fund track record is
+plan_backtest.run_funds_backtest. EU retail investors usually need UCITS equivalents (EU_FUNDS_NOTE).
 """
 
 from __future__ import annotations
@@ -46,6 +50,23 @@ COV_LOOKBACK = 252        # one year of daily returns for the weights and the ri
 SHORT_LOOKBACK = 63       # the risk budget also checks the last 3 months (the stricter of the two counts)
 CORE_FLOOR = 0.25         # keep at least a quarter of the level's picks share before moving money to cash
 SPY = "SPY"
+
+# "Simple funds": no stock picking, two funds, rebalanced once a month or quarter (see plan_backtest.run_funds_backtest).
+FUNDS_PLAN = "funds"
+FUNDS = {SPY: 0.60, "SPMO": 0.40}
+FUND_INFO = {
+    SPY: ("S&P 500 ETF", "anchor", "The index itself: the 500 largest US companies."),
+    "SPMO": ("S&P 500 Momentum ETF (Invesco)", "fund",
+             "About 100 S&P 500 stocks with the strongest past-year rise, reviewed by the fund twice a year."),
+}
+EU_FUNDS_NOTE = ("For European investors: US-listed ETFs such as SPY and SPMO often cannot be bought by EU retail "
+                 "investors (PRIIPs rules require a KID document that US funds do not publish). Look for UCITS "
+                 "equivalents at your broker: an S&P 500 UCITS ETF for the 60% part, and a momentum UCITS ETF such "
+                 "as iShares Edge MSCI USA Momentum Factor or iShares Edge MSCI World Momentum Factor for the 40% "
+                 "part. Their rules and history differ from SPMO's (MSCI momentum index, different stocks and "
+                 "weights; the World version also holds non-US stocks), so the track record shown here is only "
+                 "indicative for them.")
+LEVEL_NAME[FUNDS_PLAN] = "Simple funds"
 
 
 @dataclass
@@ -345,9 +366,12 @@ def build_plan(amount: float, risk: str, core: list[dict], core_risk_off: bool, 
                spy_price: float | None, fractional: bool = True, stock_cap: float = 0.10,
                sector_cap: float = 0.25, risk_per_idea: float = 0.01, max_ideas: int = 3,
                core_n: int = 10, closes: pd.DataFrame | None = None, as_of=None,
-               risk_budget: bool = True) -> Plan:
+               risk_budget: bool = True, fund_prices: dict[str, float | None] | None = None) -> Plan:
     """`core` is the engine's ranked list of eligible stocks (best first); the first `core_n` are the picks.
-    `closes` (daily closes incl. SPY, up to the plan date) switches on risk-aware weights and the risk budget."""
+    `closes` (daily closes incl. SPY, up to the plan date) switches on risk-aware weights and the risk budget.
+    risk="funds": the fixed 60% SPY + 40% SPMO plan in whole shares (`fund_prices` = {symbol: USD price})."""
+    if risk == FUNDS_PLAN:
+        return build_funds_plan(amount, fund_prices or {SPY: spy_price})
     if risk not in RISK_LEVELS:
         raise ValueError(f"Unknown risk level '{risk}'")
     if amount <= 0:
@@ -409,6 +433,49 @@ def build_plan(amount: float, risk: str, core: list[dict], core_risk_off: bool, 
     info["summary"] = weighting_summary(risk, info, placed_start, core_used, anchor_start, anchor_share,
                                         cash) if chosen else []
     plan.weighting = info
+    return plan
+
+
+def whole_shares(targets: dict[str, float], prices: dict[str, float], amount: float) -> dict[str, int]:
+    """Whole shares closest to the target money per fund, leaving only rounding in cash.
+
+    Floor every fund, then buy one more share at a time of the fund furthest below its target that the
+    remaining cash can still pay for. A share of a fund that is below target always lowers the total gap
+    (money off target + cash), a share of a fund already at or above target never does, so it stops there."""
+    q = {s: int(math.floor(targets[s] / prices[s] + 1e-9)) for s in targets}
+    left = amount - sum(q[s] * prices[s] for s in q)
+    while True:
+        gaps = {s: targets[s] - q[s] * prices[s] for s in q if prices[s] <= left + 1e-9}
+        gaps = {s: g for s, g in gaps.items() if g > 1e-9}
+        if not gaps:
+            return q
+        s = max(gaps, key=gaps.get)
+        q[s] += 1
+        left -= prices[s]
+
+
+def build_funds_plan(amount: float, prices: dict[str, float | None]) -> Plan:
+    """60% SPY + 40% SPMO in whole shares (prices in the plan's money, USD). No stock picking, no live ideas."""
+    if amount <= 0:
+        raise ValueError("Amount must be positive")
+    missing = [s for s in FUNDS if not prices.get(s) or prices[s] <= 0]
+    if missing:
+        raise ValueError(f"Fund prices unavailable: {', '.join(missing)}")
+    px = {s: float(prices[s]) for s in FUNDS}
+    q = whole_shares({s: w * amount for s, w in FUNDS.items()}, px, amount)
+    plan = Plan(amount, FUNDS_PLAN)
+    for s, w in FUNDS.items():
+        name, role, note = FUND_INFO[s]
+        plan.lines.append(Line(s, name, role, None, w, w * amount, px[s], float(q[s]), q[s] * px[s], note=note))
+    plan.mix = {"anchor": FUNDS[SPY], "fund": FUNDS["SPMO"], "satellite": 0.0}
+    held = {l.symbol: l.invested / amount for l in plan.lines}
+    summary = ["No stock picking: 60% in a fund that holds the whole S&P 500 and 40% in a fund that holds its "
+               "strongest risers of the past year (momentum). Rebalance back to 60/40 once a month or once a quarter."]
+    if max(abs(held[s] - FUNDS[s]) for s in FUNDS) > 0.02:
+        summary.append(f"With whole shares and this amount the closest mix is {held[SPY] * 100:.0f}% / "
+                       f"{held['SPMO'] * 100:.0f}%; a larger amount (or fractional shares at your broker) gets "
+                       "closer to 60/40.")
+    plan.weighting = {"method": "fixed_funds", "target_x": None, "budget_applied": False, "summary": summary}
     return plan
 
 

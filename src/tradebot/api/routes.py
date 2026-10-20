@@ -176,17 +176,65 @@ def portfolio(request: Request, body: PortfolioRequest):
     return _portfolio(_state(request), body)
 
 
-def _portfolio(st, body: PortfolioRequest) -> dict:
-    from ..portfolio import build_plan, lasting_mix, plan_risk
+def _fx_for(st, currency: str) -> float:
+    if currency != "EUR":
+        return 1.0
+    fx = st.market.quote("EURUSD=X").get("price") or 0
+    if not fx:
+        raise HTTPException(502, "EUR/USD rate unavailable. Try again or use USD.")
+    return fx
 
+
+def _funds_portfolio(st, body: PortfolioRequest) -> dict:
+    """"Simple funds": 60% SPY + 40% SPMO in whole shares, no picks needed, with its real-fund track record."""
+    from ..portfolio import EU_FUNDS_NOTE, FUNDS, FUNDS_PLAN, build_plan, plan_risk
+    from ..portfolio_risk import FUND_SECTORS
+
+    fx = _fx_for(st, body.currency)
+    amount_usd = body.amount * fx
+    prices = {s: st.market.quote(s).get("price") for s in FUNDS}
+    try:
+        plan = build_plan(amount_usd, FUNDS_PLAN, [], False, [], prices.get("SPY"), fund_prices=prices)
+    except ValueError as exc:
+        raise HTTPException(502 if "unavailable" in str(exc) else 400, str(exc)) from exc
+    closes = _daily_closes(st, list(FUNDS))
+    risk = plan_risk(plan, closes, closes["SPY"]) if "SPY" in closes else {}
+    held = {l.symbol: l.invested / amount_usd for l in plan.lines if l.invested > 0}
+    risk_block = _risk_block(st, closes, held, dict(FUND_SECTORS), body.amount, body.currency)
+    track = (st.precompute.get("plan_track") or {}).get("funds") or st.precompute.get("funds_track")
+    if track is None:
+        try:  # two fund histories, about a second: computed once and kept until the next full refresh
+            from .services import compute_funds_track
+            track = compute_funds_track(st.market)
+            st.precompute.put("funds_track", track)
+        except Exception:
+            track = None
+    if track is not None:
+        track = {**track, "method": "funds"}
+
+    def money(x):
+        return None if x is None else x / fx
+
+    return ser.clean({
+        "currency": body.currency, "fx_usd_per_unit": fx, "risk": FUNDS_PLAN, "amount": body.amount,
+        "lines": [{**vars(l), "amount": money(l.amount), "invested": money(l.invested)} for l in plan.lines],
+        "cash": money(plan.cash), "by_role": plan.by_role(), "by_sector": {},
+        "risk_metrics": risk, "risk_view": risk_block, "track_record": track, "changes": None,
+        "core_risk_off": False, "as_of": closes.index[-1].date().isoformat() if len(closes) else None,
+        "mix": plan.mix, "standard_mix": dict(plan.mix), "weighting": plan.weighting,
+        "whole_shares": True, "eu_note": EU_FUNDS_NOTE,
+    })
+
+
+def _portfolio(st, body: PortfolioRequest) -> dict:
+    from ..portfolio import FUNDS_PLAN, build_plan, lasting_mix, plan_risk
+
+    if body.risk == FUNDS_PLAN:
+        return _funds_portfolio(st, body)
     core = st.precompute.get(f"picks:{DEFAULT_PRESET}")
     if core is None:
         raise HTTPException(503, "The picks are being computed. Try again in about a minute.")
-    fx = 1.0
-    if body.currency == "EUR":
-        fx = st.market.quote("EURUSD=X").get("price") or 0
-        if not fx:
-            raise HTTPException(502, "EUR/USD rate unavailable. Try again or use USD.")
+    fx = _fx_for(st, body.currency)
     amount_usd = body.amount * fx
     spy_price = st.market.quote("SPY").get("price")
     candidates = [r for r in core["ranking"] if r["eligible"]]

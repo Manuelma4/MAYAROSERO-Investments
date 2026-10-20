@@ -91,7 +91,11 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
       limits: { risk_per_trade_pct: 1, max_position_pct: 10, max_open_positions: 5, max_short_exposure_pct: 20, max_daily_loss_pct: 3, max_order_value: null, max_daily_loss_value: null },
     };
     case "/api/portfolio": {
-      try { return await load(`portfolio_${body.risk ?? "balanced"}.json`); } catch { return limit("Building a portfolio"); }
+      const risk = body.risk ?? "balanced";
+      try { return await load(`portfolio_${risk}.json`); } catch {
+        // Older snapshots have no Simple funds file: say so instead of showing another plan.
+        return limit(risk === "funds" ? "The Simple funds plan (60% S&P 500 + 40% momentum fund)" : "Building a portfolio");
+      }
     }
     case "/api/portfolio/drift": return { status: "no_target", target: null,
       message: "Saving a target and the weekly drift check run on the live server. This preview has no saved target." };

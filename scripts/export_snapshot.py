@@ -125,7 +125,7 @@ def main(out: Path) -> None:
                 earn[rec["symbol"]] = rec
         save("earnings.json", earn)
         print(f"earnings: {sum(r['status'] == 'ok' for r in earn.values())}/{len(earn)}")
-        for risk in ("cautious", "balanced", "bold"):
+        for risk in ("cautious", "balanced", "bold", "funds"):
             save(f"portfolio_{risk}.json", post("/api/portfolio", {"amount": 10000, "currency": "EUR", "risk": risk}))
         print("picks + today: ok")
         save("backtest.json", post("/api/backtest", {"provider": "yahoo", "symbol": "^GSPC", "timeframe": "1d",

@@ -72,11 +72,18 @@ What the tests honestly say today (details on the Learn page):
   stocks. Its honest estimate: **about +1–2% a year over the S&P 500 at best, slightly bigger drops, not proven.**
 - The ready-made plans use the same ranking with a risk limit: Balanced ≈ the S&P 500, Bold a bit more
   return and bigger drops.
-- **The simplest version, no stock picking:** 60% in an S&P 500 fund (e.g. SPY / an S&P 500 UCITS ETF in your
-  PEA or broker) + 40% in a momentum fund such as **SPMO**. With real fund prices since late 2015 it did about
-  **+1.5% a year** better than the S&P 500 with a slightly smaller worst drop. Check which of these funds your
-  broker offers in Europe (UCITS versions exist for S&P 500; momentum UCITS funds also exist, e.g. iShares
-  MSCI World/USA Momentum).
+- **The simplest version, no stock picking: "Simple funds"** on My portfolio. 60% in an S&P 500 fund + 40% in
+  the S&P 500 momentum fund **SPMO**, rebalanced back to 60/40 once a month or quarter. Real fund prices,
+  monthly rebalancing, 0.10% costs, Oct 2015 to Oct 2026: **16.3% a year vs 14.8%** for the S&P 500 (SPY,
+  dividends included), worst drop -32.6% vs -33.7%, about the same swings (18.0% vs 17.6% a year), ahead in
+  75% of 3-year periods and in both halves. A small edge (+1.5% a year) from one decade with a strong
+  momentum run: likely, not certain, to continue.
+- **Buying from Europe:** US-listed ETFs such as SPY and SPMO often cannot be bought by EU retail investors
+  (PRIIPs rules: the fund must publish a KID document, US funds do not). Look for UCITS equivalents at your
+  broker: an **S&P 500 UCITS ETF** for the 60%, and a **momentum UCITS ETF** such as *iShares Edge MSCI USA
+  Momentum Factor* or *iShares Edge MSCI World Momentum Factor* for the 40%. They follow MSCI momentum indexes
+  (different stocks and weights; the World one also holds non-US stocks), so their history differs from
+  SPMO's and the track record in the app is only indicative for them.
 
 So: let the **live track record** (Today and Beat the S&P pages) run for at least 1–3 months, ideally a year,
 before trusting the picks with real money. If you invest anyway, keep most of it in a plain S&P 500 fund and

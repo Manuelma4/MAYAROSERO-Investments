@@ -216,3 +216,70 @@ def test_plan_backtest_truncation_costs_and_levels():
     assert all(x["core"] <= 0.40 + 1e-9 and x["anchor"] == pytest.approx(0.60) for x in before["log"])
     cautious = run_plan_backtest(frames, bench, "cautious", **kw)
     assert all(x["x_spy_est"] <= TARGET_VOL["cautious"] + 1e-6 for x in cautious["log"] if x["x_spy_est"] is not None)
+
+
+# ---------------------------------------------------------------- "Simple funds" plan (60% SPY + 40% SPMO)
+
+def test_funds_plan_weights_and_whole_shares():
+    from tradebot.portfolio import FUNDS, build_funds_plan, whole_shares
+
+    assert FUNDS == {"SPY": 0.60, "SPMO": 0.40}
+    prices = {"SPY": 650.0, "SPMO": 120.0}
+    for amount in (1_000, 5_000, 10_000, 123_456.78):
+        plan = build_plan(amount, "funds", [], False, [], prices["SPY"], fund_prices=prices)
+        assert plan.risk == "funds" and [l.symbol for l in plan.lines] == ["SPY", "SPMO"]
+        assert all(float(l.shares).is_integer() and l.invested == pytest.approx(l.shares * l.price) for l in plan.lines)
+        assert 0 <= plan.cash < prices["SPY"] + 1e-9          # only rounding left in cash
+        # no further whole share of an under-target fund is affordable
+        for l in plan.lines:
+            assert l.price > plan.cash + 1e-9 or l.invested >= FUNDS[l.symbol] * amount - 1e-9
+        assert {l.role for l in plan.lines} == {"anchor", "fund"} and plan.weighting["summary"]
+    big = build_funds_plan(1_000_000, prices)
+    held = {l.symbol: l.invested / big.amount for l in big.lines}
+    assert held["SPY"] == pytest.approx(0.60, abs=0.001) and held["SPMO"] == pytest.approx(0.40, abs=0.001)
+    assert whole_shares({"A": 100.0, "B": 100.0}, {"A": 30.0, "B": 300.0}, 200.0) == {"A": 4, "B": 0}
+    with pytest.raises(ValueError):
+        build_funds_plan(10_000, {"SPY": 650.0, "SPMO": None})
+
+
+def test_funds_backtest_truncation_costs_and_stats():
+    from conftest import make_ohlcv
+    from tradebot.plan_backtest import run_funds_backtest
+
+    frames = {"SPY": make_ohlcv(900, seed=1, drift=0.0003, vol=0.01),
+              "SPMO": make_ohlcv(800, seed=2, drift=0.0004, vol=0.013)}
+    frames["SPMO"].index = frames["SPY"].index[100:]          # the momentum fund starts later
+    full = run_funds_backtest(frames)
+    assert full["equity"].index[0] == frames["SPMO"].index[0] and full["equity"].iloc[0] == 100
+    for cut_at in (full["equity"].index[333], full["equity"].index[500]):
+        cut = run_funds_backtest(frames, end=str(cut_at.date()))
+        pd.testing.assert_series_equal(full["equity"].loc[:cut_at], cut["equity"], check_freq=False, check_names=False)
+    # weights equal to an all-SPY mix reproduce SPY (minus the first buy's cost), so the engine adds nothing
+    spy_only = run_funds_backtest(frames, weights={"SPY": 1.0}, cost_bps=0)
+    pd.testing.assert_series_equal(spy_only["equity"].iloc[1:], spy_only["benchmark"].iloc[1:] / spy_only["benchmark"].iloc[1] * spy_only["equity"].iloc[1], check_names=False, check_freq=False, rtol=1e-6)
+    free = run_funds_backtest(frames, cost_bps=0)
+    assert free["equity"].iloc[-1] > full["equity"].iloc[-1]
+    st = full["stats"]
+    assert {"cagr_%", "volatility_%", "max_drawdown_%", "sharpe", "month_1in20_%", "turnover_per_year_%"} <= set(st)
+    assert st["turnover_per_year_%"] > 0                      # monthly trades back to 60/40
+
+
+def test_funds_track_record_fields():
+    from conftest import make_ohlcv
+    from tradebot.api.services import funds_track
+
+    frames = {"SPY": make_ohlcv(1200, seed=1, drift=0.0003, vol=0.01), "SPMO": make_ohlcv(1200, seed=2, drift=0.0004)}
+    t = funds_track(frames)
+    assert {"cagr_%", "spy_cagr_%", "volatility_%", "max_drawdown_%", "sharpe", "month_1in20_%",
+            "spy_month_1in20_%", "momentum_fund_cagr_%"} <= set(t)
+    assert t["robustness"]["windows"] > 0 and 0 <= t["robustness"]["windows_beating_%"] <= 100
+
+
+def test_risk_view_on_funds_plan_has_no_largest_sector():
+    from conftest import make_ohlcv
+    from tradebot.portfolio_risk import risk_view
+
+    closes = pd.DataFrame({s: make_ohlcv(900, seed=k)["close"] for k, s in enumerate(["SPY", "SPMO"])})
+    r = risk_view(closes, {"SPY": 0.6, "SPMO": 0.4}, 10_000, "USD")
+    assert r["status"] == "ok" and r["diversification"]["top_sector"] is None
+    assert {d["sector"] for d in r["diversification"]["sectors"]} == {"S&P 500 index", "Momentum fund"}

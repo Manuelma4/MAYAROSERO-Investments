@@ -167,7 +167,40 @@ def compute_plan_track(market: MarketData, start: str = PicksRequest().start) ->
                      "spy_max_drawdown_%": spy["max_drawdown_%"], "spy_sharpe": spy["sharpe"],
                      "spy_month_1in20_%": spy["month_1in20_%"],
                      "robustness": {k: v for k, v in robustness(res["equity"], b).items() if k != "years"}}
+    try:  # the funds plan only needs two fund histories; a failure here never hides the risk levels
+        out["funds"] = compute_funds_track(market)
+    except Exception:
+        pass
     return ser.clean(out)
+
+
+def funds_track(frames: dict) -> dict:
+    """Track record of the "Simple funds" plan (60% SPY + 40% SPMO, monthly, 10 bps) from SPMO's first day."""
+    from ..plan_backtest import level_stats, run_funds_backtest
+
+    res = run_funds_backtest(frames)
+    b = res["benchmark"]
+    spy, st = level_stats(b, b), res["stats"]
+    rob = robustness(res["equity"], b)
+    mom = frames["SPMO"]["close"].reindex(b.index).dropna()
+    mom_st = level_stats(mom / mom.iloc[0] * 100, b)
+    return ser.clean({
+        "start": res["equity"].index[0].date().isoformat(), "end": res["equity"].index[-1].date().isoformat(),
+        **{k: st[k] for k in ("cagr_%", "volatility_%", "max_drawdown_%", "sharpe", "month_1in20_%",
+                              "months_beating_spy_%", "turnover_per_year_%", "vol_x_spy")},
+        "spy_cagr_%": spy["cagr_%"], "spy_volatility_%": spy["volatility_%"],
+        "spy_max_drawdown_%": spy["max_drawdown_%"], "spy_sharpe": spy["sharpe"],
+        "spy_month_1in20_%": spy["month_1in20_%"],
+        "momentum_fund_cagr_%": mom_st["cagr_%"], "momentum_fund_max_drawdown_%": mom_st["max_drawdown_%"],
+        "robustness": {k: v for k, v in rob.items() if k != "years"}, "years": rob.get("years", []),
+    })
+
+
+def compute_funds_track(market: MarketData) -> dict:
+    from ..portfolio import FUNDS
+
+    frames = {s: market.history("yahoo", s, "1d", start="2015-01-01") for s in FUNDS}
+    return funds_track(frames)
 
 
 def market_mood(market: MarketData, breadth_pct: float | None) -> dict:
