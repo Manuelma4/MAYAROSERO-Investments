@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tradebot.portfolio import build_plan, capped_weights, plan_risk
+from tradebot.portfolio import build_plan, capped_weights, lasting_mix, plan_risk
 
 CORE = [{"symbol": f"T{i}", "name": f"Tech {i}", "sector": "Tech", "price": 100.0, "volatility_%": 30} for i in range(6)] + \
        [{"symbol": f"H{i}", "name": f"Health {i}", "sector": "Health", "price": 50.0, "volatility_%": 20} for i in range(4)]
@@ -23,18 +23,31 @@ def test_plan_balanced_sums_and_roles():
     p = build_plan(10_000, "balanced", CORE, False, [IDEA], spy_price=500.0)
     roles = p.by_role()
     assert sum(l.invested for l in p.lines) + p.cash == pytest.approx(10_000)
-    assert roles["anchor"] == pytest.approx(0.10)
     sat = [l for l in p.lines if l.role == "satellite"]
-    # 1% risk = 100 / 50 per share = 2 shares = 2,000 > budget 2,000? capped by stock cap 10% = 1,000
+    # 1% risk = 100 / 50 per share = 2 shares = 2,000, capped by the 10% ideas budget and stock cap = 1,000
     assert sat and sat[0].invested <= 1_000 + 1e-6 and sat[0].stop == 950.0
+    assert roles["anchor"] == pytest.approx(0.54) == pytest.approx(lasting_mix("balanced", 0.10)[2])
     assert all(s <= 0.25 + 1e-9 for s in p.by_sector().values())
+
+
+def test_unused_ideas_budget_is_invested_not_left_in_cash():
+    for risk in ("cautious", "balanced", "bold"):
+        core, sat, anchor = lasting_mix(risk)
+        assert sat == 0 and core + anchor == pytest.approx(1.0)
+    assert lasting_mix("balanced") == pytest.approx((0.40, 0.0, 0.60))
+    assert lasting_mix("bold", 0.05) == pytest.approx((0.51 * 0.95 / 0.85, 0.05, 0.34 * 0.95 / 0.85))
+    assert lasting_mix("balanced", None) == (0.36, 0.10, 0.54)              # old behaviour on request
+    p = build_plan(10_000, "balanced", CORE + [{"symbol": f"E{i}", "name": "E", "sector": "Energy", "price": 80.0,
+                                                "volatility_%": 25} for i in range(4)], False, [], spy_price=500.0)
+    assert p.cash < 1.0                                                     # only rounding stays in cash
+    assert p.by_role()["anchor"] == pytest.approx(0.60) and p.by_role()["core"] == pytest.approx(0.40, abs=1e-3)
 
 
 def test_risk_off_core_goes_to_cash_and_whole_shares():
     p = build_plan(10_000, "cautious", CORE, True, [], spy_price=500.0, fractional=False)
     assert not [l for l in p.lines if l.role == "core"]
     anchor = [l for l in p.lines if l.role == "anchor"][0]
-    assert anchor.shares == 9 and p.cash == pytest.approx(10_000 - 9 * 500)
+    assert anchor.shares == 16 and p.cash == pytest.approx(10_000 - 16 * 500)   # 80% index, picks share in cash
 
 
 def test_invalid_inputs():
@@ -59,8 +72,8 @@ def test_diversifies_beyond_concentrated_top_picks():
              [{"symbol": f"F{i}", "name": f"Fin {i}", "sector": "Financials", "price": 60.0, "volatility_%": 22} for i in range(3)]
     p = build_plan(10_000, "balanced", ranked, False, [], 500.0, core_n=6)  # top 6 are all Tech
     core = [l for l in p.lines if l.role == "core"]
-    assert {l.sector for l in core} >= {"Tech", "Energy", "Financials"}
-    assert sum(l.weight for l in core) == pytest.approx(0.70, abs=0.01)  # fully invested despite caps
+    assert {l.sector for l in core} >= {"Tech", "Energy"}               # 25% Tech cap: the rest goes elsewhere
+    assert sum(l.weight for l in core) == pytest.approx(0.40, abs=0.01)  # fully invested despite caps
 
 
 def test_live_idea_already_in_core_is_not_doubled():
@@ -113,7 +126,7 @@ def test_risk_aware_plan_sums_and_respects_caps():
         assert p.cash >= -1e-6
         assert all(l.weight <= 0.10 + 1e-9 for l in p.lines if l.role in ("core", "satellite"))
         assert all(v <= 0.25 + 1e-9 for v in p.by_sector().values())
-        assert sum(p.mix.values()) <= 1 + 1e-9 and p.mix["core"] <= RISK_LEVELS[risk][0] + 1e-9
+        assert sum(p.mix.values()) <= 1 + 1e-9 and p.mix["core"] <= lasting_mix(risk, p.mix["satellite"])[0] + 1e-9
         assert p.weighting["method"] == "equal_risk" and len(p.weighting["summary"]) == 2
         assert len({l.symbol for l in p.lines}) == len(p.lines)          # never doubles a holding
 
@@ -137,7 +150,7 @@ def test_risk_budget_hits_the_target_on_jumpy_picks():
         _, w, anchor, info = plan_weights(risk, cands, False, closes)
         assert info["x_spy_start"] > TARGET_VOL[risk]
         assert info["x_spy"] == pytest.approx(TARGET_VOL[risk], rel=1e-3)
-        assert sum(w.values()) >= CORE_FLOOR * RISK_LEVELS[risk][0] * min(1.0, info["x_spy"] / info["x_spy_start"]) - 1e-9
+        assert sum(w.values()) >= CORE_FLOOR * lasting_mix(risk)[0] * min(1.0, info["x_spy"] / info["x_spy_start"]) - 1e-9
         # recomputed from scratch on the past year: plan vol / SPY vol <= the level's target
         wt = pd.Series({**w, "SPY": anchor})
         port = rets[wt.index].mul(wt).sum(axis=1)
@@ -154,8 +167,8 @@ def test_cautious_needs_cash_and_calm_picks_keep_the_standard_mix():
     calm, cands2 = market(idio=[0.006] * 10, beta=[0.6] * 10)
     _, w2, anchor2, info2 = plan_weights("balanced", cands2, False, calm)
     assert info2["x_spy_start"] <= 1.0 and info2["to_cash"] == 0
-    assert anchor2 == pytest.approx(RISK_LEVELS["balanced"][2])
-    assert sum(w2.values()) == pytest.approx(RISK_LEVELS["balanced"][0], abs=0.01)
+    assert anchor2 == pytest.approx(lasting_mix("balanced")[2]) == pytest.approx(0.60)
+    assert sum(w2.values()) == pytest.approx(lasting_mix("balanced")[0], abs=0.01)
 
 
 def test_short_window_makes_the_budget_stricter_when_picks_got_jumpier():
@@ -199,6 +212,7 @@ def test_plan_backtest_truncation_costs_and_levels():
     free = run_plan_backtest(frames, bench, "balanced", cost_bps=0, **kw)
     assert free["equity"].iloc[-1] > full["equity"].iloc[-1]
     before = run_plan_backtest(frames, bench, "balanced", risk_aware=False, **kw)
-    assert all(x["core"] <= 0.70 + 1e-9 and x["anchor"] == pytest.approx(0.10) for x in before["log"])
+    # no live ideas in a backtest: the ideas budget is invested in picks + index (40/60 for Balanced), never idle
+    assert all(x["core"] <= 0.40 + 1e-9 and x["anchor"] == pytest.approx(0.60) for x in before["log"])
     cautious = run_plan_backtest(frames, bench, "cautious", **kw)
     assert all(x["x_spy_est"] <= TARGET_VOL["cautious"] + 1e-6 for x in cautious["log"] if x["x_spy_est"] is not None)

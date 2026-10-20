@@ -26,7 +26,7 @@ from ..data import fundamentals as fd
 from ..live import alerts
 from ..live import digest as dg
 from ..live import drift as dr
-from ..picker import PRESETS
+from ..picker import DEFAULT_PRESET, PRESETS
 from ..universe import CURATED, POP, STOCKS, by_symbol, sp500_symbols
 from . import serialize as ser
 from .market import MarketData
@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 class Precomputer:
     def __init__(self, market: MarketData, interval: int = 1800, opportunities_interval: int = 300,
                  on_opportunity=None, paper=None, paper_lock=None, store=None, on_alert=None,
-                 on_picks_change=None, alert_preset: str = "quality_momentum", broker_exits=None,
+                 on_picks_change=None, alert_preset: str = DEFAULT_PRESET, broker_exits=None,
                  notify=None, holdings=None, digest_schedule: dg.Schedule | None = None,
                  earnings: er.EarningsCalendar | None = None, on_earnings=None,
                  fundamentals: fd.Fundamentals | None = None, fundamentals_delay: float = 45.0,
@@ -94,7 +94,7 @@ class Precomputer:
                 fresh.append(preset)
             except Exception as exc:  # keep the previous result if a refresh fails
                 errors.append(f"picks {preset}: {exc}")
-        if "quality_momentum" in fresh:
+        if DEFAULT_PRESET in fresh:
             try:   # backtest of each portfolio risk level (the plan's "track record"), ~20 s
                 self.put("plan_track", compute_plan_track(self.market))
             except Exception as exc:
@@ -138,7 +138,7 @@ class Precomputer:
             log.warning("precompute errors: %s", self.last_error)
 
     def build_today(self) -> dict:
-        core = self.get("picks:quality_momentum")
+        core = self.get(f"picks:{DEFAULT_PRESET}")
         try:
             mood = market_mood(self.market, core.get("breadth_%") if core else None)
         except Exception as exc:  # the board still shows picks and movers without the mood
@@ -157,7 +157,8 @@ class Precomputer:
                 "preset": core["preset"], "risk_off": core["risk_off"], "picks": core["picks"],
                 "changes": core["changes"], "as_of": core["as_of"],
                 "edge": {k: core["stats"].get(k) for k in ("cagr_%", "benchmark_cagr_%", "skill_vs_universe_%", "start")},
-                "settings": "10 stocks, monthly review, uptrends only (Quality momentum)",
+                "settings": "60% S&P 500 index + 40% in 10 momentum stocks, monthly review (Core + momentum)",
+                "benchmark_weight_%": core["stats"].get("benchmark_weight_%"),
             },
             "gainers": [{k: q[k] for k in ("symbol", "name", "price", "change_pct")} for q in quotes[:6]],
             "losers": [{k: q[k] for k in ("symbol", "name", "price", "change_pct")} for q in quotes[::-1][:6]],
@@ -180,12 +181,15 @@ class Precomputer:
             if not session_close_known(day, started):
                 continue   # ranked on an unfinished session: wait for the close
             picks = data.get("picks") or []
-            rows = [{"symbol": p["symbol"], "weight": 1 / len(picks), "price": p.get("price")} for p in picks]
+            spy_w = float(data.get("benchmark_weight_%") or 0.0) / 100 if picks else 0.0
+            rows = [{"symbol": p["symbol"], "weight": (1 - spy_w) / len(picks), "price": p.get("price")} for p in picks]
+            if spy_w > 0:   # core-satellite presets: the index share is part of the recorded portfolio
+                rows.append({"symbol": "SPY", "weight": spy_w, "price": None})
             n += self.store.record_picks_snapshot(preset, day, rows, bool(data.get("risk_off")),
                                                   datetime.now(timezone.utc).isoformat())
         return n
 
-    def track_record(self, preset: str = "quality_momentum", max_age: float = 120.0) -> dict:
+    def track_record(self, preset: str = DEFAULT_PRESET, max_age: float = 120.0) -> dict:
         """Forward record (cached briefly: it re-reads prices for every recorded pick and idea)."""
         key = f"track:{preset}"
         hit = self.get(key)

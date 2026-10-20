@@ -257,7 +257,7 @@ def test_precompute_earnings_alert_is_sent_once(tmp_path):
                            holdings=lambda: {"positions": [{"symbol": "NVDA"}, {"symbol": "BTC/USDT"}]})
 
     pre = make()
-    pre.put("picks:quality_momentum", {"picks": [{"symbol": "MSFT"}]})
+    pre.put("picks:core_momentum", {"picks": [{"symbol": "MSFT"}]})
     res = pre.refresh_earnings(NOW)
     assert res["fetched"] == len(pre.earnings_interest()) and "BTC/USDT" not in pre.earnings_interest()
     assert pre.earnings.cached(["AAPL"])["AAPL"]["avg_move"]["moves"]   # average move from daily bars

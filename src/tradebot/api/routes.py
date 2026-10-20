@@ -11,6 +11,7 @@ from ..analysis import candlesticks as cs
 from ..analysis.swings import pivots
 from ..backtest import BacktestConfig, run_backtest
 from ..ml import Predictor
+from ..picker import DEFAULT_PRESET
 from ..report import analyze_structure
 from ..strategies import REGISTRY, get_strategy
 from . import serialize as ser
@@ -79,7 +80,7 @@ def picks(request: Request, body: PicksRequest):
 
 
 @router.get("/picks/latest")
-def picks_latest(request: Request, preset: str = "quality_momentum"):
+def picks_latest(request: Request, preset: str = DEFAULT_PRESET):
     """Precomputed picks for a preset with default settings (instant)."""
     from ..picker import PRESETS
 
@@ -106,7 +107,7 @@ def today(request: Request):
 
 
 @router.get("/track-record")
-def track_record(request: Request, preset: str = "quality_momentum"):
+def track_record(request: Request, preset: str = DEFAULT_PRESET):
     """Live forward record since the first recorded day: picks vs SPY and Invest-now idea outcomes."""
     from ..picker import PRESETS
 
@@ -176,9 +177,9 @@ def portfolio(request: Request, body: PortfolioRequest):
 
 
 def _portfolio(st, body: PortfolioRequest) -> dict:
-    from ..portfolio import RISK_LEVELS, build_plan, plan_risk
+    from ..portfolio import build_plan, lasting_mix, plan_risk
 
-    core = st.precompute.get("picks:quality_momentum")
+    core = st.precompute.get(f"picks:{DEFAULT_PRESET}")
     if core is None:
         raise HTTPException(503, "The picks are being computed. Try again in about a minute.")
     fx = 1.0
@@ -243,7 +244,7 @@ def _portfolio(st, body: PortfolioRequest) -> dict:
         "cash": money(plan.cash), "by_role": plan.by_role(), "by_sector": plan.by_sector(),
         "risk_metrics": risk, "risk_view": risk_block, "track_record": track, "changes": core.get("changes"),
         "core_risk_off": core["risk_off"], "as_of": core["as_of"],
-        "mix": plan.mix, "standard_mix": dict(zip(("core", "satellite", "anchor"), RISK_LEVELS[body.risk])),
+        "mix": plan.mix, "standard_mix": dict(zip(("core", "satellite", "anchor"), lasting_mix(body.risk, plan.mix.get("satellite", 0.0)))),
         "weighting": {k: v for k, v in plan.weighting.items() if k != "risk_shares"},
     })
 
@@ -500,7 +501,7 @@ def stock(request: Request, symbol: str = Query(..., max_length=20)):
     q = st.market.quote(symbol)
     if q.get("price") is None and info is None and crypto_name is None:
         raise HTTPException(404, f"Unknown symbol {symbol}.")
-    core = st.precompute.get("picks:quality_momentum")
+    core = st.precompute.get(f"picks:{DEFAULT_PRESET}")
     pred = st.precompute.get("predictions:5") or {}
     ranked = next((i for i in pred.get("items", []) if i["symbol"] == symbol), None)
     opps = (st.precompute.get("opportunities") or {}).get("items", [])
@@ -588,7 +589,7 @@ async def ai_analyze(request: Request, symbol: str = Query(..., max_length=20)):
         raise HTTPException(503, "The AI analyst is off. Add ANTHROPIC_API_KEY to .env to turn it on (see LATER.md).")
     opps = (st.precompute.get("opportunities") or {}).get("items", [])
     idea = next((o for o in opps if o["symbol"] == symbol and o["qualified"]), None)
-    core = st.precompute.get("picks:quality_momentum") or {}
+    core = st.precompute.get(f"picks:{DEFAULT_PRESET}") or {}
     factors = next((r for r in core.get("ranking", []) if r["symbol"] == symbol), None)
     try:
         res = await asyncio.to_thread(st.analyst.analyze, symbol, idea, factors)

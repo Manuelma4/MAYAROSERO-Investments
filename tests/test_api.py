@@ -183,8 +183,14 @@ def test_precompute_today_and_latest_picks(client):
     assert latest["ranking"] and all(r["reason"] for r in latest["ranking"])
     assert {"buy", "sell", "keep"} <= set(t["core"]["changes"])
     assert len(t["gainers"]) == 6 and t["gainers"][0]["change_pct"] >= t["losers"][0]["change_pct"]
-    for preset in ("quality_momentum", "momentum", "trend_following", "low_volatility"):
+    for preset in ("core_momentum", "quality_momentum", "momentum", "trend_following", "low_volatility"):
         assert client.get("/api/picks/latest", params={"preset": preset}).json()["preset"] == preset
+    # The default is Core + momentum: 60% in the index, with a robustness summary for the UI.
+    assert latest["preset"] == "core_momentum" and latest["default_preset"] == "core_momentum"
+    assert latest["benchmark_weight_%"] in (0.0, 60.0)
+    rb = latest["robustness"]
+    assert {"windows_beating_%", "years_beating", "halves", "p_beat_5y_%", "p_beat_10y_%"} <= set(rb)
+    assert all(abs(p["weight_%"] - 40 / len(latest["picks"])) < 1e-9 for p in latest["picks"])
 
 
 def test_pick_reason_plain_english():
@@ -311,7 +317,7 @@ def test_portfolio_endpoint(client):
     assert {"cagr_%", "spy_cagr_%"} <= set(d["track_record"])
     assert d["track_record"]["method"] == "plan" and "month_1in20_%" in d["track_record"]   # walk-forward backtest
     # synthetic stocks are mostly below their 200-day average: make the top 12 eligible to exercise risk weights
-    picks = pre.get("picks:quality_momentum")
+    picks = pre.get("picks:core_momentum")
     for r in picks["ranking"][:12]:
         r["eligible"] = True
     d = client.post("/api/portfolio", json={"amount": 10000, "currency": "USD", "risk": "balanced"}).json()

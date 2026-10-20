@@ -120,6 +120,12 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 21. [x] **Euro everywhere**: show amounts in € (live EUR/USD) with the dollar price on hover, set in Settings.
 
 ## Later research track
+- Strategy study 2026-10 (pre-registered, select 2015-2020, confirm 2021-2026; ETFs select 2000-2012, confirm
+  2013-2026): default is now **Core + momentum** (60% SPY + 40% momentum top 10, monthly): 18.6%/yr vs SPY 13.7%
+  (2015-10/2026), 14.3 vs 12.7 then 23.4 vs 15.0 by half, Sharpe 0.92 vs 0.82, max drop -36% vs -34%, 83% of
+  rolling 3-year windows ahead. Not statistically proven (t 1.9, deflated Sharpe P 0.80 over 33 trials);
+  sector-ETF rotation since 2000 did not confirm. Plans use the same ranking, 20/40/60% picks, no idle cash.
+  Re-check yearly; watch the live track record of `core_momentum`.
 - Microsoft Qlib + RD-Agent to discover better ranking factors for the monthly core picks
   (offline, validated walk-forward before adoption).
 

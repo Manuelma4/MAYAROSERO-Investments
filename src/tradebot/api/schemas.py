@@ -40,7 +40,7 @@ class PredictRequest(BaseModel):
 
 
 class PicksRequest(BaseModel):
-    preset: Literal["momentum", "quality_momentum", "low_volatility", "trend_following"] = "quality_momentum"
+    preset: Literal["core_momentum", "momentum", "quality_momentum", "low_volatility", "trend_following"] = "core_momentum"
     top_n: int = Field(10, ge=3, le=30)
     rebalance: Literal["ME", "QE", "W-FRI"] = "ME"
     start: str = "2015-01-01"

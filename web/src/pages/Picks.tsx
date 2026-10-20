@@ -13,11 +13,22 @@ import { TrackRecordCard } from "../components/TrackRecord";
 import { cssVar, useTheme } from "../lib/theme";
 
 const PRESETS = [
+  { id: "core_momentum", label: "Core + momentum" },
   { id: "quality_momentum", label: "Quality momentum" },
   { id: "momentum", label: "Momentum" },
   { id: "trend_following", label: "Trend" },
   { id: "low_volatility", label: "Low volatility" },
 ];
+
+// Extra fields sent by the server (kept local to this page).
+type Robust = {
+  window_years?: number; windows?: number; "windows_beating_%"?: number; "worst_window_gap_%"?: number;
+  years_beating?: number; years_total?: number; both_halves_beating?: boolean;
+  halves?: { start: string; end: string; "cagr_%": number; "benchmark_cagr_%": number }[];
+  "p_beat_5y_%"?: number; "p_beat_10y_%"?: number;
+};
+type Extra = { "benchmark_weight_%"?: number; robustness?: Robust };
+const weightOf = (p: object, n: number) => (p as { "weight_%"?: number })["weight_%"] ?? 100 / n;
 
 function Delta({ v, digits = 1 }: { v: number | undefined; digits?: number }) {
   return <span className={(v ?? 0) >= 0 ? "up" : "down"}>{fmtPct(v, digits)}</span>;
@@ -37,7 +48,7 @@ function nextRebalance(rebalance: string): string {
 }
 
 export default function Picks() {
-  const [preset, setPreset] = useState("quality_momentum");
+  const [preset, setPreset] = useState("core_momentum");
   const [topN, setTopN] = useState("10");
   const [start, setStart] = useState("2015-01-01");
   const [rebalance, setRebalance] = useState("ME");
@@ -65,7 +76,7 @@ export default function Picks() {
   useEffect(() => { run(); }, [preset]);
 
   // Live prices for today's picks (refreshed every 30 s on the live app).
-  const { quotes } = useQuotes(res?.picks.map((p) => p.symbol) ?? [], 30_000);
+  const { quotes } = useQuotes([...(res?.picks.map((p) => p.symbol) ?? []), "SPY"], 30_000);
   const live = (res?.picks ?? []).map((p) => quotes[p.symbol]?.change_pct).filter((x): x is number => x !== undefined);
   const basketToday = live.length ? live.reduce((a, b) => a + b, 0) / live.length : undefined;
 
@@ -77,18 +88,30 @@ export default function Picks() {
   ] : [], [res, resolved]);
   const s = res?.stats as Record<string, number> | undefined;
   const beat = s ? s["excess_cagr_%"] > 0 : false;
+  const extra = res as (PicksResult & Extra) | null;
+  const spyW = extra?.["benchmark_weight_%"] ?? 0;
+  const rb = extra?.robustness;
+  const n = res?.picks.length ?? 0;
 
   return (
     <div className="page">
       <section className="hero-x">
         <p className="eyebrow">{STATIC ? "Picks" : "Live picks"} · next rebalance {nextRebalance(rebalance)}</p>
         <h1 className="display">Beat the S&amp;P&nbsp;500</h1>
-        <p className="muted lead">The stocks to hold right now: the S&amp;P&nbsp;500 stocks with the strongest momentum, trend and relative strength today, ranked by the engine and refreshed with live prices.</p>
+        <p className="muted lead">What to hold right now. The default, Core + momentum, keeps 60% in the S&amp;P&nbsp;500 itself and puts 40% in the 10 S&amp;P&nbsp;500 stocks with the strongest momentum, refreshed with live prices.</p>
         <div className="segmented wrap" role="radiogroup" aria-label="Strategy">
           {PRESETS.map((p) => (
             <button key={p.id} role="radio" aria-checked={preset === p.id} className={preset === p.id ? "active" : ""} onClick={() => setPreset(p.id)}>{p.label}</button>))}
         </div>
         {res && <p className="muted small">{res.preset_info[preset]}</p>}
+        {rb?.["windows_beating_%"] !== undefined && (
+          <p className="muted small">
+            How consistent: ahead of the S&amp;P&nbsp;500 in {fmtNum(rb["windows_beating_%"], 0)}% of the {rb.windows} overlapping {rb.window_years}-year periods since {s?.start}, and in {rb.years_beating} of {rb.years_total} calendar years
+            {rb.halves?.length === 2 ? <>; first half {fmtPct(rb.halves[0]["cagr_%"], 1)}/yr vs {fmtPct(rb.halves[0]["benchmark_cagr_%"], 1)}, second half {fmtPct(rb.halves[1]["cagr_%"], 1)}/yr vs {fmtPct(rb.halves[1]["benchmark_cagr_%"], 1)}</> : null}.
+            {rb["p_beat_10y_%"] !== undefined && <> Re-shuffling this history, it came out ahead over 10 years in {fmtNum(rb["p_beat_10y_%"], 0)}% of cases (5 years: {fmtNum(rb["p_beat_5y_%"] ?? 0, 0)}%).</>}
+            <Hint>These numbers come from the backtest since {s?.start}, recomputed every day. A 3-year period "ahead" means the strategy grew faster than the S&amp;P&nbsp;500 over those 3 years. The re-shuffle (a "block bootstrap") replays random yearly chunks of the past in a new order thousands of times; it assumes the future behaves like this one stretch of history, so it is optimistic. We tested many variants before choosing this one, and after allowing for that the edge is not statistically proven: think "better odds", not "sure thing". See Learn.</Hint>
+          </p>
+        )}
       </section>
       <details className="customize">
         <summary>Customize<span className="muted small"> · {topN} stocks · {rebalance === "ME" ? "monthly" : rebalance === "QE" ? "quarterly" : "weekly"} review{trend ? " · uptrends only" : ""}{regime ? " · cash in bear markets" : ""}</span></summary>
@@ -121,20 +144,29 @@ export default function Picks() {
       )}
 
       {res && (
-        <Card title={<>{res.risk_off ? "Signal: stay in cash" : `Hold now · ${res.picks.length} stocks`}<Hint term="equal-weight">The stocks to own today, best first. Put the same amount of money in each ("equal weight") and check back at the next review for changes. "Basket today" is how the whole list is doing since yesterday's close.</Hint></>}
-          actions={<span className="muted small">{basketToday !== undefined && <>Basket today <Delta v={basketToday} digits={2} /> · </>}equal weight · ranked {fmtDay(res.as_of)}</span>}>
+        <Card title={<>{res.risk_off ? "Signal: stay in cash" : spyW > 0 ? `Hold now · S&P 500 + ${n} stocks` : `Hold now · ${n} stocks`}<Hint term="equal-weight">What to own today, best first, with the share of your money for each line. The stocks get equal amounts ("equal weight"); with Core + momentum the biggest line is the S&amp;P&nbsp;500 index itself (for example the SPY fund). Check back at the next review for changes. "Basket today" is how the stocks are doing since yesterday's close.</Hint></>}
+          actions={<span className="muted small">{basketToday !== undefined && <>Basket today <Delta v={basketToday} digits={2} /> · </>}{spyW > 0 ? `${fmtNum(spyW, 0)}% index + stocks` : "equal weight"} · ranked {fmtDay(res.as_of)}</span>}>
           {res.risk_off ? (
             <div className="notice">The S&amp;P 500 is below its 200-day average, so the bear-market filter says to hold cash until the trend recovers.</div>
           ) : !res.picks.length ? <Empty>No stock passes the engine's rules today (strong trend, beating the index). Holding cash until one does is part of the plan.</Empty> : (
             <>
             <ul className="pick-cards">
+              {spyW > 0 && (
+                <li key="SPY" className="pc-core">
+                  <div className="pc-top">
+                    <span className="muted small">00</span>
+                    <Link to={stockPath("SPY")} className="pc-name"><strong>S&amp;P 500 index</strong><span className="muted small">SPY · {fmtNum(spyW, 0)}% of the money</span></Link>
+                    <span className="pc-num"><Price className="num" v={quotes.SPY?.price} symbol="SPY" alt="stack" />{quotes.SPY?.change_pct !== undefined && <Delta v={quotes.SPY.change_pct} digits={2} />}</span>
+                  </div>
+                  <p className="muted small">The core: the whole market in one fund. It keeps the ride close to the S&amp;P&nbsp;500's while the stocks below try to add a few % a year.</p>
+                </li>)}
               {res.picks.map((p, i) => {
                 const q = quotes[p.symbol];
                 return (
                   <li key={p.symbol}>
                     <div className="pc-top">
                       <span className="muted small">{String(i + 1).padStart(2, "0")}</span>
-                      <Link to={stockPath(p.symbol)} className="pc-name"><strong>{p.name}</strong><span className="muted small">{p.symbol} · {fmtNum(100 / res.picks.length, 1)}% of the money</span></Link>
+                      <Link to={stockPath(p.symbol)} className="pc-name"><strong>{p.name}</strong><span className="muted small">{p.symbol} · {fmtNum(weightOf(p, n), 1)}% of the money</span></Link>
                       <span className="pc-num"><Price className="num" v={q?.price ?? p.price} symbol={p.symbol} alt="stack" />{q?.change_pct !== undefined && <Delta v={q.change_pct} digits={2} />}</span>
                     </div>
                     {p.reason && <p className="muted small">{p.reason}</p>}
@@ -145,6 +177,17 @@ export default function Picks() {
               <table className="picks">
                 <thead><tr><th>#</th><th>Company</th><th className="hide-sm">Sector</th><th>Score<Hint>The engine's overall grade combining momentum, trend, strength vs the S&amp;P 500 and calmness. Longer bar = stronger candidate.</Hint></th><th className="r">Price</th><th className="r">Today</th><th className="r">1M</th><th className="r hide-sm">12M ex-1M<Hint term="momentum">Return over the last 12 months, leaving out the most recent month (recent moves often reverse briefly). The core momentum signal.</Hint></th><th className="r hide-sm">vs S&amp;P 6M<Hint term="relative-strength">How much better (or worse) the stock did than the S&amp;P 500 over 6 months.</Hint></th><th className="r">Weight<Hint>Share of your money for this stock. Equal weights keep the portfolio diversified.</Hint></th></tr></thead>
                 <tbody>
+                  {spyW > 0 && (
+                    <tr key="SPY">
+                      <td className="muted">00</td>
+                      <td><Link className="asset" to={stockPath("SPY")}><span className="avatar">SP</span><span><strong>S&amp;P 500 index</strong><span className="muted small">SPY · the core</span></span></Link></td>
+                      <td className="muted hide-sm">Whole market</td>
+                      <td></td>
+                      <td className="r num"><Price v={quotes.SPY?.price} symbol="SPY" /></td>
+                      <td className="r num">{quotes.SPY?.change_pct !== undefined ? <Delta v={quotes.SPY.change_pct} digits={2} /> : "–"}</td>
+                      <td className="r num">–</td><td className="r num hide-sm">–</td><td className="r num hide-sm">–</td>
+                      <td className="r num">{fmtNum(spyW, 0)}%</td>
+                    </tr>)}
                   {res.picks.map((p, i) => {
                     const q = quotes[p.symbol];
                     return (
@@ -159,7 +202,7 @@ export default function Picks() {
                         <td className="r num"><Delta v={p["return_1m_%"]} /></td>
                         <td className="r num hide-sm"><Delta v={p["momentum_12_1_%"]} /></td>
                         <td className="r num hide-sm"><Delta v={p["rel_strength_%"]} /></td>
-                        <td className="r num">{fmtNum(100 / res.picks.length, 1)}%</td>
+                        <td className="r num">{fmtNum(weightOf(p, n), 1)}%</td>
                       </tr>);
                   })}
                 </tbody>
@@ -170,7 +213,7 @@ export default function Picks() {
         </Card>
       )}
 
-      {preset === "quality_momentum" && <TrackRecordCard />}
+      {preset === "core_momentum" && <TrackRecordCard />}
 
       {res && (
         <>
@@ -221,6 +264,9 @@ export default function Picks() {
           {showHistory && (
             <div className="history-body">
               <p className="muted small">History is only used to test and tune the engine. The picks above are what it recommends today. Settings are in Customize at the top.</p>
+              {preset === "core_momentum" && (
+                <p className="muted small">How Core + momentum was chosen: we wrote down 14 candidate strategies in advance, picked one using only 2015-2020, then checked it once on 2021-2026. It beat the S&amp;P&nbsp;500 in both periods (about +1.6% a year in 2015-2020, +8% a year in 2021-2026, much of that from the 2026 chip and memory-stock rally) with a similar worst drop. Pure momentum stocks alone did even better but fell much deeper, so 60% stays in the index. Sector-fund rotation tested back to 2000 did not beat the S&amp;P&nbsp;500 after 2013, and real momentum funds have had long losing stretches. After allowing for the 33 variants we tried, the edge is likely but not proven.</p>
+              )}
               <div className="kpis">
                 <div className="kpi"><span className="kpi-label">Annual return<Hint term="cagr">The average yearly growth of the picks over the test, compared with the S&amp;P 500 (SPY, dividends included) below.</Hint></span><span className="kpi-value">{fmtPct(s["cagr_%"], 1)}</span><span className="kpi-sub">S&amp;P 500 {fmtPct(s["benchmark_cagr_%"], 1)}</span></div>
                 <div className="kpi"><span className="kpi-label">Edge vs index / year<Hint term="benchmark">How many percentage points a year the picks did better (or worse) than the S&amp;P 500.</Hint></span><span className={`kpi-value ${beat ? "up" : "down"}`}>{fmtPct(s["excess_cagr_%"], 1)}</span><span className="kpi-sub">{beat ? "Outperformed" : "Underperformed"} since {s.start}</span></div>

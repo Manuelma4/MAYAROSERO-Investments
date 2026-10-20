@@ -22,7 +22,7 @@ from tradebot.universe import CRYPTO, CURATED, STOCKS
 MARKETS = ["^GSPC", "^NDX", "^DJI", "^FCHI", "^GDAXI", "^STOXX50E", "BTC/USDT", "ETH/USDT", "SOL/USDT",
            "GC=F", "CL=F", "EURUSD=X"]
 FX = ["EURCHF=X", "EURGBP=X"]   # display-currency conversion (EURUSD=X is in MARKETS)
-PRESETS = ["quality_momentum", "momentum", "trend_following", "low_volatility"]
+PRESETS = ["core_momentum", "quality_momentum", "momentum", "trend_following", "low_volatility"]
 
 
 def safe(s: str) -> str:

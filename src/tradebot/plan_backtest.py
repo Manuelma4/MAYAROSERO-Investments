@@ -6,9 +6,10 @@ At every month end t, using ONLY data up to t's close:
    original way (inverse volatility, fixed mix) or risk-aware (equal risk contribution + risk budget),
 3. trade at the NEXT day's open, paying `cost_bps` per unit of turnover, and hold until the next review.
 
-Live ideas (the satellite part) cannot be replayed (they come from live news scans), so their share earns
-nothing here, exactly like the risk card counts them as cash. Both variants share that handicap, so
-before/after comparisons are fair; absolute returns are understated for Balanced and Bold.
+Live ideas (the satellite part) cannot be replayed (they come from live news scans). The app puts the
+unused ideas budget into picks + index (portfolio.lasting_mix), so the backtest does the same: it measures
+the plan on a day with no ideas, without crediting (or charging) the ideas' own results.
+The ranking is the main strategy's (picker.DEFAULT_PRESET, momentum factors).
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .picker import PickerConfig, _closes, _opens, membership_mask, rank
+from .picker import DEFAULT_PRESET, PickerConfig, _closes, _opens, membership_mask, rank
 from .portfolio import SHORT_LOOKBACK, SPY, plan_weights
 
 
@@ -32,7 +33,7 @@ def run_plan_backtest(frames: dict[str, pd.DataFrame], benchmark: pd.DataFrame, 
                       cost_bps: float = 10.0, core_n: int = 10, short_lookback: int | None = SHORT_LOOKBACK) -> dict:
     """Returns {"equity": Series (starts at 100), "benchmark": SPY Series, "weights": [...], "stats": {...}}.
     `members` overrides point-in-time membership (tests); `sectors` maps symbol -> sector (default: universe)."""
-    cfg = cfg or PickerConfig(top_n=core_n)
+    cfg = cfg or PickerConfig(preset=DEFAULT_PRESET, top_n=core_n)
     if sectors is None:
         from .universe import by_symbol
         info = by_symbol()

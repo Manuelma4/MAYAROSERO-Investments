@@ -61,14 +61,14 @@ def test_picks_change_alert_once_per_review(client):  # noqa: F811
     pre = client.app.state.precompute
     sent = []
     pre.on_picks_change = sent.append
-    pre.put("picks:quality_momentum", {"changes": {"date": "2026-09-30", "buy": ["NVDA"], "sell": ["KO"], "keep": ["AAPL"]}})
+    pre.put("picks:core_momentum", {"changes": {"date": "2026-09-30", "buy": ["NVDA"], "sell": ["KO"], "keep": ["AAPL"]}})
     ev = pre.record_picks_change()
     assert ev["buy"] == ["NVDA"] and ev["sell"] == ["KO"] and sent == [ev]
     assert pre.record_picks_change() is None                       # same review: no repeat
-    pre.put("picks:quality_momentum", {"changes": {"date": "2026-10-31", "buy": [], "sell": [], "keep": ["AAPL"]}})
+    pre.put("picks:core_momentum", {"changes": {"date": "2026-10-31", "buy": [], "sell": [], "keep": ["AAPL"]}})
     assert pre.record_picks_change() is None                       # nothing changed: no alert
-    pre.put("picks:quality_momentum", {"changes": {"date": "2026-11-30", "buy": ["MSFT"], "sell": [], "keep": []}})
+    pre.put("picks:core_momentum", {"changes": {"date": "2026-11-30", "buy": ["MSFT"], "sell": [], "keep": []}})
     assert pre.record_picks_change()["date"] == "2026-11-30" and len(sent) == 2
     assert [e["date"] for e in client.get("/api/events", params={"type": "picks"}).json()] == ["2026-11-30", "2026-09-30"]
-    pre.put("picks:quality_momentum", {"changes": {"date": "2025-01-31", "buy": ["X"], "sell": [], "keep": []}})
+    pre.put("picks:core_momentum", {"changes": {"date": "2025-01-31", "buy": ["X"], "sell": [], "keep": []}})
     assert pre.record_picks_change() and len(sent) == 2               # old review: recorded, not announced

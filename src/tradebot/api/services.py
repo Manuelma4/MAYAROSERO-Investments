@@ -8,7 +8,7 @@ from dataclasses import replace
 import numpy as np
 import pandas as pd
 
-from ..picker import PRESET_INFO, PickerConfig, run_picker
+from ..picker import DEFAULT_PRESET, PRESET_INFO, PickerConfig, robustness, run_picker
 from ..universe import by_symbol, sp500_symbols
 from . import serialize as ser
 from .market import DataUnavailable, MarketData
@@ -117,14 +117,20 @@ def compute_picks(market: MarketData, body: PicksRequest, ew_cache: dict | None 
     ranking = [row(sym, r) for sym, r in res.current.iterrows()]
     current = [x for x in ranking if x["eligible"]][: body.top_n]
     risk_off = bool(res.holdings and res.holdings[-1]["risk_off"])
+    spy_share = cfg.spy_share()
+    for x in current:   # share of the portfolio in each pick (the rest of a core-satellite preset is in the index)
+        x["weight_%"] = (1 - spy_share) / max(1, len(current)) * 100
 
     # What changed at the last completed review (buy / sell / keep).
     changes = completed_changes(res.holdings, body.rebalance, res.equity.index[-1])
 
     return ser.clean({
-        "preset": body.preset, "preset_info": PRESET_INFO,
+        "preset": body.preset, "preset_info": PRESET_INFO, "default_preset": DEFAULT_PRESET,
         "as_of": res.equity.index[-1].isoformat(),
         "risk_off": risk_off,
+        "benchmark_weight_%": 0.0 if risk_off else spy_share * 100,
+        # How consistent the edge is: rolling 3-year windows, calendar years, halves, bootstrap odds.
+        "robustness": robustness(res.equity, res.benchmark),
         "picks": [] if risk_off else current,
         "ranking": ranking,
         "changes": changes,
@@ -141,7 +147,7 @@ def compute_picks(market: MarketData, body: PicksRequest, ew_cache: dict | None 
 
 def compute_plan_track(market: MarketData, start: str = PicksRequest().start) -> dict:
     """Walk-forward backtest of each risk level's lasting part (picks + index, rebuilt monthly with the
-    app's own risk-aware rules, point-in-time members, next-open fills, 10 bps costs). Live ideas earn 0."""
+    app's own risk-aware rules, point-in-time members, next-open fills, 10 bps costs). With no live ideas the ideas budget is invested in picks + index."""
     from ..plan_backtest import level_stats, run_plan_backtest
     from ..portfolio import RISK_LEVELS
 
@@ -159,7 +165,8 @@ def compute_plan_track(market: MarketData, start: str = PicksRequest().start) ->
                                            "months_beating_spy_%", "turnover_per_year_%", "vol_x_spy")},
                      "spy_cagr_%": spy["cagr_%"], "spy_volatility_%": spy["volatility_%"],
                      "spy_max_drawdown_%": spy["max_drawdown_%"], "spy_sharpe": spy["sharpe"],
-                     "spy_month_1in20_%": spy["month_1in20_%"]}
+                     "spy_month_1in20_%": spy["month_1in20_%"],
+                     "robustness": {k: v for k, v in robustness(res["equity"], b).items() if k != "years"}}
     return ser.clean(out)
 
 
@@ -269,7 +276,7 @@ def _day(iso: str) -> str:
     return f"{d.day} {d.strftime('%b %Y')}"
 
 
-def compute_track_record(market: MarketData, store, preset: str = "quality_momentum",
+def compute_track_record(market: MarketData, store, preset: str = DEFAULT_PRESET,
                          universe_line: list[dict] | None = None, now=None) -> dict:
     """The live forward record: recorded picks vs SPY, and the outcome of every recorded Invest-now idea."""
     from ..data import provider_for

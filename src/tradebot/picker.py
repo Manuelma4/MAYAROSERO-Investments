@@ -14,6 +14,10 @@ How it works, at each rebalance date (e.g. every month end):
    average, and optionally go to cash when the benchmark itself is in a downtrend).
    The decision uses the close of the review day; trades fill at the NEXT day's open.
 4. Hold until the next rebalance; trading costs are charged on turnover.
+Options: keep a share in the benchmark itself (`core_spy`, core-satellite: the default "core_momentum" preset
+holds 60% S&P 500), shrink the picks when they swing more than the benchmark (`vol_scale`, the rest in the
+index), a turnover buffer (`buffer_n`) and a per-sector cap (`sector_max`). `robustness()` summarizes how
+consistent the edge is (rolling 3-year windows, calendar years, halves, block-bootstrap odds).
 
 Point-in-time membership (`point_in_time=True`, the default): a stock can only be
 picked, and only counts in the equal-weight yardstick, from the date it actually
@@ -35,13 +39,23 @@ import numpy as np
 import pandas as pd
 
 PRESETS: dict[str, dict[str, float]] = {
+    "core_momentum": {"momentum_12_1": 0.5, "momentum_6_1": 0.3, "rel_strength": 0.2},
     "momentum": {"momentum_12_1": 0.5, "momentum_6_1": 0.3, "rel_strength": 0.2},
     "quality_momentum": {"momentum_12_1": 0.35, "rel_strength": 0.25, "trend": 0.15, "low_vol": 0.25},
     "low_volatility": {"low_vol": 0.6, "trend": 0.2, "momentum_12_1": 0.2},
     "trend_following": {"trend": 0.4, "momentum_6_1": 0.3, "rel_strength": 0.3},
 }
+# Share held in the S&P 500 itself by default (core-satellite presets).
+PRESET_CORE_SPY = {"core_momentum": 0.6}
+# The app's main strategy (Beat-the-S&P page, Today board, alerts, plans' ranking). Chosen by the walk-forward
+# study of 2026-10 (select 2015-2020, confirm 2021-2026): 60% S&P 500 + 40% the 10 strongest momentum stocks
+# was the only variant that beat SPY in both halves with a Sharpe ratio at least SPY's and a drawdown within
+# 5 points of SPY's. The edge is modest and not statistically proven (see Learn and the robustness block).
+DEFAULT_PRESET = "core_momentum"
 
 PRESET_INFO = {
+    "core_momentum": "60% in the S&P 500 itself + 40% in the 10 strongest momentum stocks. The S&P 500 part "
+                     "keeps the swings close to the market's; the momentum part tries to add a few % a year.",
     "momentum": "Winners keep winning: strongest 6-12 month performers.",
     "quality_momentum": "Strong performers with calmer price action (smoother ride).",
     "low_volatility": "Calm, defensive stocks still in an uptrend.",
@@ -59,9 +73,18 @@ class PickerConfig:
     cost_bps: float = 10.0            # cost per unit of turnover (10 bps = 0.10%)
     point_in_time: bool = True        # only pick S&P 500 stocks from the date they joined the index
     weights: dict[str, float] | None = None
+    buffer_n: int | None = None       # keep a holding while it still ranks in the top `buffer_n` (cuts turnover)
+    sector_max: int | None = None     # at most this many picks per sector (None: no cap)
+    core_spy: float | None = None     # share held in the benchmark itself (None: the preset's, usually 0)
+    vol_scale: bool = False           # risk-managed: hold less of the picks when they swing more than the benchmark
+    vol_lookback: int = 126           # days of returns used by vol_scale; what is not in the picks sits in the index
+    sectors: dict[str, str | None] | None = None   # symbol -> sector for `sector_max` (default: the universe)
 
     def factor_weights(self) -> dict[str, float]:
         return self.weights or PRESETS[self.preset]
+
+    def spy_share(self) -> float:
+        return float(self.core_spy if self.core_spy is not None else PRESET_CORE_SPY.get(self.preset, 0.0))
 
 
 def _closes(frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -131,6 +154,42 @@ def score(f: pd.DataFrame, weights: dict[str, float]) -> pd.Series:
         z = ((x - x.mean()) / x.std(ddof=0)).clip(-3, 3) if x.std(ddof=0) > 0 else x * 0
         total += w * z.fillna(0)
     return total / sum(abs(w) for w in weights.values())
+
+
+def select(eligible: list[str], held: set[str], top_n: int, buffer_n: int | None = None,
+           sector_max: int | None = None, sectors: dict[str, str | None] | None = None) -> list[str]:
+    """Pick `top_n` names from `eligible` (best first). With `buffer_n`, current holdings that still rank in
+    the top `buffer_n` are kept first (fewer trades); with `sector_max`, no sector gets more than that many."""
+    order = list(eligible)
+    if buffer_n:
+        keep = [s for s in order[:buffer_n] if s in held]
+        order = keep + [s for s in order if s not in keep]
+    out: list[str] = []
+    count: dict[str, int] = {}
+    for s in order:
+        if len(out) >= top_n:
+            break
+        sec = (sectors or {}).get(s) or "Other"
+        if sector_max and count.get(sec, 0) >= sector_max:
+            continue
+        out.append(s)
+        count[sec] = count.get(sec, 0) + 1
+    return out
+
+
+BENCH = "__benchmark__"   # internal column name of the benchmark when it is held
+
+
+def vol_scale_factor(stock_rets: pd.DataFrame, bench_rets: pd.Series, lookback: int = 126) -> float:
+    """Risk-managed momentum (Barroso & Santa-Clara 2015), long-only and without leverage: the share of the
+    equal-weight basket to hold so its recent volatility is no higher than the benchmark's, min(1, vol_b / vol_p).
+    Uses the last `lookback` daily returns given (pass data up to the decision date only)."""
+    r = stock_rets.iloc[-lookback:].fillna(0.0).mean(axis=1)
+    b = bench_rets.iloc[-lookback:]
+    vp, vb = float(r.std()), float(b.std())
+    if not np.isfinite(vp) or vp <= 0 or not np.isfinite(vb):
+        return 1.0
+    return float(min(1.0, vb / vp))
 
 
 def rank(px: pd.DataFrame, bench: pd.Series, t: pd.Timestamp, cfg: PickerConfig,
@@ -212,6 +271,21 @@ def run_picker(frames: dict[str, pd.DataFrame], benchmark: pd.DataFrame, cfg: Pi
     elif members is not None:
         members = members.reindex(index=px.index, columns=px.columns).ffill().fillna(True).astype(bool)
     bench_ma200 = bench.rolling(200).mean()
+    sectors = cfg.sectors
+    if cfg.sector_max and sectors is None:
+        from .universe import by_symbol
+        info = by_symbol()
+        sectors = {s: (info[s].sector if s in info else None) for s in px.columns}
+
+    # The benchmark itself can be held (core-satellite, risk-managed): column BENCH, next-open fills too.
+    stock_rets = px.pct_change(fill_method=None)
+    bopen = benchmark["open"].copy() if "open" in benchmark else benchmark["close"].copy()
+    bopen.index = bopen.index.normalize()
+    bopen = bopen[~bopen.index.duplicated(keep="last")].reindex(bench.index)
+    b_ret = bench.pct_change().fillna(0.0)
+    b_gap = (bopen / bench.shift(1) - 1).where(bopen.notna() & bench.shift(1).notna())
+    b_intra = (bench / bopen - 1).where(b_gap.notna())
+    rets[BENCH], gap[BENCH], intra[BENCH] = b_ret, b_gap.fillna(0.0), b_intra.fillna(b_ret)
 
     first = px.index[min(len(px) - 1, 260)]
     if start:
@@ -221,20 +295,32 @@ def run_picker(frames: dict[str, pd.DataFrame], benchmark: pd.DataFrame, cfg: Pi
         raise ValueError("Not enough history: need at least ~1 year before the start date")
     rebal = set(pd.Series(dates, index=dates).resample(cfg.rebalance).last().dropna())
 
-    weights = pd.Series(0.0, index=px.columns)   # fraction of equity per stock; the rest is cash
+    spy_share = cfg.spy_share()
+    cols = list(px.columns) + [BENCH]
+    weights = pd.Series(0.0, index=cols)          # fraction of equity per holding; the rest is cash
     equity, holdings = [1.0], []
     pending: pd.Series | None = None              # target decided at a close, filled at the next open
+    last_picks: set[str] = set()
 
     def decide(t: pd.Timestamp) -> pd.Series:
+        nonlocal last_picks
         ranked = rank(px, bench, t, cfg, members)
-        target = pd.Series(0.0, index=px.columns)
+        target = pd.Series(0.0, index=cols)
         risk_off = bool(cfg.regime_filter and bench.loc[t] < bench_ma200.loc[t])
+        picks: list[str] = []
         if not ranked.empty and not risk_off:
-            picks = ranked[ranked["eligible"]].head(cfg.top_n).index
-            if len(picks):
-                target[picks] = 1.0 / len(picks)
-        holdings.append({"date": t.date().isoformat(), "symbols": list(target[target > 0].index),
-                         "turnover": float((target - weights).abs().sum()), "risk_off": risk_off})
+            picks = select(list(ranked.index[ranked["eligible"]]), last_picks, cfg.top_n, cfg.buffer_n,
+                           cfg.sector_max, sectors)
+            if picks:
+                scale = vol_scale_factor(stock_rets[picks].loc[:t], b_ret.loc[:t], cfg.vol_lookback) \
+                    if cfg.vol_scale else 1.0
+                target[picks] = (1.0 - spy_share) * scale / len(picks)
+        if not risk_off and (spy_share > 0 or cfg.vol_scale):
+            target[BENCH] = max(0.0, 1.0 - float(target.sum()))   # fully invested: the rest is in the index
+        last_picks = set(picks)
+        holdings.append({"date": t.date().isoformat(), "symbols": picks,
+                         "turnover": float((target - weights).abs().sum()), "risk_off": risk_off,
+                         "benchmark_weight": float(target[BENCH])})
         return target
 
     def grow(value: float, r: pd.Series) -> float:
@@ -263,4 +349,54 @@ def run_picker(frames: dict[str, pd.DataFrame], benchmark: pd.DataFrame, cfg: Pi
     res.stats = _stats(eq, b, holdings)
     res.stats["point_in_time"] = members is not None
     res.current = rank(px, bench, px.index[-1], cfg, members)
+    res.stats["benchmark_weight_%"] = float(holdings[-1].get("benchmark_weight", 0.0) * 100) if holdings else 0.0
+    res.stats["turnover_per_year_%"] = float(sum(h["turnover"] for h in holdings[1:]) /
+                                             max((eq.index[-1] - eq.index[0]).days / 365.25, 1e-9) * 100)
     return res
+
+
+def robustness(eq: pd.Series, bench: pd.Series, window_months: int = 36, block: int = 12,
+               sims: int = 2000, seed: int = 0) -> dict:
+    """How consistent the edge over the benchmark is (plain numbers for the UI):
+    - rolling `window_months` windows (monthly steps): share where the strategy's yearly return beat the benchmark's,
+      and the worst / median gap in %/yr,
+    - calendar years beating the benchmark,
+    - the two halves of the period (did it win in both, or only in one?),
+    - the chance of beating the benchmark over 5 and 10 years, from a circular block bootstrap of monthly
+      returns (blocks of `block` months keep streaks and crashes together). It re-shuffles THIS history, so it
+      assumes the future looks like the past: an upper bound on confidence, not a promise."""
+    m = eq.resample("ME").last()
+    mb = bench.resample("ME").last()
+    m, mb = m.align(mb, join="inner")
+    out: dict = {}
+    if len(m) > window_months:
+        k = window_months / 12
+        gap = (((m / m.shift(window_months)) ** (1 / k) - (mb / mb.shift(window_months)) ** (1 / k)) * 100).dropna()
+        out.update({"window_years": int(k), "windows": int(len(gap)), "windows_beating_%": float((gap > 0).mean() * 100),
+                    "worst_window_gap_%": float(gap.min()), "median_window_gap_%": float(gap.median())})
+    ye, yb = eq.groupby(eq.index.year).last(), bench.groupby(bench.index.year).last()
+    ry = ye / ye.shift(1).fillna(eq.iloc[0]) - 1
+    rby = yb / yb.shift(1).fillna(bench.iloc[0]) - 1
+    out["years"] = [{"year": int(y), "return_%": float(ry[y] * 100), "benchmark_%": float(rby[y] * 100)} for y in ry.index]
+    out["years_beating"] = int((ry > rby).sum())
+    out["years_total"] = int(len(ry))
+    mid = eq.index[0] + (eq.index[-1] - eq.index[0]) / 2
+    halves = []
+    for a, b in ((eq.index[0], mid), (mid, eq.index[-1])):
+        s, sb = eq.loc[a:b], bench.loc[a:b]
+        yrs = max((s.index[-1] - s.index[0]).days / 365.25, 1e-9)
+        halves.append({"start": s.index[0].date().isoformat(), "end": s.index[-1].date().isoformat(),
+                       "cagr_%": float(((s.iloc[-1] / s.iloc[0]) ** (1 / yrs) - 1) * 100),
+                       "benchmark_cagr_%": float(((sb.iloc[-1] / sb.iloc[0]) ** (1 / yrs) - 1) * 100)})
+    out["halves"] = halves
+    out["both_halves_beating"] = all(h["cagr_%"] > h["benchmark_cagr_%"] for h in halves)
+    r = np.log1p(np.c_[m.pct_change().dropna().values, mb.pct_change().dropna().values])
+    if len(r) >= 24:
+        rng = np.random.default_rng(seed)
+        for years in (5, 10):
+            h = years * 12
+            nb = int(np.ceil(h / block))
+            idx = (rng.integers(0, len(r), size=(sims, nb))[:, :, None] + np.arange(block)).reshape(sims, -1)[:, :h]
+            s = r[idx % len(r)].sum(axis=1)
+            out[f"p_beat_{years}y_%"] = float((s[:, 0] > s[:, 1]).mean() * 100)
+    return out

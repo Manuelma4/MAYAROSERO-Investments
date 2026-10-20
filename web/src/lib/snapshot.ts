@@ -76,7 +76,7 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
     }
     case "/api/track-record": {
       try { return await load("track_record.json"); } catch {
-        return { preset: "quality_momentum", as_of: new Date().toISOString(), started: null, days: 0, too_early: true,
+        return { preset: "core_momentum", as_of: new Date().toISOString(), started: null, days: 0, too_early: true,
           message: "The live record runs on the live server: from its first market close on, the picks and every Invest-now idea are saved each day and followed with real prices.",
           picks: { days: 0, curve: [], snapshots: 0, latest_date: null, current: [], risk_off: false },
           ideas: { count: 0, closed_count: 0, open_count: 0, pending_count: 0, win_rate: null, avg_r: null, "total_r_%": null, open: [], closed: [] } };
@@ -126,10 +126,10 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
     case "/api/ai/status": return { enabled: false, how_to_enable: "Runs on the live app with a Claude API key." };
     case "/api/ai/analyze": return limit("The AI analyst");
     case "/api/picks/latest": {
-      try { return await load(`picks_${url.searchParams.get("preset") ?? "quality_momentum"}.json`); } catch { return limit("This strategy"); }
+      try { return await load(`picks_${url.searchParams.get("preset") ?? "core_momentum"}.json`); } catch { return limit("This strategy"); }
     }
     case "/api/picks": {
-      try { return await load(`picks_${body.preset ?? "quality_momentum"}.json`); } catch { return limit("This strategy"); }
+      try { return await load(`picks_${body.preset ?? "core_momentum"}.json`); } catch { return limit("This strategy"); }
     }
     case "/api/backtest": return load("backtest.json");
     case "/api/predict": return load("predict.json");

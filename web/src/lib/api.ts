@@ -77,7 +77,7 @@ export const api = {
   screener: () => request<ScreenerResult>("/api/screener"),
   earnings: (symbols: string[]) => request<EarningsResult>(`/api/earnings?${qs({ symbols: symbols.join(",") })}`),
   earningsUpcoming: (days = 14, mine = false) => request<UpcomingEarnings>(`/api/earnings/upcoming?${qs({ days, mine: mine ? "true" : undefined })}`),
-  trackRecord: (preset = "quality_momentum") => request<TrackRecord>(`/api/track-record?${qs({ preset })}`),
+  trackRecord: (preset = "core_momentum") => request<TrackRecord>(`/api/track-record?${qs({ preset })}`),
   picksLatest: (preset: string) => request<PicksResult>(`/api/picks/latest?${qs({ preset })}`),
   picks: (body: object) => request<PicksResult>("/api/picks", { method: "POST", body: JSON.stringify(body) }),
   quotes: (symbols: string[]) => request<Quote[]>(`/api/quotes?${qs({ symbols: symbols.join(",") })}`),

@@ -1,14 +1,16 @@
 """Portfolio builder: turn an amount and a risk level into a diversified, ready-to-buy plan.
 
 Structure (core + satellite + anchor):
-- Core: the monthly picks (the most evidence-backed way to beat the S&P 500). With price history
+- Core: the monthly picks of the main strategy's momentum ranking (picker.DEFAULT_PRESET; chosen by the
+  2026-10 walk-forward study, the most evidence-backed way we found to beat the S&P 500). With price history
   (`closes`), weighted by EQUAL RISK CONTRIBUTION: each pick adds the same share of the core's swings,
   measured on the last year of daily returns, so one jumpy stock or a cluster of stocks that move
   together cannot dominate the risk (Maillard, Roncalli & Teiletche 2010). Without history: inverse
   volatility. Then money caps: max `stock_cap` per stock and `sector_cap` per sector of the WHOLE
   portfolio; money above a cap goes to the other holdings.
 - Satellite: today's live ideas with a news catalyst (long only), each sized so that hitting its stop
-  costs about 1% of the portfolio, within the satellite budget. Unused satellite money stays in cash.
+  costs about 1% of the portfolio, within the satellite budget. Unused satellite money is NOT left in cash:
+  it goes to the picks and the index in the level's proportion (idle cash cost ~2-3%/yr in the old backtest).
 - Anchor: SPY (the S&P 500 itself) for stability.
 - When the engine is risk-off (S&P 500 below its 200-day average), the core goes to cash.
 
@@ -30,10 +32,12 @@ import numpy as np
 import pandas as pd
 
 RISK_LEVELS = {
-    # core, satellite, anchor (shares of the total): the starting mix, and the most in the picks
-    "cautious": (0.50, 0.05, 0.45),
-    "balanced": (0.70, 0.20, 0.10),
-    "bold": (0.75, 0.25, 0.00),
+    # core, satellite, anchor (shares of the total): the starting mix, and the most in the picks.
+    # Without live ideas the satellite share is spread over picks and index in proportion (lasting_mix), so the
+    # lasting mix is 20/80, 40/60 (= the Beat-the-S&P default, "Core + momentum") and 60/40 picks/index.
+    "cautious": (0.19, 0.05, 0.76),
+    "balanced": (0.36, 0.10, 0.54),
+    "bold": (0.51, 0.15, 0.34),
 }
 # Risk budget: expected yearly volatility at most this multiple of the S&P 500's (same past year).
 TARGET_VOL = {"cautious": 0.8, "balanced": 1.0, "bold": 1.3}
@@ -257,15 +261,28 @@ def fit_risk_budget(core_w: dict[str, float], anchor: float, rets: pd.DataFrame,
             "target_x": target_x, "moved_to_index": max(0.0, a - anchor), "to_cash": max(0.0, equity - c - a)}
 
 
+def lasting_mix(risk: str, satellite_used: float | None = 0.0) -> tuple[float, float, float]:
+    """(picks, live-ideas budget, index) shares for a level. The unused live-ideas budget is spread over picks
+    and index in the level's proportion, so with no ideas the plan is exactly the level's lasting mix."""
+    core, sat, anchor = RISK_LEVELS[risk]
+    if satellite_used is None:
+        return core, sat, anchor
+    idle = max(0.0, sat - max(0.0, satellite_used))
+    f = (core + anchor + idle) / (core + anchor) if core + anchor > 0 else 1.0
+    return core * f, sat - idle, anchor * f
+
+
 def plan_weights(risk: str, core: list[dict], core_risk_off: bool, closes: pd.DataFrame | None = None,
                  as_of=None, stock_cap: float = 0.10, sector_cap: float = 0.25, core_n: int = 10,
-                 risk_budget: bool = True, short_lookback: int | None = SHORT_LOOKBACK
-                 ) -> tuple[list[dict], dict[str, float], float, dict]:
+                 risk_budget: bool = True, short_lookback: int | None = SHORT_LOOKBACK,
+                 satellite_used: float | None = 0.0) -> tuple[list[dict], dict[str, float], float, dict]:
     """Lasting part of the plan as shares of the whole amount: (chosen picks, picks weights, SPY share, info).
-    `closes`: daily closes (with SPY) known at the plan date; rows after `as_of` are ignored."""
+    `closes`: daily closes (with SPY) known at the plan date; rows after `as_of` are ignored.
+    `satellite_used`: share of the amount actually put in live ideas; the unused part of the level's
+    satellite budget is added to picks and index in proportion (no idle cash). None keeps it out (cash)."""
     if risk not in RISK_LEVELS:
         raise ValueError(f"Unknown risk level '{risk}'")
-    core_share, _, anchor_share = RISK_LEVELS[risk]
+    core_share, sat_share, anchor_share = lasting_mix(risk, satellite_used)
     rets = None
     if closes is not None and SPY in closes.columns:
         syms = [c["symbol"] for c in core[: max(core_n * 4, 40)]] if core and not core_risk_off else []
@@ -335,29 +352,23 @@ def build_plan(amount: float, risk: str, core: list[dict], core_risk_off: bool, 
         raise ValueError(f"Unknown risk level '{risk}'")
     if amount <= 0:
         raise ValueError("Amount must be positive")
-    _, sat_share, anchor_start = RISK_LEVELS[risk]
+    _, sat_budget, _ = RISK_LEVELS[risk]
     plan = Plan(amount, risk)
 
     def shares_for(money: float, price: float | None) -> float:
         if not price or price <= 0:
             return 0.0
-        q = money / price
+        q = money / price + 1e-9          # 0.7999999 x 10,000 / 500 must still buy 16 shares
         return math.floor(q * 1e4) / 1e4 if fractional else float(math.floor(q))
 
-    chosen, weights, anchor_share, info = plan_weights(risk, core, core_risk_off, closes, as_of, stock_cap,
-                                                       sector_cap, core_n, risk_budget)
-    # Core
-    for it in chosen:
-        wt = weights.get(it["symbol"], 0.0)
-        money = wt * amount
-        q = shares_for(money, it.get("price"))
-        plan.lines.append(Line(it["symbol"], it.get("name", it["symbol"]), "core", it.get("sector"), wt, money,
-                               it.get("price"), q, q * (it.get("price") or 0), note=it.get("reason", "")))
+    # Pass 1: which stocks are picks (live ideas never double up on a pick).
+    first, _, _, _ = plan_weights(risk, core, core_risk_off, None, as_of, stock_cap, sector_cap, core_n, False)
+    in_core = {it["symbol"] for it in first}
     # Satellite: live long ideas sized by risk, within the satellite budget
-    budget = sat_share * amount
-    in_core = {l.symbol for l in plan.lines}
+    budget = sat_budget * amount
+    sats: list[Line] = []
     longs = [i for i in ideas if i.get("qualified") and i.get("direction") == "long"
-             and i["symbol"] not in in_core and i["symbol"] != SPY][:max_ideas]  # never double up on one stock
+             and i["symbol"] not in in_core and i["symbol"] != SPY][:max_ideas]
     for i in longs:
         if budget <= 0:
             break
@@ -368,10 +379,23 @@ def build_plan(amount: float, risk: str, core: list[dict], core_risk_off: bool, 
         q = shares_for(money, i["entry"])
         if q <= 0:
             continue
-        plan.lines.append(Line(i["symbol"], i.get("name", i["symbol"]), "satellite", i.get("sector"),
-                               money / amount, money, i["entry"], q, q * i["entry"], stop=i["stop"],
-                               note=i.get("headline") or ""))
+        sats.append(Line(i["symbol"], i.get("name", i["symbol"]), "satellite", i.get("sector"),
+                         money / amount, money, i["entry"], q, q * i["entry"], stop=i["stop"],
+                         note=i.get("headline") or ""))
         budget -= q * i["entry"]
+    # Pass 2: the unused live-ideas budget goes to picks and index in the level's proportion (no idle cash).
+    used = sum(l.invested for l in sats) / amount
+    _, sat_share, anchor_start = lasting_mix(risk, used)
+    chosen, weights, anchor_share, info = plan_weights(risk, core, core_risk_off, closes, as_of, stock_cap,
+                                                       sector_cap, core_n, risk_budget, satellite_used=used)
+    # Core
+    for it in chosen:
+        wt = weights.get(it["symbol"], 0.0)
+        money = wt * amount
+        q = shares_for(money, it.get("price"))
+        plan.lines.append(Line(it["symbol"], it.get("name", it["symbol"]), "core", it.get("sector"), wt, money,
+                               it.get("price"), q, q * (it.get("price") or 0), note=it.get("reason", "")))
+    plan.lines.extend(l for l in sats if l.symbol not in {c["symbol"] for c in chosen})
     # Anchor
     if anchor_share > 1e-6 and spy_price:
         money = anchor_share * amount

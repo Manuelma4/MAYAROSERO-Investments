@@ -395,7 +395,9 @@ def test_customize_picks_changes_number_of_stocks(ui):
     ui.page.get_by_role("button", name="Update picks").click()
     expect(hold).to_contain_text("5 stocks", timeout=60_000)
     expect(ui.page.locator("details.customize summary")).to_contain_text("5 stocks")
-    expect(ui.page.locator("ul.pick-cards > li")).to_have_count(5)
+    # Core + momentum: the S&P 500 core line comes first, then the 5 stocks.
+    expect(ui.page.locator("ul.pick-cards > li:not(.pc-core)")).to_have_count(5)
+    expect(ui.page.locator("ul.pick-cards > li.pc-core")).to_contain_text("S&P 500 index")
     ui.check()
 
 

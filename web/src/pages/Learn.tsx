@@ -126,19 +126,19 @@ export default function Learn() {
       {/* 2. Honest expectations */}
       <section id="honest" className="learn-section" aria-labelledby="honest-h">
         <h2 id="honest-h" className="section-title">Honest expectations</h2>
-        <p className="lead learn-lead">The engine has a modest, real-looking edge in tests. It is not proven, it will have bad years, and the way you size and spread your money matters more than any single pick.</p>
+        <p className="lead learn-lead">The default strategy has a modest, real-looking edge in tests. It is not proven, it will have bad years, and the way you size and spread your money matters more than any single pick.</p>
         <div className="kpis learn-kpis">
-          <div className="kpi"><span className="kpi-label">Picks, per year<Hint term="cagr">Average yearly growth of the Beat-the-S&amp;P picks in the test from January 2015 to October 2026: 10 stocks, monthly review, costs included, survivorship bias corrected.</Hint></span><span className="kpi-value">≈ 17%</span><span className="kpi-sub">in the test since 2015</span></div>
-          <div className="kpi"><span className="kpi-label">S&amp;P 500, per year<Hint term="spy">What simply holding SPY (dividends included) did over the same years. Doing nothing is the bar to beat.</Hint></span><span className="kpi-value">≈ 14%</span><span className="kpi-sub">SPY, dividends included</span></div>
-          <div className="kpi"><span className="kpi-label">Worst drop<Hint term="drawdown">The biggest fall from a peak in the test. The picks fell further than the index at their worst: higher returns came with a bumpier ride.</Hint></span><span className="kpi-value down">−39%</span><span className="kpi-sub">S&amp;P 500 −34%</span></div>
-          <div className="kpi"><span className="kpi-label">Months ahead<Hint term="benchmark">Share of single months where the picks beat the S&amp;P 500. About half: the edge only shows over years, not weeks.</Hint></span><span className="kpi-value">49%</span><span className="kpi-sub">of months beat the index</span></div>
+          <div className="kpi"><span className="kpi-label">Core + momentum, per year<Hint term="cagr">Average yearly growth of the default Beat-the-S&amp;P strategy (60% S&amp;P&nbsp;500 index + 40% in the 10 strongest momentum stocks, monthly review) in the test from January 2015 to October 2026, costs included, stocks counted only while in the index. Without 2026 (a big chip-stock year): about 16% vs 13.4%.</Hint></span><span className="kpi-value">≈ 18.6%</span><span className="kpi-sub">in the test since 2015</span></div>
+          <div className="kpi"><span className="kpi-label">S&amp;P 500, per year<Hint term="spy">What simply holding SPY (dividends included) did over the same years. Doing nothing is the bar to beat.</Hint></span><span className="kpi-value">≈ 13.7%</span><span className="kpi-sub">SPY, dividends included</span></div>
+          <div className="kpi"><span className="kpi-label">Worst drop<Hint term="drawdown">The biggest fall from a peak in the test (early 2020). Keeping 60% in the index kept the drop close to the market's; the momentum stocks alone fell 40%.</Hint></span><span className="kpi-value down">−36%</span><span className="kpi-sub">S&amp;P 500 −34%</span></div>
+          <div className="kpi"><span className="kpi-label">3-year periods ahead<Hint term="benchmark">Every 3-year stretch since 2015, starting each month: in 83% of them the strategy grew faster than the S&amp;P&nbsp;500 (worst stretch: 3% a year behind). The stretches overlap, so this is weaker evidence than it sounds. Single months: ahead in 59%.</Hint></span><span className="kpi-value">83%</span><span className="kpi-sub">8 of 12 calendar years ahead</span></div>
         </div>
         <div className="honest-grid">
           <div>
             <h3 className="learn-sub">What the test really shows</h3>
-            <p>Holding the top 10 S&amp;P 500 stocks by momentum, reviewed monthly, grew about 17% a year since 2015 against about 14% for the S&amp;P 500. Before we corrected a test mistake (counting stocks before they joined the index), the same test claimed 37% a year: a reminder of how easily backtests flatter.</p>
-            <p>Some bias remains, so treat 17% as an upper estimate. Three to four points a year over ten years is a lot of money, but it is not proven until it shows up in the live track record.</p>
-            <p>The ready-made plans on My portfolio mix the picks with the S&amp;P 500 and cash so their swings match their label (Cautious, Balanced, Bold). With those limits, the same test gave about 11% a year for each level, below the S&amp;P 500's 14%, with smaller drops for Cautious. In plain words: so far the picks add excitement more than return once risk is controlled, and simply holding the S&amp;P 500 is a strong, cheap default.</p>
+            <p>We wrote down 14 candidate strategies in advance, chose using only 2015-2020, then checked once on 2021-2026. The default, Core + momentum, beat the S&amp;P&nbsp;500 in both periods: about 14.3% vs 12.7% a year in 2015-2020 and 23.4% vs 15.0% in 2021-2026, with a smoother ride per unit of return (Sharpe 0.92 vs 0.82). Part of the second period's lead comes from one theme in 2026 (memory and chip stocks).</p>
+            <p>Why we do not call it proven: after allowing for the 33 variants we tried, the chance the edge is real is about 80%, short of the 95% scientists ask for. Re-shuffling the 2015-2020 months alone, it came out ahead over 10 years in about 85% of cases. Rotating between sector funds, which we could test back to 2000 with no bias, did not beat the S&amp;P&nbsp;500 after 2013, and real momentum funds have had long losing stretches. Some bias remains in our stock test (companies that left the index are missing), so treat the figures as an upper estimate until the live track record confirms them.</p>
+            <p>The ready-made plans on My portfolio use the same momentum ranking with a swings limit. In the same test: Bold (up to 60% picks) about 16.5% a year with a deeper worst drop (−39%), Balanced about 14% (the risk limit keeps it close to the S&amp;P&nbsp;500, return and swings alike), Cautious about 11% with smaller drops. Simply holding the S&amp;P&nbsp;500 stays a strong, cheap choice.</p>
           </div>
           <div>
             <h3 className="learn-sub">Why most traders lose</h3>
@@ -148,11 +148,11 @@ export default function Learn() {
           <div>
             <h3 className="learn-sub">Why small and spread out wins</h3>
             <p>Risking 1% per idea means ten losses in a row still leave 90% of your account. Ten equal positions mean one stock halving costs you 5%, not 50%. Spreading across sectors protects you when one whole industry falls.</p>
-            <p>Big drops will happen. In 2020 and 2022 the index fell 25 to 34%, and at their worst the picks fell 39%. Only invest money you will not need for five years or more.</p>
+            <p>Big drops will happen. In 2020 and 2022 the index fell 25 to 34%, the default strategy fell 36% at its worst, and the momentum stocks on their own about 40%. Only invest money you will not need for five years or more.</p>
           </div>
           <div>
             <h3 className="learn-sub">A good plan for a beginner</h3>
-            <p>Keep most of your money in a broad index fund or the monthly picks, follow the routine above, and use the practice account for short-term ideas until you understand why they win and lose.</p>
+            <p>Keep most of your money in a broad index fund (the default strategy already keeps 60% there), follow the routine above, and use the practice account for short-term ideas until you understand why they win and lose.</p>
             <p>You do not need to be an expert. You need a plan you can stick with when the market is scary. This page is here whenever a word is unclear.</p>
           </div>
         </div>

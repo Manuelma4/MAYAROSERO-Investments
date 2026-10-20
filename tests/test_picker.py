@@ -145,6 +145,77 @@ def test_backtest_is_unchanged_by_future_data():
     pd.testing.assert_series_equal(full.equity.loc[:t], cut.equity, check_freq=False)
 
 
+def test_select_buffer_keeps_holdings_and_sector_cap_limits_names():
+    from tradebot.picker import select
+
+    ranked = ["A", "B", "C", "D", "E", "F"]
+    assert select(ranked, set(), 3) == ["A", "B", "C"]
+    # E is held and still in the top 5: kept ahead of new names; F is held but outside the buffer: sold
+    assert select(ranked, {"E", "F"}, 3, buffer_n=5) == ["E", "A", "B"]
+    sectors = {"A": "tech", "B": "tech", "C": "tech", "D": "energy", "E": "health", "F": "tech"}
+    assert select(ranked, set(), 4, sector_max=2, sectors=sectors) == ["A", "B", "D", "E"]
+
+
+def test_core_momentum_keeps_60pct_in_the_index_and_is_the_default():
+    from tradebot.picker import DEFAULT_PRESET, PRESET_CORE_SPY
+
+    assert DEFAULT_PRESET == "core_momentum" and PRESET_CORE_SPY[DEFAULT_PRESET] == 0.6
+    frames, bench = universe(seed=10, winners={1, 2, 3})
+    res = run_picker(frames, bench, PickerConfig(preset="core_momentum"))
+    for h in res.holdings:
+        assert h["benchmark_weight"] == pytest.approx(0.6 if h["symbols"] else 1.0)   # never idle cash
+    assert res.stats["benchmark_weight_%"] in (pytest.approx(60.0), pytest.approx(100.0))
+    # Same ranking as the momentum preset: the same stocks are picked.
+    mom = run_picker(frames, bench, PickerConfig(preset="momentum"))
+    assert [h["symbols"] for h in res.holdings] == [h["symbols"] for h in mom.holdings]
+    assert PickerConfig(preset="core_momentum", core_spy=0.0).spy_share() == 0.0
+
+
+def test_all_in_benchmark_tracks_the_benchmark_from_the_next_open():
+    frames, bench = universe(n_stocks=5, seed=11)
+    bench["open"] = bench["close"].shift(1).fillna(bench["close"]) * 1.001
+    res = run_picker(frames, bench, PickerConfig(core_spy=1.0, cost_bps=0, rebalance="10YE"))
+    b = bench["close"].loc[res.equity.index]
+    fill = bench["open"].loc[res.equity.index[1]]
+    assert res.equity.iloc[-1] / res.equity.iloc[0] == pytest.approx(b.iloc[-1] / fill, rel=1e-9)
+
+
+def test_vol_scale_factor_matches_the_benchmark_volatility():
+    from tradebot.picker import vol_scale_factor
+
+    rng = np.random.default_rng(0)
+    b = pd.Series(rng.normal(0, 0.01, 300))
+    jumpy = pd.DataFrame({"A": b * 2, "B": b * 2})
+    calm = pd.DataFrame({"A": b * 0.5})
+    assert vol_scale_factor(jumpy, b) == pytest.approx(0.5)
+    assert vol_scale_factor(calm, b) == 1.0          # never leverages
+    frames, bench = universe(seed=12, winners={0, 1})
+    res = run_picker(frames, bench, PickerConfig(preset="momentum", vol_scale=True))
+    assert all(0.0 <= h["benchmark_weight"] < 1.0 for h in res.holdings if h["symbols"])
+
+
+def test_buffer_cuts_turnover():
+    frames, bench = universe(seed=13)
+    plain = run_picker(frames, bench, PickerConfig(preset="momentum", top_n=8, trend_filter=False))
+    buf = run_picker(frames, bench, PickerConfig(preset="momentum", top_n=8, trend_filter=False, buffer_n=16))
+    assert buf.stats["turnover_per_year_%"] < plain.stats["turnover_per_year_%"]
+
+
+def test_robustness_summary():
+    from tradebot.picker import robustness
+
+    idx = pd.bdate_range("2015-01-02", "2024-12-31", tz="UTC")
+    rng = np.random.default_rng(1)
+    b = pd.Series(100 * np.exp(np.cumsum(rng.normal(0.0003, 0.01, len(idx)))), index=idx)
+    ahead = b * np.exp(np.arange(len(idx)) * 0.0002)        # steadily ~5%/yr ahead
+    r = robustness(ahead, b)
+    assert r["windows_beating_%"] == 100 and r["worst_window_gap_%"] > 0 and r["both_halves_beating"]
+    assert r["years_beating"] == r["years_total"] == 10 and r["p_beat_10y_%"] > 99
+    behind = robustness(b * np.exp(-np.arange(len(idx)) * 0.0002), b)
+    assert behind["windows_beating_%"] == 0 and behind["p_beat_5y_%"] < 1 and not behind["both_halves_beating"]
+    assert robustness(ahead, b) == r                       # fixed seed: the UI number does not flicker
+
+
 def test_trades_fill_at_next_open():
     # Decided at the close of day 261 at 100; the stock opens at 110 the next day and stays there,
     # so a next-open fill buys at 110 and gains nothing.
