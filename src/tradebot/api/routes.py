@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
 from .. import indicators as ta
@@ -13,7 +14,8 @@ from ..report import analyze_structure
 from ..strategies import REGISTRY, get_strategy
 from . import serialize as ser
 from .market import DataUnavailable
-from .schemas import BacktestRequest, DataQuery, PaperOrder, PicksRequest, PortfolioRequest, PredictRequest
+from .schemas import (BacktestRequest, DataQuery, PaperOrder, PicksRequest, PortfolioRequest, PredictionsRequest,
+                      PredictRequest)
 
 router = APIRouter(prefix="/api")
 
@@ -244,6 +246,63 @@ def portfolio(request: Request, body: PortfolioRequest):
     })
 
 
+@router.get("/predictions")
+def predictions(request: Request, horizon: int = Query(5)):
+    if horizon not in (1, 5, 21):
+        raise HTTPException(400, "Horizon must be 1 (tomorrow), 5 (a week) or 21 (a month).")
+    data = _state(request).precompute.get(f"predictions:{horizon}")
+    if data is None:
+        raise HTTPException(503, "Predictions are being computed (about 1-2 minutes after start).")
+    return data
+
+
+@router.post("/predictions/custom")
+async def predictions_custom(request: Request, body: PredictionsRequest):
+    from ..universe import sp500_symbols
+    from .services import ServiceError, compute_predictions
+
+    syms = None
+    if body.universe == "sp500":
+        syms = sp500_symbols()
+    elif body.universe == "custom":
+        syms = [s.strip().upper() for s in (body.symbols or []) if s.strip()]
+        if len(syms) < 20:
+            raise HTTPException(400, "Add at least 20 stocks so they can be ranked against each other.")
+    try:
+        return await asyncio.to_thread(compute_predictions, _state(request).market, body.horizon, syms)
+    except ServiceError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
+
+
+@router.get("/forecast")
+def forecast(request: Request, symbol: str = Query(..., max_length=20), horizon: int = Query(5, ge=1, le=63)):
+    """Monte Carlo price range + volume profile for one symbol, plus its ranking if available."""
+    from ..data import provider_for
+    from ..forecast import monte_carlo, volume_profile
+
+    st = _state(request)
+    try:
+        df = st.market.history(provider_for(symbol), symbol, "1d", limit=800)
+    except DataUnavailable as exc:
+        raise HTTPException(502, str(exc)) from exc
+    try:
+        mc = monte_carlo(df["close"], horizon=horizon)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    last = df.index[-1]
+    days = list(pd.bdate_range(last, periods=horizon + 1)) if "/" not in symbol else list(pd.date_range(last, periods=horizon + 1, freq="D"))
+    mc["fan_times"] = [ser.ts(t) for t in days]
+    ranked = None
+    for h in (horizon, 5):
+        pred = st.precompute.get(f"predictions:{h}") if h in (1, 5, 21) else None
+        if pred:
+            ranked = next((dict(i, horizon=h) for i in pred["items"] if i["symbol"] == symbol), None)
+            if ranked:
+                break
+    return ser.clean({"symbol": symbol, "monte_carlo": mc, "volume_profile": volume_profile(df.iloc[-120:], bins=16),
+                      "ranking": ranked})
+
+
 @router.get("/ai/status")
 def ai_status(request: Request):
     a = _state(request).analyst
@@ -295,6 +354,8 @@ def chart(request: Request, provider: str = "auto", exchange: str = "binance", s
         "overlays": {f"ema{n}": ser.line(ta.ema(c, n)) for n in (20, 50, 200)}
         | {"bb_upper": ser.line(bb["upper"]), "bb_lower": ser.line(bb["lower"])},
         "rsi": ser.line(ta.rsi(c)),
+        "vwap": ser.line(__import__("tradebot.forecast", fromlist=["vwap_bands"]).vwap_bands(df)["vwap"])
+                if timeframe.endswith(("m", "h")) and timeframe != "4h" else [],
         "patterns": _pattern_markers(df),
         "pivots": [{"time": ser.ts(r.time), "kind": r.kind, "price": r.price} for r in piv.itertuples()],
         "analysis": analyze_structure(df),

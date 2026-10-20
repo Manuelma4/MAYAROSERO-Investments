@@ -50,6 +50,12 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
     case "/api/portfolio": {
       try { return await load(`portfolio_${body.risk ?? "balanced"}.json`); } catch { return limit("Building a portfolio"); }
     }
+    case "/api/predictions": return load(`predictions_${url.searchParams.get("horizon") ?? "5"}.json`);
+    case "/api/predictions/custom": return limit("Custom rankings");
+    case "/api/forecast": {
+      const sym = url.searchParams.get("symbol") ?? "";
+      try { return await load(`forecasts/${safeName(sym)}_${url.searchParams.get("horizon") ?? "5"}.json`); } catch { return limit(`The forecast for ${sym}`); }
+    }
     case "/api/ai/status": return { enabled: false, how_to_enable: "Runs on the live app with a Claude API key." };
     case "/api/ai/analyze": return limit("The AI analyst");
     case "/api/picks/latest": {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pandas as pd
 
 from ..picker import PRESET_INFO, PickerConfig, run_picker
@@ -159,3 +160,62 @@ def market_mood(market: MarketData, breadth_pct: float | None) -> dict:
               "Risk-off": "Weak market: consider holding more cash until the trend recovers."}[label]
     return {"label": label, "explanation": "; ".join(parts) + ".", "advice": advice,
             "spy_vs_200d_%": float(dist), "spy_1m_%": float(ret_1m), "breadth_%": breadth_pct, "vix": vix}
+
+
+HORIZONS = {1: "tomorrow", 5: "the next week", 21: "the next month"}
+
+
+def prediction_reason(f: pd.Series) -> str:
+    """Plain-English summary of the main inputs behind a ranking (not a causal claim)."""
+    parts = []
+    r20 = f.get("ret_20")
+    if r20 is not None and np.isfinite(r20):
+        parts.append(f"{'up' if r20 >= 0 else 'down'} {abs(r20) * 100:.0f}% in a month")
+    rsi = f.get("rsi14")
+    if rsi is not None and np.isfinite(rsi):
+        parts.append("overbought" if rsi > 0.7 else "oversold" if rsi < 0.3 else f"RSI {rsi * 100:.0f}")
+    vr = f.get("volume_ratio")
+    if vr is not None and np.isfinite(vr) and vr > 1.5:
+        parts.append(f"volume {vr:.1f}x normal")
+    d200 = f.get("dist_ema200")
+    if d200 is not None and np.isfinite(d200):
+        parts.append(f"{abs(d200) * 100:.0f}% {'above' if d200 >= 0 else 'below'} its long-term trend")
+    text = ", ".join(parts)
+    return text[:1].upper() + text[1:] + "." if text else ""
+
+
+def compute_predictions(market: MarketData, horizon: int = 5, symbols: list[str] | None = None) -> dict:
+    from ..ml.features import build_features
+    from ..ml.ranker import rank_universe
+    from ..universe import STOCKS, by_symbol
+
+    symbols = symbols or [s.symbol for s in STOCKS if "." not in s.symbol]
+    frames = market.history_many("yahoo", symbols, "1d", start="2017-01-01")
+    if len(frames) < 20:
+        raise ServiceError(502, f"Only {len(frames)} stocks could be loaded; need at least 20 to rank them.")
+    try:
+        res = rank_universe(frames, horizon=horizon)
+    except ValueError as exc:
+        raise ServiceError(400, str(exc)) from exc
+    info = by_symbol()
+    items = []
+    for sym, r in res.scores.iterrows():
+        df = frames[sym]
+        feats = build_features(df.iloc[-260:]).iloc[-1]
+        st = info.get(sym)
+        items.append({
+            "symbol": sym, "name": st.name if st else sym, "sector": st.sector if st else None,
+            "score": float(r.score), "decile": int(r.decile), "p_outperform": float(r.p_outperform),
+            "p_underperform": float(r.p_underperform), "price": float(df["close"].iloc[-1]),
+            "change_1d_%": float((df["close"].iloc[-1] / df["close"].iloc[-2] - 1) * 100),
+            "reason": prediction_reason(feats),
+        })
+    v = res.validation
+    quality = (f"On unseen past data, its top-ranked stocks beat its bottom-ranked ones by "
+               f"{v['top_minus_bottom_per_period_%']:.2f}% per period on average, and its ranking was right more "
+               f"often than wrong on {v['ic_positive_share'] * 100:.0f}% of days.")
+    return ser.clean({"horizon": horizon, "horizon_label": HORIZONS.get(horizon, f"{horizon} days"),
+                      "as_of": res.as_of, "validation": v, "quality_sentence": quality,
+                      "edge_sentence": ("Small but statistically real edge." if v["has_edge"] else
+                                        "No reliable edge at this horizon: treat the ranking as weak information."),
+                      "items": items, "universe_size": len(frames)})

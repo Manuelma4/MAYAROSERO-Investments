@@ -19,6 +19,7 @@ export interface Analysis {
 }
 
 export interface ChartData {
+  vwap?: Point[];
   symbol: string;
   timeframe: string;
   candles: Candle[];
@@ -135,4 +136,18 @@ export interface PortfolioPlan {
   risk_metrics: Partial<Record<"volatility_%" | "spy_volatility_%" | "beta" | "return_1y_%" | "spy_return_1y_%" | "max_drawdown_1y_%" | "spy_max_drawdown_1y_%", number>>;
   track_record: { start: string; "cagr_%": number; "spy_cagr_%": number; "max_drawdown_%": number; "spy_max_drawdown_%": number };
   changes: Changes | null; core_risk_off: boolean; as_of: string; mix: Record<string, number>;
+}
+
+export interface RankedItem { symbol: string; name: string; sector: string | null; score: number; decile: number; p_outperform: number; p_underperform: number; price: number; "change_1d_%": number; reason: string }
+export interface PredictionsResult {
+  horizon: number; horizon_label: string; as_of: string; quality_sentence: string; edge_sentence: string; universe_size: number;
+  validation: { ic_mean: number; ic_t_stat: number; ic_positive_share: number; "top_minus_bottom_per_period_%": number; has_edge: boolean; dates_tested: number };
+  items: RankedItem[];
+}
+export interface ForecastResult {
+  symbol: string;
+  monte_carlo: { horizon: number; last_price: number; p_up: number; p_down: number; range_5_95: [number, number]; median: number; "annual_vol_%": number;
+    "p_move_up_5%": number; "p_move_down_5%": number; fan: Record<"p5" | "p25" | "p50" | "p75" | "p95", number[]>; fan_times: number[] };
+  volume_profile: { bins: { price: number; volume: number; share: number }[]; poc: number | null; value_area: [number | null, number | null] };
+  ranking: (RankedItem & { horizon: number }) | null;
 }

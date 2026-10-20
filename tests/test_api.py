@@ -174,7 +174,7 @@ def test_picks(client):
 def test_precompute_today_and_latest_picks(client):
     pre = client.app.state.precompute
     assert client.get("/api/today").status_code == 503  # not computed yet: clear message, no crash
-    pre.run_once()
+    pre.run_once(predictions=False)
     assert pre.last_error is None, pre.last_error
     t = client.get("/api/today").json()
     assert t["mood"]["label"] in {"Risk-on", "Neutral", "Risk-off"} and t["mood"]["explanation"]
@@ -303,7 +303,7 @@ def test_ai_analyst_with_fake_client(client):
 def test_portfolio_endpoint(client):
     pre = client.app.state.precompute
     assert client.post("/api/portfolio", json={}).status_code == 503
-    pre.run_once()
+    pre.run_once(predictions=False)
     d = client.post("/api/portfolio", json={"amount": 10000, "currency": "USD", "risk": "balanced"}).json()
     invested = sum(l["invested"] for l in d["lines"])
     assert abs(invested + d["cash"] - 10000) < 1e-6
@@ -312,3 +312,19 @@ def test_portfolio_endpoint(client):
     eur = client.post("/api/portfolio", json={"amount": 10000, "currency": "EUR", "risk": "cautious"}).json()
     assert eur["currency"] == "EUR" and eur["fx_usd_per_unit"] > 0
     assert client.post("/api/portfolio", json={"risk": "yolo"}).status_code == 422
+
+
+def test_predictions_and_forecast(client):
+    pre = client.app.state.precompute
+    assert client.get("/api/predictions").status_code == 503
+    pre.run_once()
+    # FakeProvider gives every symbol 1500 synthetic bars -> the ranker runs offline
+    d = client.get("/api/predictions", params={"horizon": 5}).json()
+    assert d["horizon"] == 5 and len(d["items"]) >= 20
+    assert all(0 <= i["p_outperform"] <= 1 for i in d["items"]) and d["items"][0]["score"] >= d["items"][-1]["score"]
+    assert "ic_mean" in d["validation"] and d["quality_sentence"]
+    assert client.get("/api/predictions", params={"horizon": 7}).status_code == 400
+    f = client.get("/api/forecast", params={"symbol": "AAPL", "horizon": 5}).json()
+    assert len(f["monte_carlo"]["fan"]["p50"]) == 6 == len(f["monte_carlo"]["fan_times"])
+    assert f["volume_profile"]["poc"] is not None
+    assert f["ranking"] is not None and f["ranking"]["symbol"] == "AAPL"

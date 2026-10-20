@@ -63,3 +63,9 @@ class PortfolioRequest(BaseModel):
     currency: Literal["EUR", "USD"] = "EUR"
     risk: Literal["cautious", "balanced", "bold"] = "balanced"
     fractional: bool = True
+
+
+class PredictionsRequest(BaseModel):
+    horizon: Literal[1, 5, 21] = 5
+    universe: Literal["us", "sp500", "custom"] = "us"
+    symbols: list[str] | None = Field(None, max_length=300)

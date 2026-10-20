@@ -73,6 +73,21 @@ def main(out: Path) -> None:
             save(f"picks_{p}.json", get("/api/picks/latest", preset=p))
         save("today.json", get("/api/today"))
         save("opportunities.json", post("/api/opportunities/scan", {}))
+        (out / "forecasts").mkdir(exist_ok=True)
+        fc_targets = {(s, 5) for s in symbols}
+        for h in (1, 5, 21):
+            pr = get("/api/predictions", horizon=h)
+            save(f"predictions_{h}.json", pr)
+            names = [i["symbol"] for i in pr["items"]]
+            fc_targets |= {(s, h) for s in names[:20] + names[-20:]}
+        n_fc = 0
+        for s, h in sorted(fc_targets):
+            try:
+                save(f"forecasts/{safe(s)}_{h}.json", get("/api/forecast", symbol=s, horizon=h))
+                n_fc += 1
+            except Exception as exc:
+                print("forecast failed", s, h, exc)
+        print(f"predictions + {n_fc} forecasts: ok")
         for risk in ("cautious", "balanced", "bold"):
             save(f"portfolio_{risk}.json", post("/api/portfolio", {"amount": 10000, "currency": "EUR", "risk": risk}))
         print("picks + today: ok")

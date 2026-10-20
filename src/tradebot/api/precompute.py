@@ -18,7 +18,7 @@ from ..universe import by_symbol, sp500_symbols
 from . import serialize as ser
 from .market import MarketData
 from .schemas import PicksRequest
-from .services import compute_picks, market_mood
+from .services import compute_picks, compute_predictions, market_mood
 
 log = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class Precomputer:
         with self._lock:
             self._data[key] = value
 
-    def run_once(self) -> None:
+    def run_once(self, predictions: bool = True) -> None:
         errors = []
         ew_cache: dict = {}  # the equal-weight yardstick is identical for every preset
         for preset in PRESETS:
@@ -61,6 +61,18 @@ class Precomputer:
             self.put("today", self.build_today())
         except Exception as exc:
             errors.append(f"today: {exc}")
+        today = datetime.now(timezone.utc).date().isoformat()
+        for h in ((5, 1, 21) if predictions else ()):   # heavy: recomputed once per day
+            key = f"predictions:{h}"
+            cur = self.get(key)
+            if cur is not None and cur.get("_computed") == today:
+                continue
+            try:
+                data = compute_predictions(self.market, h)
+                data["_computed"] = today
+                self.put(key, data)
+            except Exception as exc:
+                errors.append(f"predictions {h}: {exc}")
         self.last_run = datetime.now(timezone.utc).isoformat()
         self.last_error = "; ".join(errors) or None
         if errors:

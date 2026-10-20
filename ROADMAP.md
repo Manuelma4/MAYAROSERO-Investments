@@ -43,7 +43,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        opportunities, 20-30%) + optional SPY anchor; sector cap 25%, single-stock cap ~10%, volatility-aware
        weights; shows shares to buy per stock, expected risk vs S&P 500, and what changed since last month
        (buy / sell / keep). Validated walk-forward by quant-researcher; limits reviewed by risk-guardian.
-0e. [ ] **Live intraday charts + two-sided probabilistic forecasts** (comment from Manuel, Oct 19):
+0e. [x] **Live intraday charts + two-sided probabilistic forecasts** (comment from Manuel, Oct 19):
        - Charts open on intraday data (5m / 15m, ~15 min delayed for stocks with free data, real time for
          crypto and later with the paid feed), auto-refresh every minute, live last-price line.
        - Predictions for BOTH directions: long (expected rise) and short (expected fall) signals in the

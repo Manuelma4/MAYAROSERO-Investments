@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { STATIC } from "../lib/snapshot";
 import { isCrypto, marketName } from "../lib/markets";
 import { api } from "../lib/api";
 import { fmtNum, fmtPrice } from "../lib/format";
@@ -8,6 +9,8 @@ import { LinesChart, PriceChart, SERIES, downColor, upColor, type Marker, type O
 import { MarketPicker, PRESETS, type MarketSel } from "../components/MarketPicker";
 import { Badge, Card, ErrorBox, Spinner, Stat } from "../components/ui";
 import { AIDesk } from "../components/AIDesk";
+import { ForecastPanel } from "../components/Forecast";
+import { Hint } from "../components/Hint";
 
 const TREND = { 1: ["Uptrend", "up"], [-1]: ["Downtrend", "down"], 0: ["Range", ""] } as const;
 
@@ -25,10 +28,11 @@ export default function Markets() {
   const [error, setError] = useState<string | null>(null);
   const [show, setShow] = useState({ ema: true, bb: false, patterns: true, pivots: false });
 
-  const load = useCallback(async (s: MarketSel) => {
-    setLoading(true); setError(null);
-    try { setData(await api.chart({ ...s, limit: 500 })); } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
+  const load = useCallback(async (s: MarketSel, silent = false) => {
+    if (!silent) { setLoading(true); setError(null); }
+    try { setData(await api.chart({ ...s, limit: 500 })); } catch (e) { if (!silent) setError((e as Error).message); } finally { if (!silent) setLoading(false); }
   }, []);
+  const intraday = /^[0-9]+(m|h)$/.test(sel.timeframe) && sel.timeframe !== "4h";
   // The URL (?symbol=&tf=) is the source of truth: search, presets and the form all navigate.
   const urlKey = `${params.get("symbol")}|${params.get("tf")}`;
   useEffect(() => {
@@ -38,6 +42,13 @@ export default function Markets() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlKey]);
   const open = (s: MarketSel) => setParams({ symbol: s.symbol, tf: s.timeframe });
+  // Intraday charts refresh every minute (stock data is ~15 min delayed on the free feed).
+  useEffect(() => {
+    if (!intraday || STATIC) return;
+    const id = setInterval(() => load(fromUrl(), true), 60_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlKey, intraday]);
 
   const overlays = useMemo<Overlay[]>(() => {
     if (!data) return [];
@@ -46,6 +57,7 @@ export default function Markets() {
       { data: data.overlays.ema20, color: SERIES.ema20, title: "EMA20" },
       { data: data.overlays.ema50, color: SERIES.ema50, title: "EMA50" },
       { data: data.overlays.ema200, color: SERIES.ema200, width: 2, title: "EMA200" });
+    if (data.vwap?.length) o.push({ data: data.vwap, color: "#e5c07b", width: 2, title: "VWAP" });
     if (show.bb) o.push(
       { data: data.overlays.bb_upper, color: SERIES.band, dashed: true },
       { data: data.overlays.bb_lower, color: SERIES.band, dashed: true });
@@ -92,7 +104,7 @@ export default function Markets() {
 
       {data && a && (
         <div className="grid-main">
-          <Card title={<>{marketName(data.symbol)} <span className="muted">{data.symbol !== marketName(data.symbol) && data.symbol} · {data.timeframe}</span></>} actions={
+          <Card title={<>{marketName(data.symbol)} <span className="muted">{data.symbol !== marketName(data.symbol) && data.symbol} · {data.timeframe}</span>{intraday && !STATIC && <span className="live-pill on" title="Refreshes every minute"><span className="dot" />Live</span>}</>} actions={
             <div className="toggles">
               {(Object.keys(show) as (keyof typeof show)[]).map((k) => (
                 <label key={k}><input type="checkbox" checked={show[k]} onChange={(e) => setShow({ ...show, [k]: e.target.checked })} /> {k === "bb" ? "Bollinger" : k}</label>))}
@@ -119,6 +131,11 @@ export default function Markets() {
             </dl>
           </Card>
         </div>
+      )}
+      {data && (
+        <Card title={<>Forecast · next 5 trading days<Hint>5,000 simulated futures built from this market's real daily moves and today's volatility (a method used by bank risk desks), plus where most shares changed hands. It shows the likely range, not a promise.</Hint></>}>
+          <ForecastPanel symbol={data.symbol} horizon={5} />
+        </Card>
       )}
     </div>
   );
