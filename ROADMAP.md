@@ -119,6 +119,13 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         on Discover, with fundamentals cached once a day.
 21. [x] **Euro everywhere**: show amounts in € (live EUR/USD) with the dollar price on hover, set in Settings.
 
+## Phase 5: investable and solid (overnight Oct 20-21)
+
+22. [~] **Funds-only plan**: a "Simple funds" choice on My portfolio: 60% S&P 500 fund + 40% momentum fund
+        (SPMO; UCITS equivalents named for a European broker), with its real-fund track record vs the S&P 500.
+23. [ ] **Night review**: code review of tonight's big changes (plans, screener, digest, earnings, currency),
+        fix what is found, final QA.
+
 ## Later research track
 - Strategy study 2026-10 (pre-registered, select 2015-2020, confirm 2021-2026; ETFs select 2000-2012, confirm
   2013-2026): default is now **Core + momentum** (60% SPY + 40% momentum top 10, monthly): 18.6%/yr vs SPY 13.7%
