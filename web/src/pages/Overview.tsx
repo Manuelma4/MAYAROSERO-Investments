@@ -67,7 +67,7 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
           {core && !core.risk_off && (
             <p className="muted small edge-line">
               Tested since {core.edge.start} with {core.settings ?? "the default settings"}: {fmtPct(core.edge["cagr_%"], 1)} a year vs {fmtPct(core.edge["benchmark_cagr_%"], 1)} for the S&amp;P 500.
-              <Hint>How this strategy would have done in the past (not a guarantee). Part of that lead comes from using today's index members; the honest "selection skill" is {fmtPct(core.edge["skill_vs_universe_%"], 1)} a year. Details in Picks › Track record.</Hint>
+              <Hint>How this strategy would have done in the past (not a guarantee). Each stock only counts from the day it joined the S&amp;P 500, but companies that left the index are missing, so this is still a bit flattering; the "selection skill" over the same stocks held equally is {fmtPct(core.edge["skill_vs_universe_%"], 1)} a year. Details in Picks › Track record.</Hint>
             </p>
           )}
         </Card>

@@ -11,8 +11,15 @@ Keep tickers in Yahoo Finance format (BRK-B, BF-B, MC.PA, ...). To refresh the i
 list, edit the CSV (one row per member, renames included) and run the tests.
 
 Note: this is today's list. Backtesting a stock picker on today's index members
-has survivorship bias (yesterday's losers that left the index are missing), so
-historical results look better than reality. The UI states this explicitly.
+has two biases: yesterday's losers that left the index are missing, and today's
+members include companies that only joined AFTER a big rise (PLTR, SMCI, TSLA, ...),
+which a momentum picker would otherwise "buy" during the run-up, before they were
+members. `data/sp500_joins.csv` holds the approximate join (and, for re-joiners,
+leave) dates of current members that entered since 2015, so backtests only allow a
+stock from the day it was actually in the index (`membership_spells`). Stocks not
+in that file are assumed to have been members for the whole backtest window.
+The dates are compiled from public S&P announcements to month accuracy and are
+not exhaustive: the remaining bias is stated in the UI.
 """
 
 from __future__ import annotations
@@ -218,6 +225,18 @@ def load_sp500() -> list[Stock]:
         if row["sector"] not in SECTORS:
             raise ValueError(f"sp500.csv: unknown sector {row['sector']!r} for {row['symbol']}")
         out.append(Stock(row["symbol"].strip(), row["name"].strip(), row["sector"], row["industry"].strip()))
+    return out
+
+
+def membership_spells() -> dict[str, list[tuple[str | None, str | None]]]:
+    """Approximate S&P 500 membership spells (added, removed) as ISO dates; None = open-ended.
+
+    Only current members that joined (or re-joined) since 2015 are listed. A symbol that is
+    missing here is treated as a member throughout the backtest window."""
+    text = resources.files("tradebot.data").joinpath("sp500_joins.csv").read_text(encoding="utf-8")
+    out: dict[str, list[tuple[str | None, str | None]]] = {}
+    for row in csv.DictReader(text.splitlines()):
+        out.setdefault(row["symbol"].strip(), []).append((row["added"].strip() or None, row["removed"].strip() or None))
     return out
 
 

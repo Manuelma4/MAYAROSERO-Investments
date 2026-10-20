@@ -61,7 +61,7 @@ export default function Predict() {
   return (
     <div className="page">
       <section className="hero-x">
-        <p className="eyebrow">Predictions · ranked {res ? `on ${res.as_of}` : "daily"} · {res?.universe_size ?? "~130"} stocks</p>
+        <p className="eyebrow">Predictions · ranked {res ? `on ${res.as_of}` : "daily"} · {res?.universe_size ?? "~500"} stocks</p>
         <h1 className="display">Predict</h1>
         <p className="muted lead">Which stocks are likely to do better, or worse, than the others over the coming days. A machine-learning model ranks them every day, the way quant funds do. Tap a stock to see its simulated price range.</p>
         <div className="segmented" role="radiogroup" aria-label="Time horizon">

@@ -314,7 +314,15 @@ def test_portfolio_endpoint(client):
     assert client.post("/api/portfolio", json={"risk": "yolo"}).status_code == 422
 
 
-def test_predictions_and_forecast(client):
+def test_predictions_and_forecast(client, monkeypatch):
+    import tradebot.api.services as services
+    from tradebot.universe import CURATED
+
+    full = services.default_prediction_symbols()
+    assert len(full) >= 500 and {"PLTR", "ASML"} <= set(full)   # default: full S&P 500 + curated US-listed
+    # Offline the synthetic ranker on 510 symbols x 3 horizons takes minutes: use the curated US names.
+    monkeypatch.setattr(services, "default_prediction_symbols",
+                        lambda: [s.symbol for s in CURATED if "." not in s.symbol])
     pre = client.app.state.precompute
     assert client.get("/api/predictions").status_code == 503
     pre.run_once()

@@ -12,10 +12,18 @@ How it works, at each rebalance date (e.g. every month end):
    the weights of the chosen preset into one score.
 3. Buy the top N equally weighted (optionally only stocks above their 200-day
    average, and optionally go to cash when the benchmark itself is in a downtrend).
+   The decision uses the close of the review day; trades fill at the NEXT day's open.
 4. Hold until the next rebalance; trading costs are charged on turnover.
 
+Point-in-time membership (`point_in_time=True`, the default): a stock can only be
+picked, and only counts in the equal-weight yardstick, from the date it actually
+joined the S&P 500 (`universe.membership_spells`). Without this, today's members
+that joined after a huge run (PLTR, SMCI, APP, CVNA, ...) get "bought" during the
+run-up, which no investor following the index could have done.
+
 Honesty notes shown in the UI:
-- The universe is today's index members, so backtests carry survivorship bias.
+- Companies that LEFT the index are still missing (residual survivorship bias), and
+  the join-date list is approximate, so backtests remain somewhat flattering.
 - Factor premiums are real on average but can underperform for years.
 """
 
@@ -49,6 +57,7 @@ class PickerConfig:
     trend_filter: bool = True         # only buy stocks above their 200-day average
     regime_filter: bool = False       # hold cash when the benchmark is below its 200-day average
     cost_bps: float = 10.0            # cost per unit of turnover (10 bps = 0.10%)
+    point_in_time: bool = True        # only pick S&P 500 stocks from the date they joined the index
     weights: dict[str, float] | None = None
 
     def factor_weights(self) -> dict[str, float]:
@@ -59,6 +68,34 @@ def _closes(frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
     px = pd.DataFrame({s: df["close"] for s, df in frames.items()})
     px.index = px.index.normalize()
     return px[~px.index.duplicated(keep="last")].sort_index()
+
+
+def _opens(frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    op = pd.DataFrame({s: df["open"] if "open" in df else df["close"] for s, df in frames.items()})
+    op.index = op.index.normalize()
+    return op[~op.index.duplicated(keep="last")].sort_index()
+
+
+def membership_mask(index: pd.DatetimeIndex, symbols, spells: dict | None = None) -> pd.DataFrame:
+    """True where a symbol was an S&P 500 member on that date (point-in-time approximation).
+
+    Symbols without recorded spells (long-time members, or stocks outside the S&P 500 such as
+    a custom list) are allowed on every date."""
+    if spells is None:
+        from .universe import membership_spells
+        spells = membership_spells()
+    tz = index.tz
+    mask = pd.DataFrame(True, index=index, columns=list(symbols))
+    for sym in mask.columns:
+        if sym not in spells:
+            continue
+        inside = np.zeros(len(index), dtype=bool)
+        for added, removed in spells[sym]:
+            lo = pd.Timestamp(added, tz=tz) if added else index.min()
+            hi = pd.Timestamp(removed, tz=tz) if removed else index.max() + pd.Timedelta(days=1)
+            inside |= (index >= lo) & (index < hi)
+        mask[sym] = inside
+    return mask
 
 
 def factors_at(px: pd.DataFrame, bench: pd.Series, t: pd.Timestamp) -> pd.DataFrame:
@@ -96,8 +133,15 @@ def score(f: pd.DataFrame, weights: dict[str, float]) -> pd.Series:
     return total / sum(abs(w) for w in weights.values())
 
 
-def rank(px: pd.DataFrame, bench: pd.Series, t: pd.Timestamp, cfg: PickerConfig) -> pd.DataFrame:
+def rank(px: pd.DataFrame, bench: pd.Series, t: pd.Timestamp, cfg: PickerConfig,
+         members: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Ranked factor table at date t. `members` (dates x symbols, bool) drops stocks that were
+    not index members at t; membership at t is a historical fact known at t (no look-ahead)."""
     f = factors_at(px, bench, t)
+    if members is not None and not f.empty:
+        known = members.loc[:t]
+        if len(known):
+            f = f[known.iloc[-1].reindex(f.index).fillna(True).astype(bool)]
     if f.empty:
         return f
     f["score"] = score(f, cfg.factor_weights())
@@ -148,14 +192,25 @@ def _stats(eq: pd.Series, bench: pd.Series, holdings: list[dict]) -> dict:
 
 
 def run_picker(frames: dict[str, pd.DataFrame], benchmark: pd.DataFrame, cfg: PickerConfig | None = None,
-               start: str | None = None) -> PickerResult:
+               start: str | None = None, members: pd.DataFrame | None = None) -> PickerResult:
+    """Backtest the picker. `members` overrides the point-in-time membership mask (tests)."""
     cfg = cfg or PickerConfig()
     px = _closes(frames)
     bench = benchmark["close"].copy()
     bench.index = bench.index.normalize()
     bench = bench[~bench.index.duplicated(keep="last")]
-    px = px.reindex(bench.index).ffill(limit=5)   # align to benchmark trading days
+    raw = px.reindex(bench.index)
+    px = raw.ffill(limit=5)                       # align to benchmark trading days
     rets = px.pct_change(fill_method=None).fillna(0.0)
+    # Next-open fills: split each day into overnight (prev close -> open) and intraday (open -> close).
+    opn = _opens(frames).reindex(bench.index).where(raw.notna())
+    gap = (opn / px.shift(1) - 1).where(opn.notna() & px.shift(1).notna())
+    intra = (px / opn - 1).where(gap.notna())
+    gap, intra = gap.fillna(0.0), intra.fillna(rets)
+    if members is None and cfg.point_in_time:
+        members = membership_mask(px.index, px.columns)
+    elif members is not None:
+        members = members.reindex(index=px.index, columns=px.columns).ffill().fillna(True).astype(bool)
     bench_ma200 = bench.rolling(200).mean()
 
     first = px.index[min(len(px) - 1, 260)]
@@ -168,34 +223,44 @@ def run_picker(frames: dict[str, pd.DataFrame], benchmark: pd.DataFrame, cfg: Pi
 
     weights = pd.Series(0.0, index=px.columns)   # fraction of equity per stock; the rest is cash
     equity, holdings = [1.0], []
+    pending: pd.Series | None = None              # target decided at a close, filled at the next open
 
-    def rebalance(t: pd.Timestamp) -> None:
-        nonlocal weights
-        ranked = rank(px, bench, t, cfg)
+    def decide(t: pd.Timestamp) -> pd.Series:
+        ranked = rank(px, bench, t, cfg, members)
         target = pd.Series(0.0, index=px.columns)
         risk_off = bool(cfg.regime_filter and bench.loc[t] < bench_ma200.loc[t])
         if not ranked.empty and not risk_off:
             picks = ranked[ranked["eligible"]].head(cfg.top_n).index
             if len(picks):
                 target[picks] = 1.0 / len(picks)
-        turnover = float((target - weights).abs().sum())
-        equity[-1] *= 1 - turnover * cfg.cost_bps / 10_000
-        weights = target
         holdings.append({"date": t.date().isoformat(), "symbols": list(target[target > 0].index),
-                         "turnover": turnover, "risk_off": risk_off})
+                         "turnover": float((target - weights).abs().sum()), "risk_off": risk_off})
+        return target
 
-    rebalance(dates[0])                           # invest at the close of the first day
+    def grow(value: float, r: pd.Series) -> float:
+        nonlocal weights
+        day = float((weights * r).sum())
+        weights = weights * (1 + r) / (1 + day)   # weights drift with prices; the rest is cash
+        return value * (1 + day)
+
+    pending = decide(dates[0])                    # decided at the first close, bought at the next open
     for t in dates[1:]:
-        r = rets.loc[t]
-        day = float((weights * r).sum())          # today's return with yesterday's weights
-        equity.append(equity[-1] * (1 + day))
-        weights = weights * (1 + r) / (1 + day)   # weights drift with prices until next rebalance
+        if pending is not None:
+            value = grow(equity[-1], gap.loc[t])  # overnight move still on the old portfolio
+            turnover = float((pending - weights).abs().sum())
+            holdings[-1]["turnover"] = turnover
+            value *= 1 - turnover * cfg.cost_bps / 10_000
+            weights, pending = pending, None
+            equity.append(grow(value, intra.loc[t]))
+        else:
+            equity.append(grow(equity[-1], rets.loc[t]))
         if t in rebal:
-            rebalance(t)                          # decided at today's close with data up to today
+            pending = decide(t)                   # decided at today's close with data up to today
 
     eq = pd.Series(equity, index=dates, name="portfolio") * 100
     b = bench.loc[dates] / bench.loc[dates].iloc[0] * 100
     res = PickerResult(eq, b, holdings)
     res.stats = _stats(eq, b, holdings)
-    res.current = rank(px, bench, px.index[-1], cfg)
+    res.stats["point_in_time"] = members is not None
+    res.current = rank(px, bench, px.index[-1], cfg, members)
     return res

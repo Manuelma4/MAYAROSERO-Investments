@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 import numpy as np
 import pandas as pd
@@ -74,22 +75,32 @@ def compute_picks(market: MarketData, body: PicksRequest, ew_cache: dict | None 
         raise ServiceError(502, f"Only {len(frames)} of {len(symbols)} stocks could be loaded")
     cfg = PickerConfig(preset=body.preset, top_n=body.top_n, rebalance=body.rebalance,
                        trend_filter=body.trend_filter, regime_filter=body.regime_filter, cost_bps=body.cost_bps)
-    try:
-        res = run_picker(frames, bench, cfg, start=body.start)
-        # Honest yardstick: the same stocks, equal weight, no selection. It shares the
-        # survivorship bias, so the gap to it measures the selection skill itself.
-        ew_key = (tuple(sorted(frames)), body.rebalance, body.cost_bps, body.start, body.benchmark)
-        ew = ew_cache.get(ew_key) if ew_cache is not None else None
+    def equal_weight(point_in_time: bool):
+        # Honest yardstick: the same stocks (index members at each date), equal weight, no
+        # selection. The gap to it measures the selection skill itself.
+        key = (tuple(sorted(frames)), body.rebalance, body.cost_bps, body.start, body.benchmark, point_in_time)
+        ew = ew_cache.get(key) if ew_cache is not None else None
         if ew is None:
-            ew = run_picker(frames, bench, PickerConfig(top_n=len(frames), trend_filter=False,
-                                                        rebalance=body.rebalance, cost_bps=body.cost_bps),
+            ew = run_picker(frames, bench, PickerConfig(top_n=len(frames), trend_filter=False, rebalance=body.rebalance,
+                                                        cost_bps=body.cost_bps, point_in_time=point_in_time),
                             start=body.start)
             if ew_cache is not None:
-                ew_cache[ew_key] = ew
+                ew_cache[key] = ew
+        return ew
+
+    try:
+        # Point-in-time membership (default): a stock counts only from the day it joined the S&P 500.
+        res = run_picker(frames, bench, cfg, start=body.start)
+        ew = equal_weight(True)
+        # Same test on today's members throughout, shown only to explain how much that bias inflates results.
+        naive = run_picker(frames, bench, replace(cfg, point_in_time=False), start=body.start)
+        ew_naive = equal_weight(False)
     except ValueError as exc:
         raise ServiceError(400, str(exc)) from exc
     res.stats["universe_cagr_%"] = ew.stats["cagr_%"]
     res.stats["skill_vs_universe_%"] = res.stats["cagr_%"] - ew.stats["cagr_%"]
+    res.stats["todays_members_cagr_%"] = naive.stats["cagr_%"]
+    res.stats["todays_members_skill_%"] = naive.stats["cagr_%"] - ew_naive.stats["cagr_%"]
 
     info = by_symbol()
 
@@ -184,14 +195,20 @@ def prediction_reason(f: pd.Series) -> str:
     return text[:1].upper() + text[1:] + "." if text else ""
 
 
+def default_prediction_symbols() -> list[str]:
+    """The full S&P 500 plus the curated US-listed names (~510). With capped OpenMP threads, float32
+    features and weekly training dates (5/21 days) this takes ~1.5 min per horizon instead of ~20."""
+    from ..universe import CURATED
+
+    return list(dict.fromkeys(sp500_symbols() + [s.symbol for s in CURATED if "." not in s.symbol]))
+
+
 def compute_predictions(market: MarketData, horizon: int = 5, symbols: list[str] | None = None) -> dict:
     from ..ml.features import build_features
     from ..ml.ranker import rank_universe
-    from ..universe import CURATED, by_symbol
+    from ..universe import by_symbol
 
-    # Default: the curated US list (~130). The full ~510-stock universe makes the ranker's
-    # walk-forward fits take ~20 min per horizon (2+ GB RAM); it stays available on request.
-    symbols = symbols or [s.symbol for s in CURATED if "." not in s.symbol]
+    symbols = symbols or default_prediction_symbols()
     frames = market.history_many("yahoo", symbols, "1d", start="2017-01-01")
     if len(frames) < 20:
         raise ServiceError(502, f"Only {len(frames)} stocks could be loaded; need at least 20 to rank them.")

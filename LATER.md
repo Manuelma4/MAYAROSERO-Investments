@@ -149,5 +149,8 @@ Any of: a small VPS (Hetzner / OVH ~€5/month), Railway, Render or Fly.io. Run
 ## 5. Optional extras
 - **Verified commits**: add a GPG or SSH signing key to your GitHub account so commits show "Verified".
 - **Install on your phone**: once hosted, open the site in Safari/Chrome → "Add to Home Screen".
-- **Better S&P 500 history**: a paid point-in-time constituents dataset (e.g. Norgate Data)
-  removes survivorship bias from the picker's backtest.
+- **Better S&P 500 history**: the picker's backtest only allows a stock from the date it joined the index,
+  using `src/tradebot/data/sp500_joins.csv` (about 155 joins since 2015, written from memory, accurate to
+  about a month; some smaller additions and every company that LEFT the index are missing, so results are
+  still somewhat flattering). A paid point-in-time constituents dataset (e.g. Norgate Data, or S&P's own
+  files) would make it exact: replace that CSV and add the leavers to the universe.
