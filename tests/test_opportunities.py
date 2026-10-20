@@ -112,3 +112,15 @@ def test_session_fraction_follows_new_york_daylight_saving():
     winter = session_fraction(pd.Timestamp("2026-11-10 17:45", tz="UTC"), False)   # 12:45 in New York (EST)
     assert abs(summer - 195 / 390) < 1e-9 and abs(winter - 195 / 390) < 1e-9
     assert session_fraction(pd.Timestamp("2026-11-10 14:00", tz="UTC"), False) == 1.0  # 9:00 NY: not open yet
+
+
+def test_ticker_that_is_an_english_word_needs_capitals():
+    from tradebot.live.news import mentions
+
+    merck = "Merck (MRK) Has New Cancer Treatments. Can They Outgrow the Keytruda Patent Cliff?"
+    assert not mentions(merck, "HAS", "Hasbro")
+    assert mentions("Hasbro (HAS) earnings beat, shares jump", "HAS", "Hasbro")
+    assert mentions("Why HAS stock is soaring today", "HAS", None)
+    assert not mentions("Now is the time to buy", "NOW", None)
+    assert mentions("ServiceNow (NOW) raises guidance", "NOW", "ServiceNow")
+    assert mentions("BRK earnings: Buffett's cash pile grows", "BRK-B", None)

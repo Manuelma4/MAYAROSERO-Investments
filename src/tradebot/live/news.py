@@ -58,9 +58,10 @@ def name_tokens(name: str) -> set[str]:
 
 
 def mentions(title: str, symbol: str, name: str | None) -> bool:
-    base = symbol.split("/")[0].replace("^", "")
+    base = symbol.split("/")[0].replace("^", "").split("-")[0].split(".")[0].upper()
     t = title.lower()
-    if len(base) >= 2 and re.search(rf"\b{re.escape(base.lower())}\b", t):
+    # Tickers count only in capitals ("HAS", "(HAS)", "$HAS"): many are English words ("Has", "Now", "All").
+    if len(base) >= 2 and re.search(rf"(?<![A-Za-z0-9]){re.escape(base)}(?![A-Za-z0-9])", title):
         return True
     return bool(name and any(re.search(rf"\b{re.escape(w)}\b", t) for w in name_tokens(name)))
 
