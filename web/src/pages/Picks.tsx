@@ -110,7 +110,7 @@ export default function Picks() {
             {rb.halves?.length === 2 ? <>; first half {fmtPct(rb.halves[0]["cagr_%"], 1)}/yr vs {fmtPct(rb.halves[0]["benchmark_cagr_%"], 1)}, second half {fmtPct(rb.halves[1]["cagr_%"], 1)}/yr vs {fmtPct(rb.halves[1]["benchmark_cagr_%"], 1)}</> : null}.
             {rb["p_beat_10y_%"] !== undefined && <> Re-shuffling this history, it came out ahead over 10 years in {fmtNum(rb["p_beat_10y_%"], 0)}% of cases (5 years: {fmtNum(rb["p_beat_5y_%"] ?? 0, 0)}%).</>}
             <Hint>These numbers come from the backtest since {s?.start}, recomputed every day. A 3-year period "ahead" means the strategy grew faster than the S&amp;P&nbsp;500 over those 3 years. The re-shuffle (a "block bootstrap") replays random yearly chunks of the past in a new order thousands of times; it assumes the future behaves like this one stretch of history, so it is optimistic. We tested many variants before choosing this one, and after allowing for that the edge is not statistically proven: think "better odds", not "sure thing". See Learn.</Hint>
-          </p>
+           <strong>Honest expectation after an independent stress test: about +1–2% a year over the S&amp;P&nbsp;500 at best, not proven; much of the backtest lead is 2026 and a few chip stocks.</strong></p>
         )}
       </section>
       <details className="customize">

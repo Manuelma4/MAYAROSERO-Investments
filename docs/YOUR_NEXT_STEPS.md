@@ -66,11 +66,17 @@ only; tell Claude to finish it if you choose IBKR for real money.
 
 What the tests honestly say today (details on the Learn page):
 
-- The monthly picks alone grew about **17% a year since 2015** vs **14% for the S&P 500**, with bigger swings
-  (worst drop −39%). They lost to the index in 2015–2020 and beat it strongly in 2021–2026. Not proven.
-- The ready-made plans with their risk matched to Cautious / Balanced / Bold earned about **11% a year**, below
-  the S&P 500. Simply holding an S&P 500 fund is a strong, cheap default.
-- Only the 1-day prediction ranking showed a statistically real edge; the 5-day and 21-day rankings did not.
+- The default **Core + momentum** strategy (60% S&P 500 + 40% the 10 strongest momentum stocks) made
+  **18.6% a year since 2015 vs 13.7%** for the S&P 500 in the backtest. An independent stress test found no
+  cheating (no look-ahead) but showed that about half of that lead is **2026 alone** and a handful of chip
+  stocks. Its honest estimate: **about +1–2% a year over the S&P 500 at best, slightly bigger drops, not proven.**
+- The ready-made plans use the same ranking with a risk limit: Balanced ≈ the S&P 500, Bold a bit more
+  return and bigger drops.
+- **The simplest version, no stock picking:** 60% in an S&P 500 fund (e.g. SPY / an S&P 500 UCITS ETF in your
+  PEA or broker) + 40% in a momentum fund such as **SPMO**. With real fund prices since late 2015 it did about
+  **+1.5% a year** better than the S&P 500 with a slightly smaller worst drop. Check which of these funds your
+  broker offers in Europe (UCITS versions exist for S&P 500; momentum UCITS funds also exist, e.g. iShares
+  MSCI World/USA Momentum).
 
 So: let the **live track record** (Today and Beat the S&P pages) run for at least 1–3 months, ideally a year,
 before trusting the picks with real money. If you invest anyway, keep most of it in a plain S&P 500 fund and

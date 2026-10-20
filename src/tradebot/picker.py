@@ -47,15 +47,19 @@ PRESETS: dict[str, dict[str, float]] = {
 }
 # Share held in the S&P 500 itself by default (core-satellite presets).
 PRESET_CORE_SPY = {"core_momentum": 0.6}
-# The app's main strategy (Beat-the-S&P page, Today board, alerts, plans' ranking). Chosen by the walk-forward
-# study of 2026-10 (select 2015-2020, confirm 2021-2026): 60% S&P 500 + 40% the 10 strongest momentum stocks
-# was the only variant that beat SPY in both halves with a Sharpe ratio at least SPY's and a drawdown within
-# 5 points of SPY's. The edge is modest and not statistically proven (see Learn and the robustness block).
+# The app's main strategy (Beat-the-S&P page, Today board, alerts, plans' ranking), from the 2026-10 study.
+# Honest history: the pre-registered 60% SPY + 40% pure 12-1 momentum (top 25) failed the 2015-2020 gate and
+# gave only +1.6%/yr over the full period; this variant (40% in the momentum preset's top 10) came from the
+# robustness runs made after the confirmation results existed, so its 2021-2026 result is not a clean
+# out-of-sample test. An adversarial review (no look-ahead found) puts the believable edge at about +1-2%/yr
+# with ~2-3 points deeper drawdowns: much of the backtest gain is 2026 and a few chip/storage stocks, and it
+# fades with 50 bps costs or a survivorship drag of ~5%/yr on the momentum part. Not statistically proven.
 DEFAULT_PRESET = "core_momentum"
 
 PRESET_INFO = {
     "core_momentum": "60% in the S&P 500 itself + 40% in the 10 strongest momentum stocks. The S&P 500 part "
-                     "keeps the swings close to the market's; the momentum part tries to add a few % a year.",
+                     "keeps the swings close to the market's; the momentum part tries to add a little (realistically about "
+                     "+1-2% a year, not proven).",
     "momentum": "Winners keep winning: strongest 6-12 month performers.",
     "quality_momentum": "Strong performers with calmer price action (smoother ride).",
     "low_volatility": "Calm, defensive stocks still in an uptrend.",
@@ -350,7 +354,9 @@ def run_picker(frames: dict[str, pd.DataFrame], benchmark: pd.DataFrame, cfg: Pi
     res.stats["point_in_time"] = members is not None
     res.current = rank(px, bench, px.index[-1], cfg, members)
     res.stats["benchmark_weight_%"] = float(holdings[-1].get("benchmark_weight", 0.0) * 100) if holdings else 0.0
-    res.stats["turnover_per_year_%"] = float(sum(h["turnover"] for h in holdings[1:]) /
+    # A review decided on the last bar of a running period has not filled yet: leave it out of turnover.
+    filled = holdings[1:-1] if pending is not None else holdings[1:]
+    res.stats["turnover_per_year_%"] = float(sum(h.get("turnover", 0.0) for h in filled) /
                                              max((eq.index[-1] - eq.index[0]).days / 365.25, 1e-9) * 100)
     return res
 
