@@ -1,13 +1,24 @@
 """Portfolio builder: turn an amount and a risk level into a diversified, ready-to-buy plan.
 
 Structure (core + satellite + anchor):
-- Core: the monthly picks (the most evidence-backed way to beat the S&P 500), weighted by inverse
-  volatility (calmer stocks get a bit more), with caps: max `stock_cap` per stock and `sector_cap`
-  per sector of the WHOLE portfolio. Excess is redistributed to the other holdings.
+- Core: the monthly picks (the most evidence-backed way to beat the S&P 500). With price history
+  (`closes`), weighted by EQUAL RISK CONTRIBUTION: each pick adds the same share of the core's swings,
+  measured on the last year of daily returns, so one jumpy stock or a cluster of stocks that move
+  together cannot dominate the risk (Maillard, Roncalli & Teiletche 2010). Without history: inverse
+  volatility. Then money caps: max `stock_cap` per stock and `sector_cap` per sector of the WHOLE
+  portfolio; money above a cap goes to the other holdings.
 - Satellite: today's live ideas with a news catalyst (long only), each sized so that hitting its stop
   costs about 1% of the portfolio, within the satellite budget. Unused satellite money stays in cash.
 - Anchor: SPY (the S&P 500 itself) for stability.
 - When the engine is risk-off (S&P 500 below its 200-day average), the core goes to cash.
+
+Risk budget per level (`TARGET_VOL`, a multiple of the S&P 500's own volatility over the same year,
+so "Balanced" means "swings about like the S&P 500"): the level's mix in RISK_LEVELS is the starting
+point and the most it ever puts in the picks. If the expected volatility of picks + index (live ideas
+count as cash, exactly as in the risk card) is above the budget, money first moves from the picks to
+the S&P 500 (down to CORE_FLOOR = a quarter of the picks share), and only then is the whole mix scaled down
+with the rest kept in cash. It never borrows and never adds risk when the plan is calmer than its
+budget. Only prices up to the plan date are used (`as_of`), see the truncation test.
 """
 
 from __future__ import annotations
@@ -19,11 +30,18 @@ import numpy as np
 import pandas as pd
 
 RISK_LEVELS = {
-    # core, satellite, anchor (shares of the total)
+    # core, satellite, anchor (shares of the total): the starting mix, and the most in the picks
     "cautious": (0.50, 0.05, 0.45),
     "balanced": (0.70, 0.20, 0.10),
     "bold": (0.75, 0.25, 0.00),
 }
+# Risk budget: expected yearly volatility at most this multiple of the S&P 500's (same past year).
+TARGET_VOL = {"cautious": 0.8, "balanced": 1.0, "bold": 1.3}
+LEVEL_NAME = {"cautious": "Cautious", "balanced": "Balanced", "bold": "Bold"}
+COV_LOOKBACK = 252        # one year of daily returns for the weights and the risk budget
+SHORT_LOOKBACK = 63       # the risk budget also checks the last 3 months (the stricter of the two counts)
+CORE_FLOOR = 0.25         # keep at least a quarter of the level's picks share before moving money to cash
+SPY = "SPY"
 
 
 @dataclass
@@ -46,6 +64,8 @@ class Plan:
     amount: float
     risk: str
     lines: list[Line] = field(default_factory=list)
+    mix: dict[str, float] = field(default_factory=dict)   # core / satellite / anchor shares actually used
+    weighting: dict = field(default_factory=dict)         # how the weights were chosen, numbers + plain English
 
     @property
     def cash(self) -> float:
@@ -66,12 +86,60 @@ class Plan:
         return dict(sorted(out.items(), key=lambda kv: -kv[1]))
 
 
-def capped_weights(items: list[dict], total: float, stock_cap: float, sector_cap: float) -> dict[str, float]:
-    """Inverse-volatility weights summing to `total`, respecting per-stock and per-sector caps.
-    Money that can't be placed within the caps is left unallocated (it becomes cash)."""
+# ---------------------------------------------------------------- risk inputs
+
+def past_returns(closes: pd.DataFrame, symbols: list[str], as_of=None, lookback: int = COV_LOOKBACK) -> pd.DataFrame:
+    """Daily returns of `symbols` + SPY over the last `lookback` days up to `as_of` (never later rows).
+    Same conventions as the risk card (portfolio_risk.daily_returns): gaps use the S&P 500's move that day."""
+    from .portfolio_risk import daily_returns
+
+    rets, _ = daily_returns(closes, symbols, as_of=as_of, lookback=lookback)
+    return rets
+
+
+def equal_risk_weights(cov: np.ndarray, iters: int = 2000, tol: float = 1e-9) -> np.ndarray:
+    """Long-only weights (sum 1) where every holding contributes the same share of the variance:
+    w_i (Cov w)_i equal for all i. Multiplicative fixed-point iteration from inverse volatility."""
+    n = len(cov)
+    vol = np.sqrt(np.clip(np.diag(cov), 1e-12, None))
+    w = (1 / vol) / (1 / vol).sum()
+    if n == 1:
+        return w
+    for _ in range(iters):
+        rc = w * (cov @ w)
+        tot = rc.sum()
+        if tot <= 0:
+            break
+        if np.max(np.abs(rc - tot / n)) < tol * tot:
+            break
+        w = w * np.sqrt((tot / n) / np.clip(rc, tot * 1e-9, None))
+        w = w / w.sum()
+    return w
+
+
+def risk_shares(cov: np.ndarray, w: np.ndarray) -> np.ndarray:
+    """Euler split of the variance (sums to 1): w_i (Cov w)_i / (w' Cov w)."""
+    var = float(w @ cov @ w)
+    return w * (cov @ w) / var if var > 0 else np.zeros_like(w)
+
+
+def _erc_base(items: list[dict], rets: pd.DataFrame) -> dict[str, float]:
+    syms = [it["symbol"] for it in items]
+    cov = rets.reindex(columns=syms).fillna(0.0).cov().to_numpy() * 252
+    cov = cov + np.eye(len(syms)) * 1e-8
+    return dict(zip(syms, equal_risk_weights(cov)))
+
+
+# ---------------------------------------------------------------- core weights
+
+def capped_weights(items: list[dict], total: float, stock_cap: float, sector_cap: float,
+                   base: dict[str, float] | None = None) -> dict[str, float]:
+    """Weights summing to `total` in proportion to `base` (default: inverse volatility), respecting
+    per-stock and per-sector caps. Money that can't be placed within the caps is left unallocated (cash)."""
     if not items or total <= 0:
         return {}
-    raw = {it["symbol"]: 1.0 / max(it.get("volatility_%") or 30.0, 5.0) for it in items}
+    raw = base or {it["symbol"]: 1.0 / max(it.get("volatility_%") or 30.0, 5.0) for it in items}
+    raw = {it["symbol"]: max(float(raw.get(it["symbol"], 0.0)), 1e-12) for it in items}
     sector = {it["symbol"]: it.get("sector") or "Other" for it in items}
     w = {s: v / sum(raw.values()) * total for s, v in raw.items()}
     for _ in range(50):
@@ -101,21 +169,27 @@ def capped_weights(items: list[dict], total: float, stock_cap: float, sector_cap
             room = {s: min(stock_cap - w[s], sector_cap - sec_tot[sector[s]]) for s in w}
             room = {s: r for s, r in room.items() if r > 1e-9}
             if room:
-                base = sum(raw[s] for s in room)
+                base_sum = sum(raw[s] for s in room)
                 for s in room:
-                    w[s] += min(room[s], left * raw[s] / base)
+                    w[s] += min(room[s], left * raw[s] / base_sum)
                 changed = True
         if not changed:
             break
     return w
 
 
-def diversified_core(candidates: list[dict], n: int, total: float, stock_cap: float, sector_cap: float):
+def diversified_core(candidates: list[dict], n: int, total: float, stock_cap: float, sector_cap: float,
+                     rets: pd.DataFrame | None = None):
     """Start from the top `n` ranked picks; if sector caps leave money unplaced, add the next-ranked
-    eligible stocks from sectors that still have room (diversification instead of idle cash)."""
+    eligible stocks from sectors that still have room (diversification instead of idle cash).
+    With `rets` (past daily returns), weights are equal-risk-contribution before the caps."""
+    def weigh(chosen):
+        base = _erc_base(chosen, rets) if rets is not None and len(chosen) else None
+        return capped_weights(chosen, total, stock_cap, sector_cap, base)
+
     chosen = list(candidates[:n])
     rest = list(candidates[n:])
-    w = capped_weights(chosen, total, stock_cap, sector_cap)
+    w = weigh(chosen)
     while rest and total - sum(w.values()) > 0.005:
         sec_tot: dict[str, float] = {}
         for it in chosen:
@@ -126,20 +200,142 @@ def diversified_core(candidates: list[dict], n: int, total: float, stock_cap: fl
             break
         rest.remove(nxt)
         chosen.append(nxt)
-        w = capped_weights(chosen, total, stock_cap, sector_cap)
+        w = weigh(chosen)
     return chosen, w
+
+
+# ---------------------------------------------------------------- risk budget
+
+def fit_risk_budget(core_w: dict[str, float], anchor: float, rets: pd.DataFrame, target_x: float,
+                    floor: float = CORE_FLOOR, short: int | None = SHORT_LOOKBACK) -> dict:
+    """Shares of picks and index so the plan's expected volatility is at most `target_x` x SPY's.
+
+    core_w: picks weights (share of the whole amount) at the level's full picks share.
+    The ratio plan vol / SPY vol is measured on the whole window (`rets`, one year) AND on its last
+    `short` days, and the larger one counts: a plan whose holdings got jumpier recently is not let off
+    by a calm year before. Live ideas and cash count as zero. Ratios are scale-free, so cutting every
+    weight by f cuts the ratio by f exactly."""
+    syms = [s for s in core_w if core_w[s] > 0]
+    cols = syms + [SPY]
+    r = rets.reindex(columns=cols).fillna(0.0)
+    windows = [r] + ([r.iloc[-short:]] if short and len(r) > short else [])
+    covs = [w.cov().to_numpy() * 252 for w in windows]
+    placed = float(sum(core_w[s] for s in syms))
+    unit = np.array([core_w[s] / placed for s in syms] + [0.0]) if placed > 0 else np.zeros(len(cols))
+    e_spy = np.zeros(len(cols))
+    e_spy[-1] = 1.0
+
+    def vol(c: float, a: float, cov: np.ndarray) -> float:
+        w = c * unit + a * e_spy
+        return math.sqrt(max(float(w @ cov @ w), 0.0))
+
+    def ratio(c: float, a: float) -> float:
+        return max(vol(c, a, cv) / math.sqrt(cv[-1, -1]) if cv[-1, -1] > 0 else 0.0 for cv in covs)
+
+    equity = placed + anchor          # money in picks + index; it first moves, then shrinks to cash
+    start = ratio(placed, anchor)
+    c, a = placed, anchor
+    if start > target_x + 1e-12:
+        lo = floor * placed
+        if ratio(lo, equity - lo) <= target_x:
+            hi = placed                     # ratio(hi) > target >= ratio(lo): largest c that fits
+            for _ in range(60):
+                mid = (lo + hi) / 2
+                if ratio(mid, equity - mid) <= target_x:
+                    lo = mid
+                else:
+                    hi = mid
+            c, a = lo, equity - lo
+        else:
+            c, a = lo, equity - lo
+            f = target_x / ratio(c, a)
+            c, a = c * f, a * f
+    spy_vol = math.sqrt(max(covs[0][-1, -1], 0.0))
+    return {"core_scale": c / placed if placed > 0 else 0.0, "anchor": a, "core": c,
+            "x_spy": ratio(c, a), "x_spy_start": start, "vol_%": vol(c, a, covs[0]) * 100,
+            "vol_start_%": vol(placed, anchor, covs[0]) * 100, "spy_vol_%": spy_vol * 100,
+            "target_x": target_x, "moved_to_index": max(0.0, a - anchor), "to_cash": max(0.0, equity - c - a)}
+
+
+def plan_weights(risk: str, core: list[dict], core_risk_off: bool, closes: pd.DataFrame | None = None,
+                 as_of=None, stock_cap: float = 0.10, sector_cap: float = 0.25, core_n: int = 10,
+                 risk_budget: bool = True, short_lookback: int | None = SHORT_LOOKBACK
+                 ) -> tuple[list[dict], dict[str, float], float, dict]:
+    """Lasting part of the plan as shares of the whole amount: (chosen picks, picks weights, SPY share, info).
+    `closes`: daily closes (with SPY) known at the plan date; rows after `as_of` are ignored."""
+    if risk not in RISK_LEVELS:
+        raise ValueError(f"Unknown risk level '{risk}'")
+    core_share, _, anchor_share = RISK_LEVELS[risk]
+    rets = None
+    if closes is not None and SPY in closes.columns:
+        syms = [c["symbol"] for c in core[: max(core_n * 4, 40)]] if core and not core_risk_off else []
+        r = past_returns(closes, syms, as_of=as_of)
+        rets = r if len(r) >= 60 else None
+    chosen, weights = [], {}
+    if core and not core_risk_off:
+        chosen, weights = diversified_core(core, core_n, core_share, stock_cap, sector_cap, rets)
+    info: dict = {"method": "equal_risk" if rets is not None else "inverse_volatility",
+                  "target_x": TARGET_VOL[risk], "budget_applied": False}
+    if rets is not None and risk_budget:
+        fit = fit_risk_budget(weights, anchor_share, rets, TARGET_VOL[risk], short=short_lookback)
+        weights = {s: v * fit["core_scale"] for s, v in weights.items()}
+        anchor_share = fit["anchor"]
+        info.update(fit, budget_applied=True, days=len(rets))
+        cw = np.array([weights.get(c["symbol"], 0.0) for c in chosen] + [anchor_share])
+        cols = [c["symbol"] for c in chosen] + [SPY]
+        cov = rets.reindex(columns=cols).fillna(0.0).cov().to_numpy() * 252
+        rs = risk_shares(cov, cw) if cw.sum() > 0 else np.zeros(len(cols))
+        info["risk_shares"] = {s: float(x) for s, x in zip(cols, rs)}
+    return chosen, weights, anchor_share, info
+
+
+def _pct(x: float) -> str:
+    return f"{x * 100:.0f}%"
+
+
+def weighting_summary(risk: str, info: dict, core_start: float, core: float, anchor_start: float,
+                      anchor: float, cash: float) -> list[str]:
+    """Plain-English 'why these weights' lines for the UI."""
+    lvl = LEVEL_NAME.get(risk, risk)
+    out = []
+    if info.get("method") == "equal_risk":
+        out.append("Each pick is sized so it adds about the same amount of ups and downs to the plan, based on its "
+                   "last year of daily prices: calmer stocks get more money, jumpy ones less, and stocks that "
+                   "move together share one risk slot.")
+    else:
+        out.append("Calmer stocks get a bit more money and jumpy ones a bit less (based on their recent swings).")
+    if not info.get("budget_applied"):
+        return out
+    x0, tx = info["x_spy_start"], info["target_x"]
+    budget = f"the {lvl} limit ({tx:.1f} times)"
+    mix0 = f"the standard {lvl} mix ({_pct(core_start)} picks, {_pct(anchor_start)} S&P 500 index)"
+    if x0 <= tx + 1e-9:
+        out.append(f"With {mix0} the plan is expected to swing about {x0:.1f} times as much as the S&P 500, "
+                   f"within {budget}, so the standard mix is kept.")
+    else:
+        msg = (f"With {mix0} the plan would swing about {x0:.1f} times as much as the S&P 500 (judged on the "
+               f"past year and the last 3 months, whichever is jumpier), above {budget}. ")
+        if cash < 0.005:
+            msg += f"So {_pct(max(0.0, anchor - anchor_start))} of the money moved from the picks to the S&P 500 index"
+        else:
+            msg += (f"So the picks were cut to {_pct(core)}, the S&P 500 index holds {_pct(anchor)} "
+                    f"and {_pct(cash)} waits in cash")
+        out.append(msg + f", bringing it to about {info['x_spy']:.1f} times.")
+    return out
 
 
 def build_plan(amount: float, risk: str, core: list[dict], core_risk_off: bool, ideas: list[dict],
                spy_price: float | None, fractional: bool = True, stock_cap: float = 0.10,
                sector_cap: float = 0.25, risk_per_idea: float = 0.01, max_ideas: int = 3,
-               core_n: int = 10) -> Plan:
-    """`core` is the engine's ranked list of eligible stocks (best first); the first `core_n` are the picks."""
+               core_n: int = 10, closes: pd.DataFrame | None = None, as_of=None,
+               risk_budget: bool = True) -> Plan:
+    """`core` is the engine's ranked list of eligible stocks (best first); the first `core_n` are the picks.
+    `closes` (daily closes incl. SPY, up to the plan date) switches on risk-aware weights and the risk budget."""
     if risk not in RISK_LEVELS:
         raise ValueError(f"Unknown risk level '{risk}'")
     if amount <= 0:
         raise ValueError("Amount must be positive")
-    core_share, sat_share, anchor_share = RISK_LEVELS[risk]
+    _, sat_share, anchor_start = RISK_LEVELS[risk]
     plan = Plan(amount, risk)
 
     def shares_for(money: float, price: float | None) -> float:
@@ -148,20 +344,20 @@ def build_plan(amount: float, risk: str, core: list[dict], core_risk_off: bool, 
         q = money / price
         return math.floor(q * 1e4) / 1e4 if fractional else float(math.floor(q))
 
+    chosen, weights, anchor_share, info = plan_weights(risk, core, core_risk_off, closes, as_of, stock_cap,
+                                                       sector_cap, core_n, risk_budget)
     # Core
-    if core and not core_risk_off:
-        chosen, weights = diversified_core(core, core_n, core_share, stock_cap, sector_cap)
-        for it in chosen:
-            wt = weights.get(it["symbol"], 0.0)
-            money = wt * amount
-            q = shares_for(money, it.get("price"))
-            plan.lines.append(Line(it["symbol"], it.get("name", it["symbol"]), "core", it.get("sector"), wt, money,
-                                   it.get("price"), q, q * (it.get("price") or 0), note=it.get("reason", "")))
+    for it in chosen:
+        wt = weights.get(it["symbol"], 0.0)
+        money = wt * amount
+        q = shares_for(money, it.get("price"))
+        plan.lines.append(Line(it["symbol"], it.get("name", it["symbol"]), "core", it.get("sector"), wt, money,
+                               it.get("price"), q, q * (it.get("price") or 0), note=it.get("reason", "")))
     # Satellite: live long ideas sized by risk, within the satellite budget
     budget = sat_share * amount
     in_core = {l.symbol for l in plan.lines}
     longs = [i for i in ideas if i.get("qualified") and i.get("direction") == "long"
-             and i["symbol"] not in in_core][:max_ideas]  # never double up on one stock
+             and i["symbol"] not in in_core and i["symbol"] != SPY][:max_ideas]  # never double up on one stock
     for i in longs:
         if budget <= 0:
             break
@@ -177,11 +373,18 @@ def build_plan(amount: float, risk: str, core: list[dict], core_risk_off: bool, 
                                note=i.get("headline") or ""))
         budget -= q * i["entry"]
     # Anchor
-    if anchor_share > 0 and spy_price:
+    if anchor_share > 1e-6 and spy_price:
         money = anchor_share * amount
         q = shares_for(money, spy_price)
-        plan.lines.append(Line("SPY", "S&P 500 ETF", "anchor", None, anchor_share, money, spy_price, q, q * spy_price,
+        plan.lines.append(Line(SPY, "S&P 500 ETF", "anchor", None, anchor_share, money, spy_price, q, q * spy_price,
                                note="The index itself: stability and diversification."))
+    core_used = float(sum(weights.values()))
+    plan.mix = {"core": core_used, "satellite": sat_share, "anchor": anchor_share}
+    placed_start = core_used / info["core_scale"] if info.get("core_scale") else core_used
+    cash = max(0.0, info.get("to_cash", 0.0))
+    info["summary"] = weighting_summary(risk, info, placed_start, core_used, anchor_start, anchor_share,
+                                        cash) if chosen else []
+    plan.weighting = info
     return plan
 
 

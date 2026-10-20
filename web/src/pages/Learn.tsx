@@ -138,6 +138,7 @@ export default function Learn() {
             <h3 className="learn-sub">What the test really shows</h3>
             <p>Holding the top 10 S&amp;P 500 stocks by momentum, reviewed monthly, grew about 17% a year since 2015 against about 14% for the S&amp;P 500. Before we corrected a test mistake (counting stocks before they joined the index), the same test claimed 37% a year: a reminder of how easily backtests flatter.</p>
             <p>Some bias remains, so treat 17% as an upper estimate. Three to four points a year over ten years is a lot of money, but it is not proven until it shows up in the live track record.</p>
+            <p>The ready-made plans on My portfolio mix the picks with the S&amp;P 500 and cash so their swings match their label (Cautious, Balanced, Bold). With those limits, the same test gave about 11% a year for each level, below the S&amp;P 500's 14%, with smaller drops for Cautious. In plain words: so far the picks add excitement more than return once risk is controlled, and simply holding the S&amp;P 500 is a strong, cheap default.</p>
           </div>
           <div>
             <h3 className="learn-sub">Why most traders lose</h3>

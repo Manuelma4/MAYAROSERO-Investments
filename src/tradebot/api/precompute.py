@@ -1,7 +1,7 @@
 """Background precomputation: pages show results instantly instead of computing on click.
 
 Jobs run at startup and then every `interval` seconds in a daemon thread:
-- picks for every preset with default settings
+- picks for every preset with default settings, and the walk-forward backtest of each portfolio risk level
 - the "Today" board: market mood, what to hold, buy/sell/keep changes, today's biggest movers
 - the live track record: one picks snapshot per preset and trading day (once the US close is known),
   and every qualified Invest-now idea (recorded by the opportunity loop)
@@ -27,7 +27,7 @@ from ..universe import CURATED, POP, by_symbol, sp500_symbols
 from . import serialize as ser
 from .market import MarketData
 from .schemas import PicksRequest
-from .services import compute_picks, compute_predictions, compute_track_record, market_mood
+from .services import compute_picks, compute_plan_track, compute_predictions, compute_track_record, market_mood
 
 log = logging.getLogger(__name__)
 
@@ -84,6 +84,11 @@ class Precomputer:
                 fresh.append(preset)
             except Exception as exc:  # keep the previous result if a refresh fails
                 errors.append(f"picks {preset}: {exc}")
+        if "quality_momentum" in fresh:
+            try:   # backtest of each portfolio risk level (the plan's "track record"), ~20 s
+                self.put("plan_track", compute_plan_track(self.market))
+            except Exception as exc:
+                errors.append(f"plan track record: {exc}")
         try:
             self.record_track_snapshots(fresh, started)
             self.track_record(self.alert_preset, max_age=0)

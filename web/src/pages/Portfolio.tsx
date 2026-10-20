@@ -10,9 +10,9 @@ import { RiskCard } from "../components/RiskCard";
 
 const KEY = "mri.portfolio";
 const RISKS = [
-  { id: "cautious", label: "Cautious", hint: "50% picks, 45% S&P 500 index, 5% live ideas. Smoother ride, smaller edge." },
-  { id: "balanced", label: "Balanced", hint: "70% picks, 20% live ideas, 10% S&P 500 index. The recommended mix." },
-  { id: "bold", label: "Bold", hint: "75% picks, 25% live ideas, no index. Biggest potential edge, biggest swings." },
+  { id: "cautious", label: "Cautious", hint: "Risk limit: swings at most about 0.8 times as much as the S&P 500. Up to 50% picks, the rest mostly the S&P 500 index, 5% live ideas, and some cash when the picks are jumpy. Smaller losses in bad months, smaller gains in good ones." },
+  { id: "balanced", label: "Balanced", hint: "Risk limit: swings at most about as much as the S&P 500 (1.0 times). Up to 70% picks, 20% live ideas, the rest the S&P 500 index. The recommended mix." },
+  { id: "bold", label: "Bold", hint: "Risk limit: swings at most about 1.3 times as much as the S&P 500. Up to 75% picks and 25% live ideas. Biggest potential edge, biggest swings." },
 ];
 const ROLE = { core: "Picks", satellite: "Live idea", anchor: "S&P 500", cash: "Cash" } as const;
 // Monochrome on purpose: green and red are reserved for price direction (BRAND.md).
@@ -111,9 +111,25 @@ export default function Portfolio() {
                   </div>
                   <p className="muted small">{fmtNum(l.invested / plan.amount * 100, 1)}% of the portfolio{l.stop ? ` · stop-loss $${fmtNum(l.stop, 2)}` : ""}{l.note ? ` · ${l.note}` : ""}</p>
                 </li>))}
-              {plan.cash > 0.5 && <li><div className="pc-top"><Badge>Cash</Badge><span className="pc-name"><strong>Keep in cash</strong><span className="muted small">{plan.by_role.satellite === undefined || plan.by_role.satellite < plan.mix.satellite - 0.005 ? "Waiting for live ideas, plus rounding" : "Rounding"}</span></span><span className="pc-num">{money(plan.cash)}</span></div></li>}
+              {plan.cash > 0.5 && <li><div className="pc-top"><Badge>Cash</Badge><span className="pc-name"><strong>Keep in cash</strong><span className="muted small">{[
+                (plan.weighting?.to_cash ?? 0) > 0.005 ? "Kept out of the market by the risk limit" : "",
+                plan.by_role.satellite === undefined || plan.by_role.satellite < plan.mix.satellite - 0.005 ? "waiting for live ideas" : "",
+                "rounding"].filter(Boolean).join(", ").replace(/^./, (c) => c.toUpperCase())}</span></span><span className="pc-num">{money(plan.cash)}</span></div></li>}
             </ul>}
           </Card>
+
+          {plan.weighting && plan.weighting.summary.length > 0 && (
+            <Card title={<>Why these weights<Hint>Money is not the same as risk: 1,000 in a jumpy stock can move your plan as much as 3,000 in a calm one. So each pick gets the amount that makes its ups and downs count about equally, and each risk level has a limit on how much the whole plan may swing compared with the S&amp;P&nbsp;500. When the picks are too jumpy for that limit, money goes to the S&amp;P&nbsp;500 index first and only then to cash. Only past prices are used, never anything that happened after the plan date.</Hint></>}>
+              <div className="weights-why">
+                {plan.weighting.summary.map((s) => <p key={s}>{s}</p>)}
+              </div>
+              {plan.standard_mix && plan.weighting.budget_applied && (
+                <p className="muted small">Risk limit for {RISK_LABEL[plan.risk] ?? plan.risk}: {fmtNum(plan.weighting.target_x, 1)} times the S&amp;P&nbsp;500's swings.
+                  {" "}Picks {fmtNum(plan.mix.core * 100, 0)}% (standard {fmtNum(plan.standard_mix.core * 100, 0)}%), S&amp;P&nbsp;500 index {fmtNum(plan.mix.anchor * 100, 0)}% (standard {fmtNum(plan.standard_mix.anchor * 100, 0)}%).
+                  <Hint>"Swings" means volatility: how much the plan's value typically moves up and down in a year. 1.0 times means about as much as simply owning the S&amp;P&nbsp;500. The limit is a ceiling, judged on the past year and on the last 3 months, whichever is jumpier; a calmer plan is left as it is.</Hint></p>
+              )}
+            </Card>
+          )}
 
           <RiskCard risk={plan.risk_view} />
 
@@ -148,10 +164,14 @@ export default function Portfolio() {
             <details className="customize">
               <summary>Track record of this mix<span className="muted small"> · since {fmtDay(t.start)}: {fmtPct(t["cagr_%"], 1)}/yr vs S&amp;P 500 {fmtPct(t["spy_cagr_%"], 1)}/yr</span></summary>
               <dl className="kv">
-                <dt>Yearly return (picks + index part)</dt><dd>{fmtPct(t["cagr_%"], 1)} <span className="muted">vs {fmtPct(t["spy_cagr_%"], 1)}</span></dd>
-                <dt>Worst drop</dt><dd>{fmtPct(t["max_drawdown_%"], 1)} <span className="muted">vs {fmtPct(t["spy_max_drawdown_%"], 1)}</span></dd>
+                <dt>Yearly return<Hint>Average growth per year, dividends included, after trading costs. The live-ideas part counts as cash earning nothing.</Hint></dt><dd>{fmtPct(t["cagr_%"], 1)} <span className="muted">vs {fmtPct(t["spy_cagr_%"], 1)}</span></dd>
+                {t["volatility_%"] !== undefined && <><dt>Yearly swings<Hint>Volatility: how much the value typically moved up and down in a year. This is what the risk limit controls.</Hint></dt><dd>{fmtPct(t["volatility_%"], 1, false)} <span className="muted">vs {fmtPct(t["spy_volatility_%"], 1, false)}</span></dd></>}
+                {t["month_1in20_%"] !== undefined && <><dt>Bad month (1 in 20)<Hint>The loss that was exceeded in only 1 month out of 20.</Hint></dt><dd>{fmtPct(t["month_1in20_%"], 1)} <span className="muted">vs {fmtPct(t["spy_month_1in20_%"], 1)}</span></dd></>}
+                <dt>Worst drop<Hint>The biggest fall from a high point to a later low point.</Hint></dt><dd>{fmtPct(t["max_drawdown_%"], 1)} <span className="muted">vs {fmtPct(t["spy_max_drawdown_%"], 1)}</span></dd>
               </dl>
-              <p className="muted small">Backtest of the picks and index parts rebalanced daily; live ideas and cash are not included. It uses today's S&amp;P 500 members, which flatters the past (survivorship bias). Not a promise of future returns.</p>
+              {t.method === "plan"
+                ? <p className="muted small">Backtest of this risk level's picks and index parts, rebuilt every month with the same rules as today (weights by risk, risk limit), using only prices known at the time, trading at the next day's open with 0.10% costs. Stocks only count from the day they joined the S&amp;P&nbsp;500, but companies that later left it are missing, which still flatters the past. Live ideas cannot be replayed, so their share counts as cash. Not a promise of future returns.</p>
+                : <p className="muted small">Rough estimate while the full backtest is being computed: the equal-weight picks and the index with today's mix, rebalanced daily; live ideas and cash earn nothing. Not a promise of future returns.</p>}
             </details>
           )}
           <p className="caveat">This plan is generated by rules from market data. It is information, not personal advice. Review it monthly, keep the stop-losses on live ideas, and only invest money you can leave invested for years.</p>

@@ -139,6 +139,30 @@ def compute_picks(market: MarketData, body: PicksRequest, ew_cache: dict | None 
     })
 
 
+def compute_plan_track(market: MarketData, start: str = PicksRequest().start) -> dict:
+    """Walk-forward backtest of each risk level's lasting part (picks + index, rebuilt monthly with the
+    app's own risk-aware rules, point-in-time members, next-open fills, 10 bps costs). Live ideas earn 0."""
+    from ..plan_backtest import level_stats, run_plan_backtest
+    from ..portfolio import RISK_LEVELS
+
+    fetch_start = (pd.Timestamp(start) - pd.Timedelta(days=400)).date().isoformat()
+    frames = market.history_many("yahoo", sp500_symbols(), "1d", start=fetch_start)  # same cache as the picks
+    bench = market.history("yahoo", "SPY", "1d", start=fetch_start)
+    out = {}
+    for risk in RISK_LEVELS:
+        res = run_plan_backtest(frames, bench, risk, risk_aware=True, start=start)
+        b = res["benchmark"]
+        spy = level_stats(b, b)
+        st = res["stats"]
+        out[risk] = {"start": res["equity"].index[0].date().isoformat(),
+                     **{k: st[k] for k in ("cagr_%", "volatility_%", "max_drawdown_%", "sharpe", "month_1in20_%",
+                                           "months_beating_spy_%", "turnover_per_year_%", "vol_x_spy")},
+                     "spy_cagr_%": spy["cagr_%"], "spy_volatility_%": spy["volatility_%"],
+                     "spy_max_drawdown_%": spy["max_drawdown_%"], "spy_sharpe": spy["sharpe"],
+                     "spy_month_1in20_%": spy["month_1in20_%"]}
+    return ser.clean(out)
+
+
 def market_mood(market: MarketData, breadth_pct: float | None) -> dict:
     """S&P 500 trend + breadth + volatility (VIX) summarized as one label with a plain explanation."""
     spy = market.history("yahoo", "SPY", "1d", limit=260)

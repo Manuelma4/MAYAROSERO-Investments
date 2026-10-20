@@ -153,9 +153,20 @@ export interface PortfolioPlan {
   currency: "EUR" | "USD"; fx_usd_per_unit: number; risk: string; amount: number; lines: PlanLine[]; cash: number;
   by_role: Record<string, number>; by_sector: Record<string, number>;
   risk_metrics: Partial<Record<"volatility_%" | "spy_volatility_%" | "beta" | "return_1y_%" | "spy_return_1y_%" | "max_drawdown_1y_%" | "spy_max_drawdown_1y_%", number>>;
-  track_record: { start: string; "cagr_%": number; "spy_cagr_%": number; "max_drawdown_%": number; "spy_max_drawdown_%": number };
+  track_record: PlanTrack;
   changes: Changes | null; core_risk_off: boolean; as_of: string; mix: Record<string, number>;
+  standard_mix?: Record<string, number>;
+  weighting?: PlanWeighting;
   risk_view?: PortfolioRiskView;
+}
+export interface PlanTrack {
+  start: string; method?: "plan" | "approx"; "cagr_%": number; "spy_cagr_%": number; "max_drawdown_%": number; "spy_max_drawdown_%": number;
+  "volatility_%"?: number; "spy_volatility_%"?: number; "month_1in20_%"?: number; "spy_month_1in20_%"?: number;
+  sharpe?: number; spy_sharpe?: number; "months_beating_spy_%"?: number; "turnover_per_year_%"?: number;
+}
+export interface PlanWeighting {
+  method: "equal_risk" | "inverse_volatility"; target_x: number; budget_applied: boolean; summary: string[];
+  x_spy?: number; x_spy_start?: number; to_cash?: number; moved_to_index?: number;
 }
 
 export interface MonthLoss { "loss_95_%": number; loss_95: number; "loss_99_%": number; loss_99: number; "avg_worst_5_%": number | null; p_loss_10: number; p_gain: number; "median_%": number }

@@ -309,6 +309,16 @@ def test_portfolio_endpoint(client):
     assert abs(invested + d["cash"] - 10000) < 1e-6
     assert all(v <= 0.25 + 1e-6 for v in d["by_sector"].values())
     assert {"cagr_%", "spy_cagr_%"} <= set(d["track_record"])
+    assert d["track_record"]["method"] == "plan" and "month_1in20_%" in d["track_record"]   # walk-forward backtest
+    # synthetic stocks are mostly below their 200-day average: make the top 12 eligible to exercise risk weights
+    picks = pre.get("picks:quality_momentum")
+    for r in picks["ranking"][:12]:
+        r["eligible"] = True
+    d = client.post("/api/portfolio", json={"amount": 10000, "currency": "USD", "risk": "balanced"}).json()
+    assert [l for l in d["lines"] if l["role"] == "core"]
+    w = d["weighting"]
+    assert w["method"] == "equal_risk" and w["budget_applied"] and w["x_spy"] <= w["target_x"] + 1e-6
+    assert d["mix"]["core"] <= d["standard_mix"]["core"] + 1e-9 and w["summary"]
     r = d["risk_view"]
     assert r["status"] == "ok" and r["currency"] == "USD" and not r["currency_risk"]
     assert r["month"]["plan"]["loss_99"] > r["month"]["plan"]["loss_95"] > 0 and r["month"]["spy"]["loss_95"] > 0

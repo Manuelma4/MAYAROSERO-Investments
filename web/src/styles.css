@@ -643,6 +643,8 @@ tbody tr:hover { background: var(--surface-2); }
 .risk-summary { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-width: 760px; }
 .risk-summary p { margin: 0; font-size: 14px; line-height: 1.6; }
 .risk-summary p:first-child { font-size: 16px; color: var(--text); }
+.weights-why { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-width: 760px; }
+.weights-why p { margin: 0; font-size: 14px; line-height: 1.6; }
 .risk-table td:first-child { white-space: normal; color: var(--text-2); }
 .risk-table td:not(:first-child), .risk-table th:not(:first-child) { text-align: right; }
 .risk-chart { margin: 20px 0 16px; }

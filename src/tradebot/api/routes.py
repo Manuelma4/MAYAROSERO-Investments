@@ -190,9 +190,16 @@ def _portfolio(st, body: PortfolioRequest) -> dict:
     spy_price = st.market.quote("SPY").get("price")
     candidates = [r for r in core["ranking"] if r["eligible"]]
     ideas = (st.precompute.get("opportunities") or {}).get("items", [])
+    # Risk-aware weights need the candidates' past year of daily closes (cached, latest close at most).
+    hist = None
+    if candidates and not core["risk_off"]:
+        try:
+            hist = _daily_closes(st, [c["symbol"] for c in candidates[:40]])
+        except Exception:  # without history: inverse-volatility weights and the standard mix
+            hist = None
     try:
         plan = build_plan(amount_usd, body.risk, candidates, core["risk_off"], ideas, spy_price,
-                          fractional=body.fractional)
+                          fractional=body.fractional, closes=hist if hist is not None and "SPY" in hist else None)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -209,18 +216,23 @@ def _portfolio(st, body: PortfolioRequest) -> dict:
     risk_block = _risk_block(st, closes, lasting, {l.symbol: l.sector for l in plan.lines}, body.amount,
                              body.currency, sum(l.invested for l in sats) / amount_usd, stop_loss or None)
 
-    # Honest track record of the core + anchor mix (satellite ideas are not included).
-    c_share, _, a_share = RISK_LEVELS[body.risk]
-    eq = pd.Series({p["time"]: p["value"] for p in core["equity"]})
-    bm = pd.Series({p["time"]: p["value"] for p in core["benchmark"]})
-    r = (c_share * eq.pct_change() + a_share * bm.pct_change()).fillna(0) if not core["risk_off"] else bm.pct_change() * a_share
-    blend = (1 + r.fillna(0)).cumprod()
-    years = max((eq.index[-1] - eq.index[0]) / 86400 / 365.25, 1e-9)
-    track = {"start": core["stats"].get("start"),
-             "cagr_%": float((blend.iloc[-1] ** (1 / years) - 1) * 100),
-             "spy_cagr_%": float(((bm.iloc[-1] / bm.iloc[0]) ** (1 / years) - 1) * 100),
-             "max_drawdown_%": float((blend / blend.cummax() - 1).min() * 100),
-             "spy_max_drawdown_%": float((bm / bm.cummax() - 1).min() * 100)}
+    # Track record: walk-forward backtest of this risk level with the same rules (precomputed). Until it is
+    # ready, an approximation from the equal-weight picks with today's mix, labelled "approx".
+    track = (st.precompute.get("plan_track") or {}).get(body.risk)
+    if track is not None:
+        track = {**track, "method": "plan"}
+    else:
+        c_share, a_share = plan.mix.get("core", 0.0), plan.mix.get("anchor", 0.0)
+        eq = pd.Series({p["time"]: p["value"] for p in core["equity"]})
+        bm = pd.Series({p["time"]: p["value"] for p in core["benchmark"]})
+        r = (c_share * eq.pct_change() + a_share * bm.pct_change()).fillna(0)
+        blend = (1 + r).cumprod()
+        years = max((eq.index[-1] - eq.index[0]) / 86400 / 365.25, 1e-9)
+        track = {"start": core["stats"].get("start"), "method": "approx",
+                 "cagr_%": float((blend.iloc[-1] ** (1 / years) - 1) * 100),
+                 "spy_cagr_%": float(((bm.iloc[-1] / bm.iloc[0]) ** (1 / years) - 1) * 100),
+                 "max_drawdown_%": float((blend / blend.cummax() - 1).min() * 100),
+                 "spy_max_drawdown_%": float((bm / bm.cummax() - 1).min() * 100)}
 
     def money(x):
         return None if x is None else x / fx
@@ -231,7 +243,8 @@ def _portfolio(st, body: PortfolioRequest) -> dict:
         "cash": money(plan.cash), "by_role": plan.by_role(), "by_sector": plan.by_sector(),
         "risk_metrics": risk, "risk_view": risk_block, "track_record": track, "changes": core.get("changes"),
         "core_risk_off": core["risk_off"], "as_of": core["as_of"],
-        "mix": dict(zip(("core", "satellite", "anchor"), RISK_LEVELS[body.risk])),
+        "mix": plan.mix, "standard_mix": dict(zip(("core", "satellite", "anchor"), RISK_LEVELS[body.risk])),
+        "weighting": {k: v for k, v in plan.weighting.items() if k != "risk_shares"},
     })
 
 
