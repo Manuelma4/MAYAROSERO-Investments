@@ -50,7 +50,7 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
       </section>}
 
       <div className="grid-3">
-        <Card className="span-2" title={<>What to hold now<Hint>The engine's current top picks among the S&amp;P 500 leaders: strong 12-month performance, beating the index, in an uptrend, with calmer price action. Split your money equally between them and review once a month.</Hint></>}
+        <Card className="span-2" title={<>What to hold now<Hint>The engine's current top picks among the S&amp;P 500 stocks: strong 12-month performance, beating the index, in an uptrend, with calmer price action. Split your money equally between them and review once a month.</Hint></>}
           actions={<Link to="/picks" className="link">All picks</Link>}>
           {!core ? <Empty>Picks are being computed.</Empty> : core.risk_off ? (
             <div className="notice">The S&amp;P 500 is in a downtrend, so the engine suggests holding cash until it recovers.</div>
@@ -87,11 +87,11 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
       </div>
 
       <div className="grid-2">
-        <Card title={<>Rising most today<Hint>The S&amp;P 500 leaders up the most today. A big jump is information, not a buy signal on its own: moves backed by news tend to continue, moves without news often fade.</Hint></>}>
+        <Card title={<>Rising most today<Hint>The S&amp;P 500 stocks up the most today. A big jump is information, not a buy signal on its own: moves backed by news tend to continue, moves without news often fade.</Hint></>}>
           <ul className="movers">{t.gainers.map((q) => (
             <li key={q.symbol}><Link to={stockPath(q.symbol)}>{q.symbol} <span className="muted small">{q.name ?? marketName(q.symbol)}</span></Link><span className="up">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
         </Card>
-        <Card title={<>Falling most today<Hint>The S&amp;P 500 leaders down the most today. If one of your picks is here, check its stop-loss rather than reacting to one day.</Hint></>}>
+        <Card title={<>Falling most today<Hint>The S&amp;P 500 stocks down the most today. If one of your picks is here, check its stop-loss rather than reacting to one day.</Hint></>}>
           <ul className="movers">{t.losers.map((q) => (
             <li key={q.symbol}><Link to={stockPath(q.symbol)}>{q.symbol} <span className="muted small">{q.name ?? marketName(q.symbol)}</span></Link><span className="down">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
         </Card>

@@ -187,9 +187,11 @@ def prediction_reason(f: pd.Series) -> str:
 def compute_predictions(market: MarketData, horizon: int = 5, symbols: list[str] | None = None) -> dict:
     from ..ml.features import build_features
     from ..ml.ranker import rank_universe
-    from ..universe import STOCKS, by_symbol
+    from ..universe import CURATED, by_symbol
 
-    symbols = symbols or [s.symbol for s in STOCKS if "." not in s.symbol]
+    # Default: the curated US list (~130). The full ~510-stock universe makes the ranker's
+    # walk-forward fits take ~20 min per horizon (2+ GB RAM); it stays available on request.
+    symbols = symbols or [s.symbol for s in CURATED if "." not in s.symbol]
     frames = market.history_many("yahoo", symbols, "1d", start="2017-01-01")
     if len(frames) < 20:
         raise ServiceError(502, f"Only {len(frames)} stocks could be loaded; need at least 20 to rank them.")

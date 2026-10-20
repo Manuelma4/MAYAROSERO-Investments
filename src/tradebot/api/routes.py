@@ -336,7 +336,7 @@ def pick_verdict(symbol: str, core: dict | None) -> dict:
     pos = next((i for i, r in enumerate(ranking) if r["symbol"] == symbol), None)
     picks = {p["symbol"] for p in core.get("picks", [])}
     if pos is None:
-        return {"status": "not_covered", "text": "Not covered by the monthly engine, which ranks the S&P 500 leaders list."}
+        return {"status": "not_covered", "text": "Not covered by the monthly engine, which ranks the S&P 500 members (US stocks only)."}
     r = ranking[pos]
     if core.get("risk_off"):
         return {"status": "risk_off", "rank": pos + 1,
@@ -415,7 +415,8 @@ async def ai_analyze(request: Request, symbol: str = Query(..., max_length=20)):
 
 @router.get("/quotes")
 def quotes(request: Request, symbols: str = Query(..., max_length=8000), exchange: str = "binance"):
-    syms = list(dict.fromkeys(s.strip() for s in symbols.split(",") if s.strip()))[:400]
+    # Discover asks for the whole universe at once (~520 stocks + crypto), batched server-side.
+    syms = list(dict.fromkeys(s.strip() for s in symbols.split(",") if s.strip()))[:800]
     return ser.clean(_state(request).market.quotes(syms, exchange))
 
 

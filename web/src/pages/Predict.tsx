@@ -61,7 +61,7 @@ export default function Predict() {
   return (
     <div className="page">
       <section className="hero-x">
-        <p className="eyebrow">Predictions · ranked {res ? `on ${res.as_of}` : "daily"} · {res?.universe_size ?? "~140"} stocks</p>
+        <p className="eyebrow">Predictions · ranked {res ? `on ${res.as_of}` : "daily"} · {res?.universe_size ?? "~130"} stocks</p>
         <h1 className="display">Predict</h1>
         <p className="muted lead">Which stocks are likely to do better, or worse, than the others over the coming days. A machine-learning model ranks them every day, the way quant funds do. Tap a stock to see its simulated price range.</p>
         <div className="segmented" role="radiogroup" aria-label="Time horizon">
@@ -70,11 +70,11 @@ export default function Predict() {
       </section>
 
       <details className="customize">
-        <summary>Customize<span className="muted small"> · {count} per list · {dir === "both" ? "rises and falls" : dir === "up" ? "rises only" : "falls only"} · {universe === "us" ? "US stocks" : universe === "sp500" ? "S&P 500 leaders" : "my list"}</span></summary>
+        <summary>Customize<span className="muted small"> · {count} per list · {dir === "both" ? "rises and falls" : dir === "up" ? "rises only" : "falls only"} · {universe === "us" ? "US stocks" : universe === "sp500" ? "S&P 500" : "my list"}</span></summary>
         <form className="form" onSubmit={(e) => { e.preventDefault(); run(); }}>
           <Field label="Stocks to show"><select id="pr-count" value={count} onChange={(e) => setCount(Number(e.target.value))}>{[5, 10, 20, 50].map((n) => <option key={n}>{n}</option>)}</select></Field>
           <Field label="Direction"><select id="pr-dir" value={dir} onChange={(e) => setDir(e.target.value as typeof dir)}><option value="both">Rises and falls</option><option value="up">Rises only</option><option value="down">Falls only</option></select></Field>
-          <Field label="Market"><select id="pr-uni" value={universe} onChange={(e) => setUniverse(e.target.value as typeof universe)}><option value="us">US stocks (default)</option><option value="sp500">S&amp;P 500 leaders</option><option value="custom">My own list</option></select></Field>
+          <Field label="Market"><select id="pr-uni" value={universe} onChange={(e) => setUniverse(e.target.value as typeof universe)}><option value="us">US stocks (default)</option><option value="sp500">S&amp;P 500 only</option><option value="custom">My own list</option></select></Field>
           {universe === "custom" && <Field label="Tickers (20 or more)" wide><input id="pr-syms" value={custom} onChange={(e) => setCustom(e.target.value.toUpperCase())} placeholder="AAPL, MSFT, NVDA, …" /></Field>}
           <button className="btn primary" disabled={busy || (STATIC && universe !== "us")}>{busy ? <><Spinner /> Ranking</> : "Update"}</button>
         </form>

@@ -61,7 +61,10 @@ export default function Discover() {
   const visible = q ? all.filter((s) => s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q) || s.industry.toLowerCase().includes(q)) : current?.stocks ?? [];
 
   // One batched request for every symbol in the universe (cached server-side), refreshed every minute.
-  const { quotes } = useQuotes(all.map((s) => s.symbol), 60_000);
+  // Group tiles need every quote (refreshed every 5 min); the cards on screen refresh every minute.
+  const { quotes: allQuotes } = useQuotes(all.map((s) => s.symbol), 300_000);
+  const { quotes: onScreen } = useQuotes(visible.slice(0, 200).map((s) => s.symbol), 60_000);
+  const quotes = useMemo(() => ({ ...allQuotes, ...onScreen }), [allQuotes, onScreen]);
 
   const setMode = (m: Mode) => setParams({ by: m });
   const setGroup = (g: string) => setParams({ by: mode, g });

@@ -81,7 +81,7 @@ export default function Picks() {
       <section className="hero-x">
         <p className="eyebrow">{STATIC ? "Picks" : "Live picks"} · next rebalance {nextRebalance(rebalance)}</p>
         <h1 className="display">Beat the S&amp;P&nbsp;500</h1>
-        <p className="muted lead">The stocks to hold right now: the S&amp;P&nbsp;500 leaders with the strongest momentum, trend and relative strength today, ranked by the engine and refreshed with live prices.</p>
+        <p className="muted lead">The stocks to hold right now: the S&amp;P&nbsp;500 stocks with the strongest momentum, trend and relative strength today, ranked by the engine and refreshed with live prices.</p>
         <div className="segmented wrap" role="radiogroup" aria-label="Strategy">
           {PRESETS.map((p) => (
             <button key={p.id} role="radio" aria-checked={preset === p.id} className={preset === p.id ? "active" : ""} onClick={() => setPreset(p.id)}>{p.label}</button>))}
@@ -107,7 +107,7 @@ export default function Picks() {
         </ul>
       </details>
       <ErrorBox error={error} />
-      {loading && !res && <div className="empty"><Spinner /> Ranking ~120 S&amp;P 500 leaders on today's prices…</div>}
+      {loading && !res && <div className="empty"><Spinner /> Ranking the ~500 S&amp;P 500 stocks on today's prices…</div>}
 
       {res?.changes?.date && (
         <Card title={<>Changes at the last review · {res.changes.date}<Hint>What changed at the last completed review: buy the new names, sell the ones that dropped out, keep the rest. Reviews happen at the end of each period; the ranking below is today's and becomes official at the next review.</Hint></>}>
@@ -227,7 +227,7 @@ export default function Picks() {
                 <LinesChart series={curves} height={340} log />
               </Card>
               <p className="caveat">
-                <strong>Read this before investing.</strong> The universe is today's S&amp;P 500 leaders ({res.universe_size} companies), so the test carries survivorship bias: companies that fell out of the index are missing, which flatters past results. The orange line holds those same stocks with no selection; the gap to it ("selection skill") is the most honest measure of the engine. Costs of 0.10% per trade are included; taxes are not. This is research, not financial advice.
+                <strong>Read this before investing.</strong> The universe is today's S&amp;P 500 members ({res.universe_size} companies), so the test carries survivorship bias: companies that fell out of the index are missing, which flatters past results. The orange line holds those same stocks with no selection; the gap to it ("selection skill") is the most honest measure of the engine. Costs of 0.10% per trade are included; taxes are not. This is research, not financial advice.
               </p>
             </div>
           )}

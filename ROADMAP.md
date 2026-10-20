@@ -68,7 +68,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 1. [x] **Stock detail page** `/stock/:symbol`: price header, chart, key stats (market cap, P/E,
        dividend yield, 52-week range, sector), engine score and factor breakdown, "why / why not
        a pick", similar stocks. Link every symbol in the app to it.
-2. [ ] **Full S&P 500 universe**: load all ~500 constituents (bundled list with sector, refreshable),
+2. [x] **Full S&P 500 universe**: load all ~500 constituents (bundled list with sector, refreshable),
        picker and Discover use it; keep curated themes.
 3. [x] **Watchlists and custom price alerts**: create / edit lists, price-above / below and
        % move alerts stored in SQLite, checked by the live engine, delivered via notifiers + bell.

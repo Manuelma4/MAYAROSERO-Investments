@@ -150,7 +150,7 @@ def evaluate(symbol: str, name: str, daily: pd.DataFrame, today_volume: float, l
 
 
 class OpportunityScanner:
-    """Scans US large caps (S&P 500 leaders + popular US-listed) and major crypto."""
+    """Scans US large caps (the S&P 500 + popular US-listed) and major crypto."""
 
     def __init__(self, market, news=None, rules: OpportunityRules | None = None, crypto: bool = True):
         from .news import NewsSource

@@ -1,0 +1,500 @@
+symbol,name,sector,industry
+AAPL,Apple,Information Technology,Consumer electronics
+MSFT,Microsoft,Information Technology,Software
+NVDA,NVIDIA,Information Technology,Semiconductors
+AVGO,Broadcom,Information Technology,Semiconductors
+ORCL,Oracle,Information Technology,Software
+CRM,Salesforce,Information Technology,Software
+ADBE,Adobe,Information Technology,Software
+AMD,AMD,Information Technology,Semiconductors
+CSCO,Cisco,Information Technology,Networking
+ACN,Accenture,Information Technology,IT services
+IBM,IBM,Information Technology,IT services
+INTU,Intuit,Information Technology,Software
+NOW,ServiceNow,Information Technology,Software
+TXN,Texas Instruments,Information Technology,Semiconductors
+QCOM,Qualcomm,Information Technology,Semiconductors
+AMAT,Applied Materials,Information Technology,Semiconductor equipment
+MU,Micron,Information Technology,Semiconductors
+LRCX,Lam Research,Information Technology,Semiconductor equipment
+KLAC,KLA,Information Technology,Semiconductor equipment
+ADI,Analog Devices,Information Technology,Semiconductors
+INTC,Intel,Information Technology,Semiconductors
+PANW,Palo Alto Networks,Information Technology,Cybersecurity
+CRWD,CrowdStrike,Information Technology,Cybersecurity
+ANET,Arista Networks,Information Technology,Networking
+SNPS,Synopsys,Information Technology,Software
+CDNS,Cadence Design,Information Technology,Software
+PLTR,Palantir,Information Technology,Software
+DELL,Dell Technologies,Information Technology,Hardware
+SMCI,Super Micro Computer,Information Technology,Hardware
+APH,Amphenol,Information Technology,Electronic components
+MSI,Motorola Solutions,Information Technology,Communications equipment
+ADSK,Autodesk,Information Technology,Software
+ROP,Roper Technologies,Information Technology,Software
+FTNT,Fortinet,Information Technology,Cybersecurity
+WDAY,Workday,Information Technology,Software
+NXPI,NXP Semiconductors,Information Technology,Semiconductors
+MCHP,Microchip Technology,Information Technology,Semiconductors
+MPWR,Monolithic Power Systems,Information Technology,Semiconductors
+ON,ON Semiconductor,Information Technology,Semiconductors
+TEL,TE Connectivity,Information Technology,Electronic components
+GLW,Corning,Information Technology,Electronic components
+IT,Gartner,Information Technology,IT services
+CTSH,Cognizant,Information Technology,IT services
+HPQ,HP,Information Technology,Hardware
+HPE,Hewlett Packard Enterprise,Information Technology,Hardware
+KEYS,Keysight Technologies,Information Technology,Electronic instruments
+FICO,Fair Isaac,Information Technology,Software
+TYL,Tyler Technologies,Information Technology,Software
+PTC,PTC,Information Technology,Software
+CDW,CDW,Information Technology,IT services
+NTAP,NetApp,Information Technology,Hardware
+STX,Seagate Technology,Information Technology,Hardware
+WDC,Western Digital,Information Technology,Hardware
+SNDK,Sandisk,Information Technology,Hardware
+TER,Teradyne,Information Technology,Semiconductor equipment
+Q,Qnity Electronics,Information Technology,Semiconductor materials
+TDY,Teledyne Technologies,Information Technology,Electronic instruments
+ZBRA,Zebra Technologies,Information Technology,Electronic equipment
+TRMB,Trimble,Information Technology,Electronic instruments
+VRSN,VeriSign,Information Technology,IT services
+AKAM,Akamai,Information Technology,IT services
+FFIV,F5,Information Technology,Networking
+GEN,Gen Digital,Information Technology,Cybersecurity
+JBL,Jabil,Information Technology,Electronic manufacturing
+EPAM,EPAM Systems,Information Technology,IT services
+SWKS,Skyworks Solutions,Information Technology,Semiconductors
+FSLR,First Solar,Information Technology,Solar
+GDDY,GoDaddy,Information Technology,IT services
+DDOG,Datadog,Information Technology,Software
+APP,AppLovin,Information Technology,Software
+GOOGL,Alphabet,Communication Services,Internet
+GOOG,Alphabet (Class C),Communication Services,Internet
+META,Meta Platforms,Communication Services,Internet
+NFLX,Netflix,Communication Services,Streaming
+DIS,Walt Disney,Communication Services,Entertainment
+CMCSA,Comcast,Communication Services,Media
+T,AT&T,Communication Services,Telecom
+VZ,Verizon,Communication Services,Telecom
+TMUS,T-Mobile US,Communication Services,Telecom
+CHTR,Charter Communications,Communication Services,Cable
+TTWO,Take-Two Interactive,Communication Services,Video games
+OMC,Omnicom,Communication Services,Advertising
+LYV,Live Nation,Communication Services,Entertainment
+FOXA,Fox Corp (Class A),Communication Services,Media
+FOX,Fox Corp (Class B),Communication Services,Media
+NWSA,News Corp (Class A),Communication Services,Media
+NWS,News Corp (Class B),Communication Services,Media
+MTCH,Match Group,Communication Services,Internet
+PARA,Paramount Skydance,Communication Services,Entertainment
+TKO,TKO Group,Communication Services,Entertainment
+TTD,The Trade Desk,Communication Services,Advertising technology
+AMZN,Amazon,Consumer Discretionary,E-commerce
+TSLA,Tesla,Consumer Discretionary,Automobiles
+HD,Home Depot,Consumer Discretionary,Home improvement
+MCD,McDonald's,Consumer Discretionary,Restaurants
+NKE,Nike,Consumer Discretionary,Apparel
+SBUX,Starbucks,Consumer Discretionary,Restaurants
+LOW,Lowe's,Consumer Discretionary,Home improvement
+BKNG,Booking Holdings,Consumer Discretionary,Travel
+ABNB,Airbnb,Consumer Discretionary,Travel
+UBER,Uber,Consumer Discretionary,Mobility
+CMG,Chipotle,Consumer Discretionary,Restaurants
+TJX,TJX Companies,Consumer Discretionary,Retail
+GM,General Motors,Consumer Discretionary,Automobiles
+F,Ford,Consumer Discretionary,Automobiles
+ORLY,O'Reilly Automotive,Consumer Discretionary,Auto parts retail
+AZO,AutoZone,Consumer Discretionary,Auto parts retail
+MAR,Marriott,Consumer Discretionary,Hotels
+HLT,Hilton,Consumer Discretionary,Hotels
+RCL,Royal Caribbean,Consumer Discretionary,Cruise lines
+CCL,Carnival,Consumer Discretionary,Cruise lines
+NCLH,Norwegian Cruise Line,Consumer Discretionary,Cruise lines
+ROST,Ross Stores,Consumer Discretionary,Retail
+DHI,D.R. Horton,Consumer Discretionary,Homebuilding
+LEN,Lennar,Consumer Discretionary,Homebuilding
+PHM,PulteGroup,Consumer Discretionary,Homebuilding
+NVR,NVR,Consumer Discretionary,Homebuilding
+YUM,Yum! Brands,Consumer Discretionary,Restaurants
+DRI,Darden Restaurants,Consumer Discretionary,Restaurants
+DPZ,Domino's Pizza,Consumer Discretionary,Restaurants
+LULU,Lululemon,Consumer Discretionary,Apparel
+DECK,Deckers Brands,Consumer Discretionary,Footwear
+TPR,Tapestry,Consumer Discretionary,Luxury goods
+RL,Ralph Lauren,Consumer Discretionary,Apparel
+GRMN,Garmin,Consumer Discretionary,Consumer electronics
+EBAY,eBay,Consumer Discretionary,E-commerce
+EXPE,Expedia,Consumer Discretionary,Travel
+LVS,Las Vegas Sands,Consumer Discretionary,Casinos
+WYNN,Wynn Resorts,Consumer Discretionary,Casinos
+MGM,MGM Resorts,Consumer Discretionary,Casinos
+POOL,Pool Corp,Consumer Discretionary,Distribution
+BBY,Best Buy,Consumer Discretionary,Retail
+ULTA,Ulta Beauty,Consumer Discretionary,Retail
+TSCO,Tractor Supply,Consumer Discretionary,Retail
+GPC,Genuine Parts,Consumer Discretionary,Auto parts
+LKQ,LKQ,Consumer Discretionary,Auto parts
+KMX,CarMax,Consumer Discretionary,Auto retail
+CVNA,Carvana,Consumer Discretionary,Auto retail
+APTV,Aptiv,Consumer Discretionary,Auto parts
+HAS,Hasbro,Consumer Discretionary,Toys
+MHK,Mohawk Industries,Consumer Discretionary,Home furnishings
+DASH,DoorDash,Consumer Discretionary,Delivery
+WSM,Williams-Sonoma,Consumer Discretionary,Retail
+WMT,Walmart,Consumer Staples,Retail
+COST,Costco,Consumer Staples,Retail
+PG,Procter & Gamble,Consumer Staples,Household products
+KO,Coca-Cola,Consumer Staples,Beverages
+PEP,PepsiCo,Consumer Staples,Beverages
+PM,Philip Morris,Consumer Staples,Tobacco
+MO,Altria,Consumer Staples,Tobacco
+MDLZ,Mondelez,Consumer Staples,Food
+CL,Colgate-Palmolive,Consumer Staples,Household products
+TGT,Target,Consumer Staples,Retail
+KMB,Kimberly-Clark,Consumer Staples,Household products
+GIS,General Mills,Consumer Staples,Food
+KHC,Kraft Heinz,Consumer Staples,Food
+HSY,Hershey,Consumer Staples,Food
+KDP,Keurig Dr Pepper,Consumer Staples,Beverages
+MNST,Monster Beverage,Consumer Staples,Beverages
+STZ,Constellation Brands,Consumer Staples,Beverages
+KR,Kroger,Consumer Staples,Grocery
+SYY,Sysco,Consumer Staples,Food distribution
+ADM,Archer-Daniels-Midland,Consumer Staples,Agriculture
+KVUE,Kenvue,Consumer Staples,Personal care
+CHD,Church & Dwight,Consumer Staples,Household products
+CLX,Clorox,Consumer Staples,Household products
+MKC,McCormick,Consumer Staples,Food
+HRL,Hormel Foods,Consumer Staples,Food
+CPB,Campbell's,Consumer Staples,Food
+CAG,Conagra Brands,Consumer Staples,Food
+SJM,J.M. Smucker,Consumer Staples,Food
+TSN,Tyson Foods,Consumer Staples,Food
+TAP,Molson Coors,Consumer Staples,Beverages
+BF-B,Brown-Forman,Consumer Staples,Beverages
+EL,Estee Lauder,Consumer Staples,Personal care
+DG,Dollar General,Consumer Staples,Retail
+DLTR,Dollar Tree,Consumer Staples,Retail
+BG,Bunge,Consumer Staples,Agriculture
+LW,Lamb Weston,Consumer Staples,Food
+LLY,Eli Lilly,Health Care,Pharmaceuticals
+UNH,UnitedHealth,Health Care,Health insurance
+JNJ,Johnson & Johnson,Health Care,Pharmaceuticals
+ABBV,AbbVie,Health Care,Pharmaceuticals
+MRK,Merck,Health Care,Pharmaceuticals
+PFE,Pfizer,Health Care,Pharmaceuticals
+TMO,Thermo Fisher,Health Care,Life sciences tools
+ABT,Abbott,Health Care,Medical devices
+ISRG,Intuitive Surgical,Health Care,Medical devices
+AMGN,Amgen,Health Care,Biotechnology
+GILD,Gilead,Health Care,Biotechnology
+VRTX,Vertex,Health Care,Biotechnology
+REGN,Regeneron,Health Care,Biotechnology
+BMY,Bristol-Myers Squibb,Health Care,Pharmaceuticals
+DHR,Danaher,Health Care,Life sciences tools
+MDT,Medtronic,Health Care,Medical devices
+SYK,Stryker,Health Care,Medical devices
+BSX,Boston Scientific,Health Care,Medical devices
+ELV,Elevance Health,Health Care,Health insurance
+CI,Cigna,Health Care,Health insurance
+CVS,CVS Health,Health Care,Health services
+HCA,HCA Healthcare,Health Care,Hospitals
+ZTS,Zoetis,Health Care,Animal health
+BDX,Becton Dickinson,Health Care,Medical devices
+MCK,McKesson,Health Care,Drug distribution
+COR,Cencora,Health Care,Drug distribution
+CAH,Cardinal Health,Health Care,Drug distribution
+EW,Edwards Lifesciences,Health Care,Medical devices
+IDXX,IDEXX Laboratories,Health Care,Diagnostics
+A,Agilent,Health Care,Life sciences tools
+IQV,IQVIA,Health Care,Life sciences services
+GEHC,GE HealthCare,Health Care,Medical devices
+RMD,ResMed,Health Care,Medical devices
+DXCM,Dexcom,Health Care,Medical devices
+MTD,Mettler-Toledo,Health Care,Life sciences tools
+BIIB,Biogen,Health Care,Biotechnology
+HUM,Humana,Health Care,Health insurance
+CNC,Centene,Health Care,Health insurance
+MOH,Molina Healthcare,Health Care,Health insurance
+WAT,Waters,Health Care,Life sciences tools
+STE,Steris,Health Care,Medical devices
+ZBH,Zimmer Biomet,Health Care,Medical devices
+WST,West Pharmaceutical,Health Care,Medical supplies
+COO,Cooper Companies,Health Care,Medical devices
+BAX,Baxter,Health Care,Medical devices
+ALGN,Align Technology,Health Care,Medical devices
+PODD,Insulet,Health Care,Medical devices
+LH,Labcorp,Health Care,Diagnostics
+DGX,Quest Diagnostics,Health Care,Diagnostics
+RVTY,Revvity,Health Care,Life sciences tools
+TECH,Bio-Techne,Health Care,Life sciences tools
+CRL,Charles River Laboratories,Health Care,Life sciences services
+INCY,Incyte,Health Care,Biotechnology
+MRNA,Moderna,Health Care,Biotechnology
+VTRS,Viatris,Health Care,Pharmaceuticals
+UHS,Universal Health Services,Health Care,Hospitals
+DVA,DaVita,Health Care,Health services
+HSIC,Henry Schein,Health Care,Medical distribution
+SOLV,Solventum,Health Care,Medical supplies
+BRK-B,Berkshire Hathaway,Financials,Conglomerate
+JPM,JPMorgan Chase,Financials,Banks
+BAC,Bank of America,Financials,Banks
+WFC,Wells Fargo,Financials,Banks
+GS,Goldman Sachs,Financials,Investment banking
+MS,Morgan Stanley,Financials,Investment banking
+C,Citigroup,Financials,Banks
+BLK,BlackRock,Financials,Asset management
+SCHW,Charles Schwab,Financials,Brokerage
+V,Visa,Financials,Payments
+MA,Mastercard,Financials,Payments
+AXP,American Express,Financials,Payments
+PYPL,PayPal,Financials,Payments
+SPGI,S&P Global,Financials,Financial data
+COIN,Coinbase,Financials,Crypto exchange
+CB,Chubb,Financials,Insurance
+MRSH,Marsh McLennan,Financials,Insurance brokers
+PGR,Progressive,Financials,Insurance
+CME,CME Group,Financials,Exchanges
+ICE,Intercontinental Exchange,Financials,Exchanges
+AON,Aon,Financials,Insurance brokers
+MCO,Moody's,Financials,Financial data
+USB,U.S. Bancorp,Financials,Banks
+PNC,PNC Financial,Financials,Banks
+TFC,Truist Financial,Financials,Banks
+COF,Capital One,Financials,Consumer finance
+AJG,Arthur J. Gallagher,Financials,Insurance brokers
+TRV,Travelers,Financials,Insurance
+AFL,Aflac,Financials,Insurance
+ALL,Allstate,Financials,Insurance
+MET,MetLife,Financials,Insurance
+PRU,Prudential Financial,Financials,Insurance
+AIG,AIG,Financials,Insurance
+BNY,BNY,Financials,Custody banks
+AMP,Ameriprise Financial,Financials,Asset management
+MSCI,MSCI,Financials,Financial data
+FIS,Fidelity National Information Services,Financials,Payments
+FISV,Fiserv,Financials,Payments
+GPN,Global Payments,Financials,Payments
+CPAY,Corpay,Financials,Payments
+JKHY,Jack Henry,Financials,Financial software
+NDAQ,Nasdaq,Financials,Exchanges
+HIG,Hartford,Financials,Insurance
+ACGL,Arch Capital,Financials,Insurance
+WTW,Willis Towers Watson,Financials,Insurance brokers
+BRO,Brown & Brown,Financials,Insurance brokers
+MTB,M&T Bank,Financials,Banks
+FITB,Fifth Third,Financials,Banks
+HBAN,Huntington Bancshares,Financials,Banks
+RF,Regions Financial,Financials,Banks
+KEY,KeyCorp,Financials,Banks
+CFG,Citizens Financial,Financials,Banks
+STT,State Street,Financials,Custody banks
+NTRS,Northern Trust,Financials,Custody banks
+TROW,T. Rowe Price,Financials,Asset management
+BEN,Franklin Resources,Financials,Asset management
+IVZ,Invesco,Financials,Asset management
+RJF,Raymond James,Financials,Brokerage
+CINF,Cincinnati Financial,Financials,Insurance
+L,Loews,Financials,Insurance
+EG,Everest Group,Financials,Reinsurance
+WRB,W.R. Berkley,Financials,Insurance
+PFG,Principal Financial,Financials,Insurance
+GL,Globe Life,Financials,Insurance
+AIZ,Assurant,Financials,Insurance
+ERIE,Erie Indemnity,Financials,Insurance
+SYF,Synchrony,Financials,Consumer finance
+CBOE,Cboe Global Markets,Financials,Exchanges
+FDS,FactSet,Financials,Financial data
+KKR,KKR,Financials,Asset management
+BX,Blackstone,Financials,Asset management
+APO,Apollo Global,Financials,Asset management
+XYZ,Block,Financials,Payments
+HOOD,Robinhood,Financials,Brokerage
+IBKR,Interactive Brokers,Financials,Brokerage
+GE,GE Aerospace,Industrials,Aerospace
+CAT,Caterpillar,Industrials,Machinery
+RTX,RTX,Industrials,Aerospace & defense
+LMT,Lockheed Martin,Industrials,Aerospace & defense
+NOC,Northrop Grumman,Industrials,Aerospace & defense
+GD,General Dynamics,Industrials,Aerospace & defense
+BA,Boeing,Industrials,Aerospace
+HON,Honeywell,Industrials,Conglomerate
+UNP,Union Pacific,Industrials,Railroads
+UPS,UPS,Industrials,Logistics
+DE,Deere,Industrials,Machinery
+ETN,Eaton,Industrials,Electrical equipment
+GEV,GE Vernova,Industrials,Electrical equipment
+ADP,ADP,Industrials,Payroll services
+PH,Parker-Hannifin,Industrials,Machinery
+TT,Trane Technologies,Industrials,Building products
+WM,Waste Management,Industrials,Waste services
+RSG,Republic Services,Industrials,Waste services
+ITW,Illinois Tool Works,Industrials,Machinery
+EMR,Emerson Electric,Industrials,Electrical equipment
+MMM,3M,Industrials,Conglomerate
+CSX,CSX,Industrials,Railroads
+NSC,Norfolk Southern,Industrials,Railroads
+FDX,FedEx,Industrials,Logistics
+TDG,TransDigm,Industrials,Aerospace & defense
+HWM,Howmet Aerospace,Industrials,Aerospace
+CTAS,Cintas,Industrials,Business services
+PCAR,Paccar,Industrials,Trucks
+CMI,Cummins,Industrials,Machinery
+JCI,Johnson Controls,Industrials,Building products
+CARR,Carrier Global,Industrials,Building products
+OTIS,Otis,Industrials,Machinery
+AME,Ametek,Industrials,Electrical equipment
+ROK,Rockwell Automation,Industrials,Electrical equipment
+FAST,Fastenal,Industrials,Industrial distribution
+GWW,W.W. Grainger,Industrials,Industrial distribution
+URI,United Rentals,Industrials,Equipment rental
+PWR,Quanta Services,Industrials,Construction & engineering
+VRSK,Verisk Analytics,Industrials,Data & analytics
+CPRT,Copart,Industrials,Business services
+ODFL,Old Dominion Freight,Industrials,Trucking
+PAYX,Paychex,Industrials,Payroll services
+LHX,L3Harris,Industrials,Aerospace & defense
+AXON,Axon Enterprise,Industrials,Aerospace & defense
+IR,Ingersoll Rand,Industrials,Machinery
+XYL,Xylem,Industrials,Machinery
+DOV,Dover,Industrials,Machinery
+FTV,Fortive,Industrials,Machinery
+VLTO,Veralto,Industrials,Water & environmental
+HUBB,Hubbell,Industrials,Electrical equipment
+WAB,Wabtec,Industrials,Machinery
+BR,Broadridge,Industrials,Business services
+LDOS,Leidos,Industrials,Government services
+HII,Huntington Ingalls,Industrials,Aerospace & defense
+TXT,Textron,Industrials,Aerospace & defense
+SNA,Snap-on,Industrials,Machinery
+SWK,Stanley Black & Decker,Industrials,Machinery
+PNR,Pentair,Industrials,Machinery
+IEX,IDEX,Industrials,Machinery
+NDSN,Nordson,Industrials,Machinery
+MAS,Masco,Industrials,Building products
+ALLE,Allegion,Industrials,Building products
+AOS,A.O. Smith,Industrials,Building products
+J,Jacobs Solutions,Industrials,Construction & engineering
+EFX,Equifax,Industrials,Data & analytics
+ROL,Rollins,Industrials,Business services
+DAL,Delta Air Lines,Industrials,Airlines
+UAL,United Airlines,Industrials,Airlines
+LUV,Southwest Airlines,Industrials,Airlines
+EXPD,Expeditors,Industrials,Logistics
+CHRW,C.H. Robinson,Industrials,Logistics
+JBHT,J.B. Hunt,Industrials,Trucking
+LII,Lennox,Industrials,Building products
+BLDR,Builders FirstSource,Industrials,Building products
+EME,EMCOR,Industrials,Construction & engineering
+FIX,Comfort Systems USA,Industrials,Construction & engineering
+GNRC,Generac,Industrials,Electrical equipment
+PAYC,Paycom,Industrials,Payroll services
+XOM,Exxon Mobil,Energy,Oil & gas
+CVX,Chevron,Energy,Oil & gas
+COP,ConocoPhillips,Energy,Oil & gas
+SLB,SLB,Energy,Oil services
+EOG,EOG Resources,Energy,Oil & gas
+MPC,Marathon Petroleum,Energy,Refining
+PSX,Phillips 66,Energy,Refining
+VLO,Valero,Energy,Refining
+OXY,Occidental Petroleum,Energy,Oil & gas
+WMB,Williams Companies,Energy,Pipelines
+KMI,Kinder Morgan,Energy,Pipelines
+OKE,ONEOK,Energy,Pipelines
+BKR,Baker Hughes,Energy,Oil services
+HAL,Halliburton,Energy,Oil services
+FANG,Diamondback Energy,Energy,Oil & gas
+DVN,Devon Energy,Energy,Oil & gas
+EQT,EQT,Energy,Natural gas
+APA,APA,Energy,Oil & gas
+TRGP,Targa Resources,Energy,Pipelines
+TPL,Texas Pacific Land,Energy,Oil & gas royalties
+EXE,Expand Energy,Energy,Natural gas
+LIN,Linde,Materials,Industrial gases
+SHW,Sherwin-Williams,Materials,Chemicals
+FCX,Freeport-McMoRan,Materials,Copper mining
+NEM,Newmont,Materials,Gold mining
+APD,Air Products,Materials,Industrial gases
+ECL,Ecolab,Materials,Chemicals
+NUE,Nucor,Materials,Steel
+DOW,Dow,Materials,Chemicals
+DD,DuPont,Materials,Chemicals
+PPG,PPG Industries,Materials,Chemicals
+CTVA,Corteva,Materials,Agricultural chemicals
+VMC,Vulcan Materials,Materials,Construction materials
+MLM,Martin Marietta,Materials,Construction materials
+CRH,CRH,Materials,Construction materials
+IFF,International Flavors & Fragrances,Materials,Chemicals
+ALB,Albemarle,Materials,Lithium
+LYB,LyondellBasell,Materials,Chemicals
+PKG,Packaging Corp of America,Materials,Packaging
+IP,International Paper,Materials,Packaging
+BALL,Ball,Materials,Packaging
+AMCR,Amcor,Materials,Packaging
+AVY,Avery Dennison,Materials,Packaging
+CF,CF Industries,Materials,Fertilizers
+MOS,Mosaic,Materials,Fertilizers
+STLD,Steel Dynamics,Materials,Steel
+EMN,Eastman Chemical,Materials,Chemicals
+SW,Smurfit Westrock,Materials,Packaging
+NEE,NextEra Energy,Utilities,Renewable utilities
+DUK,Duke Energy,Utilities,Electric utilities
+SO,Southern Company,Utilities,Electric utilities
+CEG,Constellation Energy,Utilities,Nuclear power
+D,Dominion Energy,Utilities,Electric utilities
+AEP,American Electric Power,Utilities,Electric utilities
+SRE,Sempra,Utilities,Multi-utilities
+EXC,Exelon,Utilities,Electric utilities
+XEL,Xcel Energy,Utilities,Electric utilities
+PCG,PG&E,Utilities,Electric utilities
+PEG,PSEG,Utilities,Multi-utilities
+ED,Consolidated Edison,Utilities,Multi-utilities
+WEC,WEC Energy,Utilities,Multi-utilities
+EIX,Edison International,Utilities,Electric utilities
+ETR,Entergy,Utilities,Electric utilities
+DTE,DTE Energy,Utilities,Multi-utilities
+AEE,Ameren,Utilities,Multi-utilities
+PPL,PPL,Utilities,Electric utilities
+FE,FirstEnergy,Utilities,Electric utilities
+ES,Eversource,Utilities,Electric utilities
+CNP,CenterPoint Energy,Utilities,Multi-utilities
+CMS,CMS Energy,Utilities,Multi-utilities
+ATO,Atmos Energy,Utilities,Gas utilities
+NI,NiSource,Utilities,Multi-utilities
+LNT,Alliant Energy,Utilities,Electric utilities
+EVRG,Evergy,Utilities,Electric utilities
+AES,AES,Utilities,Power producers
+PNW,Pinnacle West,Utilities,Electric utilities
+NRG,NRG Energy,Utilities,Power producers
+VST,Vistra,Utilities,Power producers
+AWK,American Water Works,Utilities,Water utilities
+PLD,Prologis,Real Estate,Industrial REIT
+AMT,American Tower,Real Estate,Tower REIT
+EQIX,Equinix,Real Estate,Data center REIT
+O,Realty Income,Real Estate,Retail REIT
+WELL,Welltower,Real Estate,Health care REIT
+SPG,Simon Property,Real Estate,Retail REIT
+PSA,Public Storage,Real Estate,Storage REIT
+DLR,Digital Realty,Real Estate,Data center REIT
+CCI,Crown Castle,Real Estate,Tower REIT
+CBRE,CBRE Group,Real Estate,Real estate services
+VICI,VICI Properties,Real Estate,Casino REIT
+EXR,Extra Space Storage,Real Estate,Storage REIT
+IRM,Iron Mountain,Real Estate,Specialty REIT
+VTR,Ventas,Real Estate,Health care REIT
+SBAC,SBA Communications,Real Estate,Tower REIT
+WY,Weyerhaeuser,Real Estate,Timber REIT
+ESS,Essex Property,Real Estate,Residential REIT
+MAA,Mid-America Apartment,Real Estate,Residential REIT
+INVH,Invitation Homes,Real Estate,Residential REIT
+ARE,Alexandria Real Estate,Real Estate,Office REIT
+KIM,Kimco Realty,Real Estate,Retail REIT
+DOC,Healthpeak,Real Estate,Health care REIT
+UDR,UDR,Real Estate,Residential REIT
+CPT,Camden Property,Real Estate,Residential REIT
+HST,Host Hotels,Real Estate,Hotel REIT
+REG,Regency Centers,Real Estate,Retail REIT
+BXP,BXP,Real Estate,Office REIT
+FRT,Federal Realty,Real Estate,Retail REIT
+CSGP,CoStar Group,Real Estate,Real estate services

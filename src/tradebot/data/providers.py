@@ -75,9 +75,13 @@ class YahooProvider(DataProvider):
         return df.tail(limit) if limit else df
 
 
+    # Symbols per yf.download call: big enough to be fast, small enough that one bad chunk
+    # (rate limit, timeout) only loses a fifth of the S&P 500 and the lock is released between chunks.
+    CHUNK = 100
+
     def history_many(self, symbols: list[str], timeframe: str = "1d", start: str | None = None,
                      limit: int | None = None) -> dict[str, pd.DataFrame]:
-        """One batched Yahoo request for many symbols (much faster than one call each)."""
+        """Batched Yahoo requests for many symbols (much faster than one call each), in chunks."""
         import yfinance as yf
 
         kwargs = {"interval": timeframe, "auto_adjust": True, "progress": False, "group_by": "ticker",
@@ -87,17 +91,23 @@ class YahooProvider(DataProvider):
         else:
             days = int((limit or 300) * (7 if timeframe == "1wk" else 1) * 1.5) + 10
             kwargs["period"] = f"{days}d"
-        with _YF_LOCK:
-            raw = yf.download(symbols, **kwargs)
         out: dict[str, pd.DataFrame] = {}
-        for sym in symbols:
+        symbols = list(dict.fromkeys(symbols))
+        for i in range(0, len(symbols), self.CHUNK):
+            chunk = symbols[i:i + self.CHUNK]
             try:
-                sub = raw[sym] if isinstance(raw.columns, pd.MultiIndex) else raw
-                df = normalize(sub)
-            except (KeyError, ValueError):
+                with _YF_LOCK:
+                    raw = yf.download(chunk, **kwargs)
+            except Exception:  # keep the other chunks; missing symbols are retried one by one
                 continue
-            if len(df):
-                out[sym] = df.tail(limit) if limit else df
+            for sym in chunk:
+                try:
+                    sub = raw[sym] if isinstance(raw.columns, pd.MultiIndex) else raw
+                    df = normalize(sub)
+                except (KeyError, ValueError):
+                    continue
+                if len(df):
+                    out[sym] = df.tail(limit) if limit else df
         return out
 
 

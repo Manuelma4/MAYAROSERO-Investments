@@ -1,8 +1,14 @@
-"""Curated universe of well-known stocks, organized like a broker's "Discover" section.
+"""Stock universe, organized like a broker's "Discover" section.
+
+Two layers:
+- a curated list of well-known stocks with themes ("Magnificent 7", "AI & chips", ...),
+  including non-S&P names from Europe and Asia;
+- every other current S&P 500 member, loaded from the bundled `data/sp500.csv`
+  (symbol, name, GICS sector, short industry). Curated entries win on overlap.
 
 Sectors follow GICS. `sp500` marks current S&P 500 members (used by the picker).
-Themes group companies the way people talk about them ("Magnificent 7", "AI
-& chips", ...). Keep tickers in Yahoo Finance format (BRK-B, MC.PA, ...).
+Keep tickers in Yahoo Finance format (BRK-B, BF-B, MC.PA, ...). To refresh the index
+list, edit the CSV (one row per member, renames included) and run the tests.
 
 Note: this is today's list. Backtesting a stock picker on today's index members
 has survivorship bias (yesterday's losers that left the index are missing), so
@@ -11,7 +17,9 @@ historical results look better than reality. The UI states this explicitly.
 
 from __future__ import annotations
 
+import csv
 from dataclasses import asdict, dataclass, field
+from importlib import resources
 
 
 @dataclass(frozen=True)
@@ -34,7 +42,7 @@ M7, AI, POP, DIV, LUX, DEF, CLEAN, PAY, BIO, CLOUD, EV = (
     "Defense & Aerospace", "Clean energy", "Payments", "Biotech & Pharma", "Cloud & Software", "Electric vehicles")
 
 _S = Stock
-STOCKS: list[Stock] = [
+CURATED: list[Stock] = [
     # Information Technology
     _S("AAPL", "Apple", TECH, "Consumer electronics", themes=(M7, POP)),
     _S("MSFT", "Microsoft", TECH, "Software", themes=(M7, POP, AI, CLOUD)),
@@ -200,6 +208,26 @@ CRYPTO = [
 
 SECTORS = [TECH, COMM, DISC, STAPLES, HEALTH, FIN, IND, ENERGY, MAT, UTIL, RE]
 THEMES = [POP, M7, AI, CLOUD, PAY, DEF, LUX, BIO, DIV, CLEAN, EV]
+
+
+def load_sp500() -> list[Stock]:
+    """Current S&P 500 members from the bundled CSV (region US, no themes)."""
+    text = resources.files("tradebot.data").joinpath("sp500.csv").read_text(encoding="utf-8")
+    out = []
+    for row in csv.DictReader(text.splitlines()):
+        if row["sector"] not in SECTORS:
+            raise ValueError(f"sp500.csv: unknown sector {row['sector']!r} for {row['symbol']}")
+        out.append(Stock(row["symbol"].strip(), row["name"].strip(), row["sector"], row["industry"].strip()))
+    return out
+
+
+def _merge(curated: list[Stock], members: list[Stock]) -> list[Stock]:
+    """Curated stocks first (unchanged), then every S&P 500 member not already curated."""
+    known = {s.symbol for s in curated}
+    return curated + [s for s in members if s.symbol not in known]
+
+
+STOCKS: list[Stock] = _merge(CURATED, load_sp500())
 
 
 def sp500_symbols() -> list[str]:
