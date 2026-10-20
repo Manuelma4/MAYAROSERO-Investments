@@ -81,10 +81,14 @@ testnet in paper mode) and `IBKRBroker` (ib_insync, experimental). Choose with `
   10% per position, 5 open ideas, 20% short, 3% daily loss incl. open losses, optional `MAX_ORDER_VALUE` /
   `MAX_DAILY_LOSS_VALUE`), one lock.
 - `POST /api/orders/preview` returns the plan and a 90-second single-use confirm token; `POST /api/orders`
-  needs it. Live orders also require `TRADEBOT_API_TOKEN`. `GET /api/broker/status`, `GET /api/broker/positions`,
-  `POST /api/orders/close-all` (kill switch, then paused until `POST /api/orders/resume` or the next day).
+  needs it. Live orders also require `TRADEBOT_API_TOKEN` (32+ characters, not the example value). `GET /api/broker/status`, `GET /api/broker/positions`,
+  `POST /api/orders/close-all` and `POST /api/orders/resume`, both with the JSON body `{"confirm": true}` (kill
+  switch: pauses first, then closes; paused until resume, or the next day in paper mode).
   `/api/paper/*` always uses the practice account.
-- `tradebot serve` reads `.env` from the working directory (variables already set in the shell win).
+- `tradebot serve` reads `.env` from the repo root (or `--env-file PATH`, or `TRADEBOT_ENV_FILE`), never the working
+  directory; variables already set in the shell win, and the startup log says where `TRADING_MODE` came from.
+- Real-broker exits close only the journaled quantity and cancel only that order's own legs; a failed close
+  re-places the stop. IBKR is paper-only for now.
 
 ## Install
 

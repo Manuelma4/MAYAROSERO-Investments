@@ -50,13 +50,20 @@ Until then, the Invest button uses the practice account inside the app.
   a typo or nothing means paper / test accounts. There is no button in the app for this, on purpose.
 - Every order: a preview first (quantity, cost, stop-loss, target, risk in € and %, PAPER/LIVE badge), then a
   confirmation that expires after 90 seconds. Live orders also need a tick box "I understand this is real money".
-- Live orders are refused unless `TRADEBOT_API_TOKEN` is set, so only you can place them.
+- Live orders are refused unless `TRADEBOT_API_TOKEN` is set to your own random string of at least 32 characters
+  (the `change-me...` example value is refused), so only you can place them.
 - Server-side limits for every broker: 1% risk per idea, max 10% of the account per position, max 5 open ideas,
   max 20% short, daily loss stop 3% (open losses count). Optional stricter caps below.
 - The stop-loss (and target, on Alpaca) is held at the broker, so it works even if the app is off.
-  Positions are closed after about 5 trading days (time limit) by the app.
-- Kill switch: Settings → Trading → "Close everything" cancels every order and closes every position in the
-  broker account (including ones bought outside the app), then pauses new orders until you resume or tomorrow.
+  Positions are closed after about 5 trading days (time limit) by the app. The app only closes the quantity it
+  bought and only cancels that order's own stop / target; if a close fails, the stop-loss is placed again at once.
+- An idea on a stock or coin the account already holds is refused (the app never adds to or trades against it).
+- Real orders need a fresh price: the broker's own quote, or market data less than a minute old. Outside market
+  hours the Invest button therefore says there is no live price; that is on purpose.
+- Kill switch: Settings → Trading → "Close everything" first pauses new orders, then cancels every order and closes
+  every position in the broker account (including ones bought outside the app). Paper: paused until you resume or
+  tomorrow. Real money: paused until you press Resume. If the broker is not connected it still pauses trading,
+  and tells you to close the positions on the broker's own site.
 
 ### Step 1: Alpaca paper account (free, fake money, real prices)
 1. Sign up at https://alpaca.markets (email only for paper trading).
@@ -77,16 +84,21 @@ Until then, the Invest button uses the practice account inside the app.
 ### Step 2: real money (only when you are confident)
 1. Open and fund a live account (Alpaca live: check that French residents are accepted; otherwise IBKR below).
 2. Generate **live** API keys (they start with `AK`), and replace the paper keys in `.env`.
-3. Set a long random `TRADEBOT_API_TOKEN` (required for live), and optionally stricter caps:
+3. Set a long random `TRADEBOT_API_TOKEN` (required for live: at least 32 characters, not the example value;
+   make one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`), and optionally stricter caps:
    ```
    TRADING_MODE=live
-   TRADEBOT_API_TOKEN=a-long-random-string
+   TRADEBOT_API_TOKEN=<output of the command above>
    MAX_ORDER_VALUE=1000               # max cost of one order, in the account currency (USD at Alpaca)
-   MAX_DAILY_LOSS_VALUE=300           # stop new orders after losing this much today
+   MAX_DAILY_LOSS_VALUE=300           # stop new orders after losing this much today (account currency too)
    RISK_PER_TRADE_PCT=0.5             # optional: risk less than the 1% default per idea
    ```
-   These caps can only make the limits stricter, never looser than the defaults.
-4. Restart. The ticket now shows a red **LIVE** badge and "Confirm LIVE order". To go back to practice,
+   These caps can only make the limits stricter, never looser than the defaults. They are in the account's
+   currency (USD at Alpaca, USDT on most exchanges), not euros; the old `MAX_ORDER_EUR` / `MAX_DAILY_LOSS_EUR`
+   names are no longer read.
+4. Restart. The startup log says where `TRADING_MODE` came from (e.g. `TRADING_MODE=LIVE (/path/.env)`).
+   `tradebot serve` reads `.env` from the repo folder (or `--env-file /path/.env`), not from wherever you start it.
+   The ticket now shows a red **LIVE** badge and "Confirm LIVE order". To go back to practice,
    delete the `TRADING_MODE=live` line and restart.
 
 ### Crypto (Binance, Kraken, ... through ccxt)
@@ -99,14 +111,19 @@ CCXT_API_KEY=...  CCXT_SECRET=...     # live: trading permission only, NEVER wit
 CCXT_QUOTE=USDT
 ```
 Spot only: rising (long) ideas; short ideas are refused. The stop-loss is placed on the exchange right after the
-buy; if the exchange refuses it, the coins are sold again immediately.
+buy, sized on the coins really received (fees taken in the coin are accounted for); if the exchange refuses it,
+the coins are sold again immediately. If the exchange does not answer clearly (timeout), the app checks the
+balance and protects any coins it finds.
 
-### Interactive Brokers (recommended for real money in France; experimental here)
+### Interactive Brokers (recommended for real money in France; paper only here for now)
 1. Open an IBKR account (paper account included), install TWS or IB Gateway, enable the API
    (Configure → API → Settings), and `pip install ib_insync`.
 2. `.env`: `BROKER=ibkr`, `IBKR_HOST=127.0.0.1`, `IBKR_PORT=7497` (TWS paper; 4002 Gateway paper), `IBKR_CLIENT_ID=17`.
    Live ports (7496 / 4001) are refused unless `TRADING_MODE=live`, and a paper session that lands on a
    real account (ids not starting with "D") disconnects at once.
+3. Real money through IBKR is switched off in the app for now (`TRADING_MODE=live` with `BROKER=ibkr` is
+   refused with a message): the connection is experimental. To enable it later, the adapter must first be tested
+   against a real TWS paper session (orders, cancels, positions, the one-thread IB connection).
 
 Note: investing your own money through your own account is fine. Managing other people's
 money or selling signals as a service needs a license in France (AMF); talk to a professional first.

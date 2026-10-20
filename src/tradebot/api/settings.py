@@ -1,8 +1,31 @@
 from __future__ import annotations
 
+import hmac
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+
+
+EXAMPLE_API_TOKEN = "change-me-to-a-long-random-string"   # the placeholder in .env.example
+MIN_API_TOKEN_LENGTH = 32
+
+
+def api_token_problem(token: str | None) -> str | None:
+    """Why this TRADEBOT_API_TOKEN is not good enough to guard real-money orders (None = fine)."""
+    if not token:
+        return "Real-money orders need TRADEBOT_API_TOKEN set on the server, so that only you can place them."
+    if token.strip() == EXAMPLE_API_TOKEN or "change-me" in token.lower():
+        return ("TRADEBOT_API_TOKEN is still the example value from .env.example. Replace it with your own long "
+                "random string (e.g. the output of: python -c \"import secrets; print(secrets.token_urlsafe(32))\").")
+    if len(token) < MIN_API_TOKEN_LENGTH:
+        return (f"TRADEBOT_API_TOKEN is too short for real money ({len(token)} characters, at least "
+                f"{MIN_API_TOKEN_LENGTH} needed). Use a long random string.")
+    return None
+
+
+def token_matches(expected: str, given: str | None) -> bool:
+    """Constant-time comparison (no timing leak of how much of the token was right)."""
+    return given is not None and hmac.compare_digest(expected.encode(), given.encode())
 
 
 def _bool(v: str | None) -> bool:

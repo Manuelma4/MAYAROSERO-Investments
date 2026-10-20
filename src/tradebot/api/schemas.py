@@ -68,6 +68,12 @@ class OrderPlace(OrderPreview):
     confirm_token: str | None = Field(None, max_length=100)   # from /api/orders/preview; required
 
 
+class Confirm(BaseModel):
+    """Body of the kill switch / resume calls: {"confirm": true}. A JSON body cannot be sent by a plain
+    cross-site HTML form, so another web page cannot press these buttons for you."""
+    confirm: bool
+
+
 class PortfolioRequest(BaseModel):
     amount: float = Field(10_000, gt=0, le=100_000_000)
     currency: Literal["EUR", "USD"] = "EUR"

@@ -25,7 +25,16 @@ IBKR_LIVE_PORTS = (7496, 4001)                       # TWS live, IB Gateway live
 
 
 class BrokerError(RuntimeError):
-    """Configuration or broker-side failure. The message is shown to the user as is."""
+    """Configuration or broker-side failure. The message is shown to the user as is.
+
+    ``order``: set when something DID happen at the broker before the failure (e.g. a buy filled but its
+    stop-loss was refused), so the caller can journal it: {id, symbol, side, qty, status, unprotected, closed, legs}.
+    ``legs``: broker order ids now protecting the position (e.g. a stop re-placed after a failed close).
+    """
+
+    def __init__(self, message: str, *, order: dict | None = None, legs: list[str] | None = None):
+        super().__init__(message)
+        self.order, self.legs = order, legs
 
 
 def trading_mode(env: Mapping[str, str] | None = None) -> Mode:
@@ -98,7 +107,11 @@ class Broker(Protocol):
 
     def cancel(self, order_id: str) -> None: ...
 
-    def close_position(self, symbol: str) -> dict | None: ...
+    def close_position(self, symbol: str, qty: float | None = None, order_ids: list[str] | None = None,
+                       stop: float | None = None, side: str = "long") -> dict | None:
+        """Close what the app opened: at most ``qty`` (None = the whole position, kill switch only), cancelling
+        only ``order_ids`` (that order's own stop / target legs). If the close fails after the legs were
+        cancelled, the adapter re-places a stop at ``stop`` and raises BrokerError(legs=[new stop id])."""
 
     def close_all(self) -> dict:
         """Kill switch: cancel every open order and close every position. {cancelled, closed, errors}"""

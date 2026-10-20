@@ -104,12 +104,15 @@ export function OrderTicket({ o, onDone }: { o: Opportunity; onDone: (msg: strin
   );
 }
 
-/** Kill switch: cancels every order and closes every position at the broker, then pauses new orders. */
+/** Kill switch: pauses new orders, then cancels every order and closes every position at the broker.
+ *  Stays usable when the broker is disconnected: it still pauses trading, and says to close at the broker. */
 export function KillSwitch({ status, onChange }: { status: BrokerStatus | null; onChange: () => void }) {
   const [arm, setArm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const where = status ? brokerLabel(status.broker) : "your broker";
+  const offline = !!status && !status.connected;
+  const until = status?.halted?.persistent || status?.mode === "live" ? "until you resume them" : "until you resume them, or until tomorrow";
   const run = async () => {
     setBusy(true); setMsg(null);
     try {
@@ -120,16 +123,17 @@ export function KillSwitch({ status, onChange }: { status: BrokerStatus | null; 
   return (
     <>
       <div className="setting">
-        <div><strong>Close everything</strong><Hint>The emergency button. It cancels every open order and sells (or buys back) every position in the account at {where}, at the market price, including positions you opened outside this app. Then new orders stay paused until you resume them, or until tomorrow.</Hint>
+        <div><strong>Close everything</strong><Hint>The emergency button. It first pauses new orders, then cancels every open order and sells (or buys back) every position in the account at {where}, at the market price, including positions you opened outside this app. New orders stay paused {until}.</Hint>
           <p className="muted small">Cancels all orders and closes all positions at {where}{status ? ` (${status.mode === "live" ? "real money" : "paper"})` : ""}.</p>
+          {offline && <p className="down small" role="status">Not connected to {where}: pressing it pauses trading here, but cannot close anything. Close your positions at the broker manually.</p>}
         </div>
-        {!arm ? <button className="btn danger" onClick={() => setArm(true)} disabled={STATIC || busy || !status?.connected}>Close everything</button>
+        {!arm ? <button className="btn danger" onClick={() => setArm(true)} disabled={STATIC || busy || !status}>Close everything</button>
           : <span className="row gap"><button className="btn" onClick={() => setArm(false)}>Cancel</button><button className="btn danger" onClick={run} disabled={busy}>{busy ? <Spinner /> : "Yes, close all"}</button></span>}
       </div>
       {status?.halted && (
         <div className="setting">
-          <div><strong>Trading paused</strong><p className="muted small">Since {fmtTime(status.halted.at)}. New orders are refused until you resume (or tomorrow).</p></div>
-          <button className="btn" onClick={async () => { await api.ordersResume(); onChange(); }} disabled={STATIC}>Resume trading</button>
+          <div><strong>Trading paused</strong><p className="muted small">Since {fmtTime(status.halted.at)}. New orders are refused {status.halted.persistent ? "until you resume (real-money accounts stay paused overnight too)" : "until you resume (or tomorrow)"}.</p></div>
+          <button className="btn" onClick={async () => { try { await api.ordersResume(); } catch (e) { setMsg((e as Error).message); } onChange(); }} disabled={STATIC}>Resume trading</button>
         </div>
       )}
       {msg && <div className="notice" role="status">{msg}</div>}

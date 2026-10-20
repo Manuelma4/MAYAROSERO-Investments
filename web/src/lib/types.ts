@@ -129,7 +129,7 @@ export interface OrderPlan { symbol: string; side: string; entry: number; stop: 
 export interface PaperPosition { symbol: string; strategy: string; side: string; entry_time: string; entry: number; qty: number; stop: number; target: number | null; price?: number | null; pnl?: number | null }
 export interface RiskLimitsInfo { risk_per_trade_pct: number; max_position_pct: number; max_open_positions: number; max_short_exposure_pct: number; max_daily_loss_pct: number; max_order_value: number | null; max_daily_loss_value: number | null }
 export interface BrokerStatus {
-  broker: string; mode: "paper" | "live"; connected: boolean; error: string | null; halted: { day: string; at: string; reason: string } | null;
+  broker: string; mode: "paper" | "live"; connected: boolean; error: string | null; halted: { day: string; at: string; reason: string; persistent?: boolean } | null;
   limits: RiskLimitsInfo; confirm_seconds: number; equity?: number; buying_power?: number; cash?: number; currency?: string; blocked?: boolean; live_block?: string | null;
 }
 export interface OrderPreviewResult {

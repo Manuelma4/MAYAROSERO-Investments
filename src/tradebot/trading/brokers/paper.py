@@ -70,9 +70,13 @@ class PaperAdapter:
     def cancel(self, order_id: str) -> None:
         return None   # paper orders fill immediately
 
-    def close_position(self, symbol: str) -> dict | None:
+    def symbol_key(self, symbol: str) -> str:
+        return symbol.strip().upper()
+
+    def close_position(self, symbol: str, qty: float | None = None, order_ids: list[str] | None = None,
+                       stop: float | None = None, side: str = "long") -> dict | None:
         out = None
-        for p in [p for p in self.paper.positions.values() if p.symbol == symbol]:
+        for p in [p for p in self.paper.positions.values() if p.symbol == symbol and p.strategy == STRATEGY]:
             price = self._prices([symbol]).get(symbol) or p.entry
             out = self.paper.close(p.symbol, p.strategy, price, pd.Timestamp.now(tz="UTC").isoformat(), "closed by you")
         return out

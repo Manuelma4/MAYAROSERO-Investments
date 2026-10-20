@@ -125,13 +125,47 @@ def cmd_live(args) -> None:
     Scanner.from_config(cfg).run_forever(cfg.get("poll_seconds", 60))
 
 
-def load_dotenv(path: str = ".env") -> int:
-    """Read KEY=VALUE lines from .env into the environment (variables already set win). Returns the count."""
-    import os
-    from pathlib import Path
+def repo_root() -> Path | None:
+    """The checkout this package runs from (the folder with pyproject.toml), or None if installed elsewhere."""
+    for d in Path(__file__).resolve().parents:
+        if (d / "pyproject.toml").is_file() and (d / "src" / "tradebot").is_dir():
+            return d
+    return None
 
-    f = Path(path)
-    if not f.is_file():
+
+def default_env_file() -> Path | None:
+    """TRADEBOT_ENV_FILE if set, else <repo root>/.env. Never the current directory (it depends on where you start)."""
+    import os
+
+    if os.environ.get("TRADEBOT_ENV_FILE"):
+        return Path(os.environ["TRADEBOT_ENV_FILE"]).expanduser()
+    root = repo_root()
+    return root / ".env" if root else None
+
+
+def _env_value(raw: str) -> str:
+    """Value part of KEY=VALUE: quoted values are kept as written (a # inside quotes is not a comment);
+    unquoted values lose a trailing `  # comment`."""
+    import re
+
+    val = raw.strip()
+    if val[:1] in ("'", '"'):
+        end = val.find(val[0], 1)
+        if end > 0:
+            return val[1:end]
+    if val.startswith("#"):
+        return ""
+    return re.split(r"\s+#", val, maxsplit=1)[0].strip()
+
+
+def load_dotenv(path: str | Path | None = None) -> int:
+    """Read KEY=VALUE lines from .env into the environment (variables already set win). Returns the count.
+
+    ``path`` None: see default_env_file()."""
+    import os
+
+    f = Path(path).expanduser() if path is not None else default_env_file()
+    if f is None or not f.is_file():
         return 0
     n = 0
     for line in f.read_text().splitlines():
@@ -140,11 +174,26 @@ def load_dotenv(path: str = ".env") -> int:
             continue
         key, val = line.split("=", 1)
         key = key.strip().removeprefix("export ").strip()
-        val = val.split(" #", 1)[0].strip().strip('"').strip("'")
         if key and key not in os.environ:
-            os.environ[key] = val
+            os.environ[key] = _env_value(val)
             n += 1
     return n
+
+
+def trading_mode_origin(env_file: Path | None, shell_keys: set[str]) -> str:
+    """Plain-English line for the startup log: the trading mode and where it was set."""
+    import os
+
+    from .trading.brokers import trading_mode
+
+    mode = trading_mode()
+    if "TRADING_MODE" in shell_keys:
+        where = "the shell environment"
+    elif os.environ.get("TRADING_MODE") is not None:
+        where = str(env_file)
+    else:
+        where = "not set anywhere, so paper"
+    return f"TRADING_MODE={mode.upper()} ({where}); BROKER={(os.environ.get('BROKER') or 'paper').strip().lower()}"
 
 
 def cmd_serve(args) -> None:
@@ -152,7 +201,14 @@ def cmd_serve(args) -> None:
 
     import uvicorn
 
-    load_dotenv()
+    log = logging.getLogger("tradebot")
+    shell_keys = set(os.environ)
+    env_file = Path(args.env_file).expanduser().resolve() if args.env_file else default_env_file()
+    if args.env_file and not env_file.is_file():
+        raise SystemExit(f"--env-file {env_file} does not exist.")
+    n = load_dotenv(env_file) if env_file else 0
+    log.info(".env: %s (%d variable(s) loaded)", env_file if env_file and env_file.is_file() else "none found", n)
+    log.info(trading_mode_origin(env_file, shell_keys))
     os.environ.setdefault("TRADEBOT_CONFIG", args.config)
     uvicorn.run("tradebot.api.app:create_app", factory=True, host=args.host, port=args.port,
                 reload=args.reload)
@@ -202,6 +258,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--config", default="config/config.yaml")
     p.add_argument("--reload", action="store_true")
+    p.add_argument("--env-file", help="path to the .env file (default: TRADEBOT_ENV_FILE, else .env in the repo root)")
     p.set_defaults(fn=cmd_serve)
 
     args = ap.parse_args(argv)

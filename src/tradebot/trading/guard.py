@@ -3,7 +3,8 @@
 - ConfirmTokens: a preview issues a short-lived, single-use token bound to the exact plan; placing needs it.
 - OrderJournal: orders placed through the app (for the time limit and target watch, and the UI).
 - DayBaseline: start-of-day equity for brokers that do not report today's P&L (daily loss limit).
-- Halt: after the kill switch, new orders stay blocked until the owner resumes (or the next UTC day).
+- Halt: after the kill switch, new orders stay blocked until the owner resumes. Paper: also lifted at the next
+  UTC day. Live (real money): only a manual resume lifts it.
 """
 
 from __future__ import annotations
@@ -98,16 +99,19 @@ class DayBaseline(_JsonFile):
 
 
 class Halt(_JsonFile):
-    def set(self, reason: str, now: pd.Timestamp | None = None) -> None:
+    def set(self, reason: str, now: pd.Timestamp | None = None, persistent: bool = False) -> None:
+        """``persistent`` (real money): stays until clear(), whatever the date."""
         now = now or pd.Timestamp.now(tz="UTC")
         with self._lock:
-            self._write({"day": str(now.date()), "at": now.isoformat(), "reason": reason})
+            self._write({"day": str(now.date()), "at": now.isoformat(), "reason": reason, "persistent": persistent})
 
     def active(self, now: pd.Timestamp | None = None) -> dict | None:
         now = now or pd.Timestamp.now(tz="UTC")
         with self._lock:
             d = self._read(None)
-        return d if d and d.get("day") == str(now.date()) else None
+        if not d:
+            return None
+        return d if d.get("persistent") or d.get("day") == str(now.date()) else None
 
     def clear(self) -> None:
         with self._lock:

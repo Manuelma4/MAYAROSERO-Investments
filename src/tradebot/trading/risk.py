@@ -8,6 +8,7 @@ Rules (see .claude/agents/risk-guardian.md):
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import pandas as pd
@@ -38,14 +39,19 @@ class RiskLimits:
                 return None
             return v if v == v and v > 0 else None
 
+        for old in ("MAX_ORDER_EUR", "MAX_DAILY_LOSS_EUR"):
+            if env.get(old):
+                logging.getLogger(__name__).warning(
+                    "%s is no longer read (it was applied in the account currency, not euros). Use %s, in the "
+                    "account currency (USD at Alpaca, USDT on most exchanges).", old, old.replace("_EUR", "_VALUE"))
         return cls(
             risk_per_trade_pct=min(d.risk_per_trade_pct, num("RISK_PER_TRADE_PCT") or d.risk_per_trade_pct),
             max_position_pct=min(d.max_position_pct, num("MAX_POSITION_PCT") or d.max_position_pct),
             max_open_positions=int(min(d.max_open_positions, num("MAX_OPEN_POSITIONS") or d.max_open_positions)),
             max_short_exposure_pct=d.max_short_exposure_pct,
             max_daily_loss_pct=min(d.max_daily_loss_pct, num("MAX_DAILY_LOSS_PCT") or d.max_daily_loss_pct),
-            max_order_value=num("MAX_ORDER_VALUE") or num("MAX_ORDER_EUR"),
-            max_daily_loss_value=num("MAX_DAILY_LOSS_VALUE") or num("MAX_DAILY_LOSS_EUR"),
+            max_order_value=num("MAX_ORDER_VALUE"),
+            max_daily_loss_value=num("MAX_DAILY_LOSS_VALUE"),
         )
 
 

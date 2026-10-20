@@ -8,10 +8,16 @@ from __future__ import annotations
 
 import math
 import os
+import time
 import uuid
 from collections.abc import Mapping
 
+import pandas as pd
+
 from .base import ALPACA_DATA_URL, ALPACA_URLS, BrokerError, Endpoint, is_crypto, require_protection, resolve_endpoint
+
+DONE = {"filled", "canceled", "expired", "rejected", "replaced"}   # order states that no longer reserve shares
+MAX_TRADE_AGE = pd.Timedelta(minutes=15)   # older last trade (market closed, halted stock) = no broker price
 
 
 def _px(x: float) -> float:
@@ -19,10 +25,17 @@ def _px(x: float) -> float:
     return round(float(x), 2 if x >= 1 else 4)
 
 
+class AlpacaHTTPError(BrokerError):
+    def __init__(self, message: str, status: int):
+        super().__init__(message)
+        self.status = status
+
+
 class AlpacaBroker:
     name = "alpaca"
 
-    def __init__(self, env: Mapping[str, str] | None = None, session=None, timeout: float = 10.0):
+    def __init__(self, env: Mapping[str, str] | None = None, session=None, timeout: float = 10.0,
+                 cancel_wait: float = 5.0, sleep=time.sleep):
         env = os.environ if env is None else env
         self.endpoint: Endpoint = resolve_endpoint("alpaca", env)
         key, secret = env.get("ALPACA_API_KEY_ID"), env.get("ALPACA_API_SECRET_KEY")
@@ -35,6 +48,8 @@ class AlpacaBroker:
         self.s = session
         self.s.headers.update({"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret})
         self.timeout = timeout
+        self.feed = (env.get("ALPACA_DATA_FEED") or "iex").strip().lower()
+        self.cancel_wait, self.sleep = cancel_wait, sleep
 
     @property
     def mode(self):
@@ -57,7 +72,7 @@ class AlpacaBroker:
                 msg = r.json().get("message") or r.text
             except Exception:
                 msg = r.text
-            raise BrokerError(f"Alpaca refused ({r.status_code}): {msg}")
+            raise AlpacaHTTPError(f"Alpaca refused ({r.status_code}): {msg}", r.status_code)
         if not r.content:
             return None
         return r.json()
@@ -80,12 +95,20 @@ class AlpacaBroker:
                         "pnl": float(p.get("unrealized_pl") or 0)})
         return out
 
+    def symbol_key(self, symbol: str) -> str:
+        return symbol.strip().upper()
+
     def quote(self, symbol: str) -> float | None:
+        """Last trade on ALPACA_DATA_FEED (iex by default); None if unavailable or older than MAX_TRADE_AGE."""
         if is_crypto(symbol):
             return None
         try:
-            t = self._req("GET", f"/v2/stocks/{symbol}/trades/latest", base=ALPACA_DATA_URL)
-            return float(t["trade"]["p"])
+            t = self._req("GET", f"/v2/stocks/{symbol}/trades/latest", base=ALPACA_DATA_URL,
+                          params={"feed": self.feed})["trade"]
+            when = t.get("t")
+            if when and pd.Timestamp.now(tz="UTC") - pd.Timestamp(when).tz_convert("UTC") > MAX_TRADE_AGE:
+                return None
+            return float(t["p"])
         except (BrokerError, KeyError, TypeError, ValueError):
             return None
 
@@ -111,21 +134,111 @@ class AlpacaBroker:
                 raise BrokerError("A limit order needs a limit price.")
             body["limit_price"] = _px(limit_price)
         o = self._req("POST", "/v2/orders", json=body)
+        legs = [str(leg["id"]) for leg in o.get("legs") or [] if leg.get("id")]
         return {"id": o.get("id"), "status": o.get("status"), "symbol": symbol, "side": side, "qty": float(qty),
-                "client_order_id": body["client_order_id"]}
+                "client_order_id": body["client_order_id"], "legs": [str(o.get("id")), *legs] if o.get("id") else legs,
+                "stop_order_id": next((str(leg["id"]) for leg in o.get("legs") or []
+                                       if leg.get("type") in ("stop", "stop_limit") and leg.get("id")), None)}
 
     def cancel(self, order_id: str) -> None:
         self._req("DELETE", f"/v2/orders/{order_id}")
 
-    def close_position(self, symbol: str) -> dict | None:
-        # The bracket's stop / target legs reserve the shares: cancel them first.
-        for o in self._req("GET", "/v2/orders", params={"status": "open", "symbols": symbol, "nested": "true"}) or []:
-            self.cancel(o["id"])
-        return self._req("DELETE", f"/v2/positions/{symbol}")
+    # -- closing what the app opened -----------------------------------------------------------------------
+    def _held(self, symbol: str) -> float:
+        """Signed quantity held (+ long, - short), 0 if none."""
+        try:
+            p = self._req("GET", f"/v2/positions/{symbol}")
+        except AlpacaHTTPError as exc:
+            if exc.status == 404:
+                return 0.0
+            raise
+        q = abs(float((p or {}).get("qty") or 0))
+        return -q if (p or {}).get("side") == "short" else q
+
+    def _own_orders(self, order_ids: list[str]) -> list[str]:
+        """The given order ids plus their child legs (if the journal only had the parent id)."""
+        ids = [str(i) for i in order_ids if i]
+        if len(ids) == 1:
+            try:
+                o = self._req("GET", f"/v2/orders/{ids[0]}", params={"nested": "true"}) or {}
+                ids += [str(leg["id"]) for leg in o.get("legs") or [] if leg.get("id")]
+            except BrokerError:
+                pass
+        return list(dict.fromkeys(ids))
+
+    def _cancel_and_wait(self, ids: list[str]) -> list[str]:
+        """Cancel these orders and wait until Alpaca confirms. Returns ids still not done after cancel_wait."""
+        for oid in ids:
+            try:
+                self.cancel(oid)
+            except BrokerError:
+                pass   # already filled / cancelled: the status check below tells
+        deadline = time.monotonic() + self.cancel_wait
+        pending = list(ids)
+        while True:
+            still = []
+            for oid in pending:
+                try:
+                    st = (self._req("GET", f"/v2/orders/{oid}") or {}).get("status")
+                except AlpacaHTTPError as exc:
+                    st = "canceled" if exc.status == 404 else None
+                except BrokerError:
+                    st = None
+                if st not in DONE:
+                    still.append(oid)
+            pending = still
+            if not pending or time.monotonic() >= deadline:
+                return pending
+            self.sleep(0.5)
+
+    def _protect(self, symbol: str, held: float, stop: float | None) -> str:
+        """Re-place a stop-loss for ``held`` shares. Returns its id; raises BrokerError if Alpaca refuses."""
+        if not stop:
+            raise BrokerError("no stop price known")
+        o = self._req("POST", "/v2/orders", json={
+            "symbol": symbol, "qty": str(int(abs(held))), "side": "sell" if held > 0 else "buy", "type": "stop",
+            "stop_price": _px(stop), "time_in_force": "gtc", "client_order_id": f"mri-{uuid.uuid4().hex[:20]}"})
+        return str(o.get("id"))
+
+    def close_position(self, symbol: str, qty: float | None = None, order_ids: list[str] | None = None,
+                       stop: float | None = None, side: str = "long") -> dict | None:
+        """Cancel only this order's own legs (confirmed), then sell / buy back at most ``qty`` shares.
+
+        If the close fails, a stop-loss is re-placed at once so the position is never left unprotected."""
+        own = self._own_orders(order_ids or [])
+        pending = self._cancel_and_wait(own) if own else []
+        held = self._held(symbol)
+        want = 1 if side == "long" else -1
+        n = abs(held) if held * want > 0 else 0.0           # only close a position on the side the app opened
+        if qty is not None:
+            n = min(n, float(qty))
+        n = float(math.floor(n + 1e-9))
+        if n <= 0:
+            return None
+        if pending:
+            # Not confirmed yet: closing now could fail or double-sell. If the old legs no longer hold the shares,
+            # Alpaca accepts a fresh stop; if they still hold them, the old stop is still working.
+            msg = f"Alpaca has not confirmed cancelling the stop / target of {symbol} yet; the close is retried on the next check"
+            try:
+                new_stop = self._protect(symbol, n * want, stop)
+            except BrokerError:
+                raise BrokerError(msg + ".", legs=own) from None
+            raise BrokerError(msg + f"; a stop-loss was placed again at {_px(stop)}.", legs=[new_stop, *pending])
+        try:
+            return self._req("DELETE", f"/v2/positions/{symbol}", params={"qty": str(int(n))})
+        except BrokerError as exc:
+            try:
+                new_stop = self._protect(symbol, n * want, stop)
+            except BrokerError as exc2:
+                raise BrokerError(f"DANGER: closing {symbol} failed ({exc}) and re-placing its stop-loss also failed "
+                                  f"({exc2}). Check the position at Alpaca now.") from exc2
+            raise BrokerError(f"Closing {symbol} failed ({exc}); its stop-loss was placed again at {_px(stop)}.",
+                              legs=[new_stop]) from exc
 
     def close_all(self) -> dict:
         cancelled = self._req("DELETE", "/v2/orders") or []
         closed = self._req("DELETE", "/v2/positions", params={"cancel_orders": "true"}) or []
         errors = [c for c in closed if isinstance(c, dict) and int(c.get("status", 200)) >= 400]
         return {"cancelled": len(cancelled), "closed": [c.get("symbol") for c in closed if c not in errors],
-                "errors": [f"{e.get('symbol')}: {(e.get('body') or {}).get('message', 'failed')}" for e in errors]}
+                "errors": [f"{e.get('symbol')}: {(e.get('body') or {}).get('message', 'failed')} "
+                           "(its stop-loss may be cancelled: check it at Alpaca)" for e in errors]}

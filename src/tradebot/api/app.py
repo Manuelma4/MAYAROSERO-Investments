@@ -20,7 +20,7 @@ from .engine import Broadcaster, LiveEngine
 from .market import MarketData, ProviderFactory
 from .precompute import Precomputer
 from .routes import router, ws_router
-from .settings import Settings
+from .settings import Settings, token_matches
 from .store import EventStore
 
 log = logging.getLogger(__name__)
@@ -122,7 +122,7 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
     async def auth(request: Request, call_next):
         token = settings.api_token
         if (token and request.url.path.startswith("/api/") and request.url.path != "/api/health"
-                and request.headers.get("authorization") != f"Bearer {token}"):
+                and not token_matches(f"Bearer {token}", request.headers.get("authorization"))):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
         return await call_next(request)
 

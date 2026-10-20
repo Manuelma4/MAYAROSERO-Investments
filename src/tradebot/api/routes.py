@@ -17,6 +17,7 @@ from . import serialize as ser
 from .market import DataUnavailable
 from .schemas import (BacktestRequest, DataQuery, PaperOrder, PicksRequest, PortfolioRequest, PredictionsRequest,
                       PredictRequest, WatchlistBody, AlertBody)
+from .settings import token_matches
 
 router = APIRouter(prefix="/api")
 
@@ -583,7 +584,7 @@ ws_router = APIRouter()
 async def ws_events(websocket: WebSocket):
     app = websocket.app
     token = app.state.settings.api_token
-    if token and websocket.query_params.get("token") != token:
+    if token and not token_matches(token, websocket.query_params.get("token")):
         await websocket.close(code=4401)
         return
     await websocket.accept()
