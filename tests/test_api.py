@@ -28,7 +28,7 @@ class FakeProvider(DataProvider):
 @pytest.fixture
 def client(tmp_path):
     prov = FakeProvider()
-    settings = Settings(db_path=tmp_path / "t.db", static_dir=None, api_token=None, autostart_live=False)
+    settings = Settings(db_path=tmp_path / "t.db", static_dir=None, api_token=None, autostart_live=False, precompute=False)
 
     def scanner_factory(cfg):
         item = WatchItem("yahoo", "AAA", "1d", [{"name": "ema_cross_rsi"}])
@@ -116,7 +116,7 @@ def test_live_start_stop(client):
 
 
 def test_token_auth(tmp_path):
-    settings = Settings(db_path=tmp_path / "t.db", static_dir=None, api_token="s3cret")
+    settings = Settings(db_path=tmp_path / "t.db", static_dir=None, api_token="s3cret", precompute=False)
     app = create_app(settings, provider_factory=lambda n, e: FakeProvider(), config={})
     with TestClient(app) as c:
         assert c.get("/api/health").status_code == 200
@@ -129,7 +129,7 @@ def test_spa_fallback_and_traversal(tmp_path):
     (dist / "assets").mkdir(parents=True)
     (dist / "index.html").write_text("<html>app</html>")
     (tmp_path / "secret.txt").write_text("nope")
-    settings = Settings(db_path=tmp_path / "t.db", static_dir=dist, api_token=None)
+    settings = Settings(db_path=tmp_path / "t.db", static_dir=dist, api_token=None, precompute=False)
     with TestClient(create_app(settings, config={})) as c:
         assert "app" in c.get("/backtest").text
         assert "nope" not in c.get("/..%2Fsecret.txt").text
@@ -169,3 +169,27 @@ def test_picks(client):
     assert {"cagr_%", "benchmark_cagr_%", "excess_cagr_%", "max_drawdown_%", "skill_vs_universe_%"} <= set(d["stats"])
     assert len(d["universe"]) == len(d["equity"])
     assert d["holdings"][0]["date"] >= d["holdings"][-1]["date"]  # newest first
+
+
+def test_precompute_today_and_latest_picks(client):
+    pre = client.app.state.precompute
+    assert client.get("/api/today").status_code == 503  # not computed yet: clear message, no crash
+    pre.run_once()
+    assert pre.last_error is None, pre.last_error
+    t = client.get("/api/today").json()
+    assert t["mood"]["label"] in {"Risk-on", "Neutral", "Risk-off"} and t["mood"]["explanation"]
+    assert isinstance(t["core"]["picks"], list)  # may be empty if nothing is in an uptrend
+    latest = client.get("/api/picks/latest").json()
+    assert latest["ranking"] and all(r["reason"] for r in latest["ranking"])
+    assert {"buy", "sell", "keep"} <= set(t["core"]["changes"])
+    assert len(t["gainers"]) == 6 and t["gainers"][0]["change_pct"] >= t["losers"][0]["change_pct"]
+    for preset in ("quality_momentum", "momentum", "trend_following", "low_volatility"):
+        assert client.get("/api/picks/latest", params={"preset": preset}).json()["preset"] == preset
+
+
+def test_pick_reason_plain_english():
+    from tradebot.api.services import pick_reason
+
+    r = pick_reason({"momentum_12_1_%": 45.2, "rel_strength_%": -3.1, "trend_%": 12.0, "volatility_%": 21})
+    assert r == ("Up 45% over the past year, lagging the S&P 500 by 3% over 6 months, "
+                 "12% above its 200-day average, calm price action.")

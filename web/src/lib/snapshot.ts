@@ -44,6 +44,10 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
         try { return await load(`charts/${safeName(sym)}_1d.json`); } catch { return limit(`Charts for ${sym} ${tf}`); }
       }
     }
+    case "/api/today": return load("today.json");
+    case "/api/picks/latest": {
+      try { return await load(`picks_${url.searchParams.get("preset") ?? "quality_momentum"}.json`); } catch { return limit("This strategy"); }
+    }
     case "/api/picks": {
       try { return await load(`picks_${body.preset ?? "quality_momentum"}.json`); } catch { return limit("This strategy"); }
     }

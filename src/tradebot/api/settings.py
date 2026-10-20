@@ -20,6 +20,8 @@ class Settings:
     autostart_live: bool = field(default_factory=lambda: _bool(os.environ.get("TRADEBOT_AUTOSTART")))
     cors_origins: list[str] = field(default_factory=lambda: [
         o for o in os.environ.get("TRADEBOT_CORS", "http://localhost:5173").split(",") if o])
+    precompute: bool = field(default_factory=lambda: _bool(os.environ.get("TRADEBOT_PRECOMPUTE", "1")))
+    precompute_seconds: int = field(default_factory=lambda: int(os.environ.get("TRADEBOT_PRECOMPUTE_SECONDS", "1800")))
     cache_seconds: int = field(default_factory=lambda: int(os.environ.get("TRADEBOT_CACHE_SECONDS", "60")))
 
     def load_config(self) -> dict:

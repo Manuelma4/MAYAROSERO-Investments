@@ -7,6 +7,7 @@ import { STATIC } from "../lib/snapshot";
 import type { PicksResult } from "../lib/types";
 import { LinesChart, SERIES, type Overlay } from "../components/charts";
 import { Card, ErrorBox, Field, Spinner } from "../components/ui";
+import { Hint } from "../components/Hint";
 import { cssVar, useTheme } from "../lib/theme";
 
 const PRESETS = [
@@ -46,10 +47,13 @@ export default function Picks() {
   const [showHistory, setShowHistory] = useState(false);
   const { resolved } = useTheme();
 
+  const isDefault = topN === "10" && start === "2015-01-01" && rebalance === "ME" && trend && !regime;
   const run = async () => {
     setLoading(true); setError(null);
+    const custom = () => api.picks({ preset, top_n: Number(topN), start, rebalance, trend_filter: trend, regime_filter: regime });
     try {
-      setRes(await api.picks({ preset, top_n: Number(topN), start, rebalance, trend_filter: trend, regime_filter: regime }));
+      // Default settings: instant precomputed result. Custom settings (or not ready yet): compute now.
+      setRes(isDefault ? await api.picksLatest(preset).catch(custom) : await custom());
     } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,8 +85,35 @@ export default function Picks() {
         </div>
         {res && <p className="muted small">{res.preset_info[preset]}</p>}
       </section>
+      <details className="customize">
+        <summary>Customize<span className="muted small"> · {topN} stocks · {rebalance === "ME" ? "monthly" : rebalance === "QE" ? "quarterly" : "weekly"} review{trend ? " · uptrends only" : ""}{regime ? " · cash in bear markets" : ""}</span></summary>
+        <form className="form" onSubmit={(e) => { e.preventDefault(); run(); }}>
+          <Field label="Stocks to hold"><select id="pk-topn" value={topN} onChange={(e) => setTopN(e.target.value)}>{[5, 8, 10, 15, 20].map((n) => <option key={n}>{n}</option>)}</select></Field>
+          <Field label="Review every"><select id="pk-rebal" value={rebalance} onChange={(e) => setRebalance(e.target.value)}>
+            <option value="ME">Month</option><option value="QE">Quarter</option><option value="W-FRI">Week</option></select></Field>
+          <Field label="Test history from"><input id="pk-start" type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
+          <label className="check"><input id="pk-trend" type="checkbox" checked={trend} onChange={(e) => setTrend(e.target.checked)} /> Only uptrends</label>
+          <label className="check"><input id="pk-regime" type="checkbox" checked={regime} onChange={(e) => setRegime(e.target.checked)} /> Cash in bear markets</label>
+          <button className="btn primary" disabled={loading}>{loading ? <><Spinner /> Computing</> : "Update picks"}</button>
+        </form>
+        <ul className="hint-list muted small">
+          <li><strong>Stocks to hold:</strong> fewer stocks means more concentrated (bigger ups and downs); 10 is a good balance.</li>
+          <li><strong>Review every:</strong> how often the list is refreshed. Monthly is the standard for momentum; weekly trades more and costs more.</li>
+          <li><strong>Only uptrends:</strong> skip stocks below their 200-day average (their long-term trend is down).</li>
+          <li><strong>Cash in bear markets:</strong> sell everything when the S&amp;P 500 falls below its 200-day average; it avoids big crashes but can miss rebounds.</li>
+        </ul>
+      </details>
       <ErrorBox error={error} />
       {loading && !res && <div className="empty"><Spinner /> Ranking ~120 S&amp;P 500 leaders on today's prices…</div>}
+
+      {res?.changes?.date && !res.risk_off && (
+        <Card title={<>Changes at the last review · {res.changes.date}<Hint>What changed when the list was last refreshed: buy the new names, sell the ones that dropped out, keep the rest.</Hint></>}>
+          <div className="changes inline">
+            {([["Buy", res.changes.buy, "up"], ["Sell", res.changes.sell, "down"], ["Keep", res.changes.keep, ""]] as const).map(([label, list, tone]) => (
+              <div key={label} className="change-row"><span className={`badge ${tone}`}>{label}</span><span className="change-syms">{list.length ? list.join(" · ") : <span className="muted">None</span>}</span></div>))}
+          </div>
+        </Card>
+      )}
 
       {res && (
         <Card title={<>{res.risk_off ? "Signal: stay in cash" : `Hold now · ${res.picks.length} stocks`}</>}
@@ -92,14 +123,15 @@ export default function Picks() {
           ) : (
             <div className="table-wrap">
               <table className="picks">
-                <thead><tr><th>#</th><th>Company</th><th className="hide-sm">Sector</th><th>Score</th><th className="r">Price</th><th className="r">Today</th><th className="r">1M</th><th className="r hide-sm">12M ex-1M</th><th className="r hide-sm">vs S&amp;P 6M</th><th className="r">Weight</th></tr></thead>
+                <thead><tr><th>#</th><th>Company</th><th className="hide-sm">Sector</th><th>Score<Hint>The engine's overall grade combining momentum, trend, strength vs the S&amp;P 500 and calmness. Longer bar = stronger candidate.</Hint></th><th className="r">Price</th><th className="r">Today</th><th className="r">1M</th><th className="r hide-sm">12M ex-1M<Hint>Return over the last 12 months, leaving out the most recent month (recent moves often reverse briefly). The core momentum signal.</Hint></th><th className="r hide-sm">vs S&amp;P 6M<Hint>How much better (or worse) the stock did than the S&amp;P 500 over 6 months.</Hint></th><th className="r">Weight<Hint>Share of your money for this stock. Equal weights keep the portfolio diversified.</Hint></th></tr></thead>
                 <tbody>
                   {res.picks.map((p, i) => {
                     const q = quotes[p.symbol];
                     return (
                       <tr key={p.symbol}>
                         <td className="muted">{String(i + 1).padStart(2, "0")}</td>
-                        <td><Link className="asset" to={`/charts?symbol=${encodeURIComponent(p.symbol)}`}><span className="avatar">{p.symbol.slice(0, 2)}</span><span><strong>{p.name}</strong><span className="muted small">{p.symbol}</span></span></Link></td>
+                        <td><Link className="asset" to={`/charts?symbol=${encodeURIComponent(p.symbol)}`}><span className="avatar">{p.symbol.slice(0, 2)}</span><span><strong>{p.name}</strong><span className="muted small">{p.symbol}</span></span></Link>
+                          {p.reason && <div className="muted small pick-reason">{p.reason}</div>}</td>
                         <td className="muted hide-sm">{p.sector}</td>
                         <td><ScoreBar v={p.score} /></td>
                         <td className="r num">{fmtPrice(q?.price ?? p.price)}</td>
@@ -150,18 +182,7 @@ export default function Picks() {
           </button>
           {showHistory && (
             <div className="history-body">
-              <p className="muted small">History is only used to test and tune the engine. The picks above are what it recommends today.</p>
-              <Card>
-                <form className="form" onSubmit={(e) => { e.preventDefault(); run(); }}>
-                  <Field label="Stocks held"><select value={topN} onChange={(e) => setTopN(e.target.value)}>{[5, 8, 10, 15, 20].map((n) => <option key={n}>{n}</option>)}</select></Field>
-                  <Field label="Rebalance"><select value={rebalance} onChange={(e) => setRebalance(e.target.value)}>
-                    <option value="ME">Monthly</option><option value="QE">Quarterly</option><option value="W-FRI">Weekly</option></select></Field>
-                  <Field label="Test from"><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
-                  <label className="check"><input type="checkbox" checked={trend} onChange={(e) => setTrend(e.target.checked)} /> Only uptrends</label>
-                  <label className="check" title="Move to cash when the S&P 500 is below its 200-day average"><input type="checkbox" checked={regime} onChange={(e) => setRegime(e.target.checked)} /> Cash in bear markets</label>
-                  <button className="btn primary" disabled={loading}>{loading ? <><Spinner /> Computing</> : "Update"}</button>
-                </form>
-              </Card>
+              <p className="muted small">History is only used to test and tune the engine. The picks above are what it recommends today. Settings are in Customize at the top.</p>
               <div className="kpis">
                 <div className="kpi"><span className="kpi-label">Annual return</span><span className="kpi-value">{fmtPct(s["cagr_%"], 1)}</span><span className="kpi-sub">S&amp;P 500 {fmtPct(s["benchmark_cagr_%"], 1)}</span></div>
                 <div className="kpi"><span className="kpi-label">Edge vs index / year</span><span className={`kpi-value ${beat ? "up" : "down"}`}>{fmtPct(s["excess_cagr_%"], 1)}</span><span className="kpi-sub">{beat ? "Outperformed" : "Underperformed"} since {s.start}</span></div>

@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, PicksResult, PredictResult, Quote, StrategyInfo, Universe } from "./types";
+import type { BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, PicksResult, PredictResult, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -41,6 +41,8 @@ const qs = (o: Record<string, string | number | undefined>) =>
 
 export const api = {
   universe: () => request<Universe>("/api/universe"),
+  today: () => request<TodayBoard>("/api/today"),
+  picksLatest: (preset: string) => request<PicksResult>(`/api/picks/latest?${qs({ preset })}`),
   picks: (body: object) => request<PicksResult>("/api/picks", { method: "POST", body: JSON.stringify(body) }),
   quotes: (symbols: string[]) => request<Quote[]>(`/api/quotes?${qs({ symbols: symbols.join(",") })}`),
   strategies: () => request<StrategyInfo[]>("/api/strategies"),

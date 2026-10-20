@@ -32,7 +32,8 @@ def main(out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     (out / "charts").mkdir(exist_ok=True)
     tmp = Path(tempfile.mkdtemp())
-    app = create_app(Settings(db_path=tmp / "s.db", static_dir=None, api_token=None, cache_seconds=3600))
+    app = create_app(Settings(db_path=tmp / "s.db", static_dir=None, api_token=None, cache_seconds=3600,
+                              precompute=False))
 
     def save(name: str, data) -> None:
         (out / name).write_text(json.dumps(data, separators=(",", ":")))
@@ -65,9 +66,13 @@ def main(out: Path) -> None:
                 print("chart failed", s, exc)
         print(f"charts: {ok}/{len(symbols)}")
 
+        app.state.precompute.run_once()   # same precomputed results the live app serves
+        if app.state.precompute.last_error:
+            print("precompute warnings:", app.state.precompute.last_error)
         for p in PRESETS:
-            save(f"picks_{p}.json", post("/api/picks", {"preset": p}))
-        print("picks: ok")
+            save(f"picks_{p}.json", get("/api/picks/latest", preset=p))
+        save("today.json", get("/api/today"))
+        print("picks + today: ok")
         save("backtest.json", post("/api/backtest", {"provider": "yahoo", "symbol": "^GSPC", "timeframe": "1d",
                                                       "start": "2015-01-01", "strategy": "dow_pullback"}))
         save("predict.json", post("/api/predict", {"provider": "yahoo", "symbols": ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"],

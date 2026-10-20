@@ -15,7 +15,7 @@ import Predict from "./pages/Predict";
 import Settings from "./pages/Settings";
 
 const NAV = [
-  { to: "/", label: "Overview", mobile: true, icon: "M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" },
+  { to: "/", label: "Today", mobile: true, icon: "M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" },
   { to: "/discover", label: "Discover", mobile: true, icon: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15.5 8.5l-2 5-5 2 2-5z" },
   { to: "/picks", label: "Beat the S&P", short: "Picks", mobile: true, icon: "M5 19V9m7 10V5m7 14v-7" },
   { to: "/alerts", label: "Alerts", mobile: true, badge: true, icon: "M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" },

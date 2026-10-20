@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { fmtPct, fmtPrice, fmtTime } from "../lib/format";
 import type { PredictResult } from "../lib/types";
@@ -35,6 +35,9 @@ export default function Predict() {
       }));
     } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
   };
+  // Results appear immediately with the default stocks; the form is for customizing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { run(); }, []);
   const v = res?.validation;
 
   return (
@@ -45,8 +48,8 @@ export default function Predict() {
         <form className="form" onSubmit={(e) => { e.preventDefault(); run(); }}>
           <MarketPicker value={sel} onChange={setSel} multi />
           <Field label="History from"><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
-          <Field label="Horizon (bars ahead)"><input type="number" min="1" max="100" value={horizon} onChange={(e) => setHorizon(e.target.value)} /></Field>
-          <button className="btn primary" disabled={loading}>{loading ? <><Spinner /> Training…</> : "Train & predict"}</button>
+          <Field label="Look ahead (candles)"><input type="number" min="1" max="100" value={horizon} onChange={(e) => setHorizon(e.target.value)} /></Field>
+          <button className="btn primary" disabled={loading}>{loading ? <><Spinner /> Calculating…</> : "Update"}</button>
         </form>
       </Card>
       <ErrorBox error={error} />

@@ -66,64 +66,30 @@ def universe():
 
 @router.post("/picks")
 def picks(request: Request, body: PicksRequest):
-    import pandas as pd
+    from .services import ServiceError, compute_picks
 
-    from ..picker import PRESET_INFO, PickerConfig, run_picker
-    from ..universe import by_symbol, sp500_symbols
-
-    symbols = body.symbols or sp500_symbols()
-    # One extra year before `start` so 12-month factors exist on day one.
-    fetch_start = (pd.Timestamp(body.start) - pd.Timedelta(days=400)).date().isoformat()
-    market = _state(request).market
-    frames = market.history_many("yahoo", symbols, "1d", start=fetch_start)
     try:
-        bench = market.history("yahoo", body.benchmark, "1d", start=fetch_start)
-    except DataUnavailable as exc:
-        raise HTTPException(502, str(exc)) from exc
-    if len(frames) < body.top_n:
-        raise HTTPException(502, f"Only {len(frames)} of {len(symbols)} stocks could be loaded")
-    cfg = PickerConfig(preset=body.preset, top_n=body.top_n, rebalance=body.rebalance,
-                       trend_filter=body.trend_filter, regime_filter=body.regime_filter, cost_bps=body.cost_bps)
-    try:
-        res = run_picker(frames, bench, cfg, start=body.start)
-        # Honest yardstick: the same stocks, equal weight, no selection. It shares the
-        # survivorship bias, so the gap to it measures the selection skill itself.
-        ew = run_picker(frames, bench, PickerConfig(top_n=len(frames), trend_filter=False,
-                                                    rebalance=body.rebalance, cost_bps=body.cost_bps),
-                        start=body.start)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    res.stats["universe_cagr_%"] = ew.stats["cagr_%"]
-    res.stats["skill_vs_universe_%"] = res.stats["cagr_%"] - ew.stats["cagr_%"]
+        return compute_picks(_state(request).market, body)
+    except ServiceError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
 
-    info = by_symbol()
-    cur = res.current
 
-    def row(sym: str, r) -> dict:
-        s = info.get(sym)
-        return {"symbol": sym, "name": s.name if s else sym, "sector": s.sector if s else None,
-                "score": r.score, "eligible": bool(r.eligible), "price": r.price,
-                "return_1m_%": r.return_1m * 100, "momentum_12_1_%": r.momentum_12_1 * 100,
-                "momentum_6_1_%": r.momentum_6_1 * 100, "rel_strength_%": r.rel_strength * 100,
-                "trend_%": r.trend * 100, "volatility_%": -r.low_vol * 100}
+@router.get("/picks/latest")
+def picks_latest(request: Request, preset: str = "quality_momentum"):
+    """Precomputed picks for a preset with default settings (instant)."""
+    data = _state(request).precompute.get(f"picks:{preset}")
+    if data is None:
+        raise HTTPException(503, "Picks are being computed. They will be ready in about a minute.")
+    return data
 
-    ranking = [row(sym, r) for sym, r in cur.iterrows()]
-    current = [x for x in ranking if x["eligible"]][: body.top_n]
-    risk_off = bool(res.holdings and res.holdings[-1]["risk_off"])
-    return ser.clean({
-        "preset": body.preset, "preset_info": PRESET_INFO,
-        "as_of": res.equity.index[-1].isoformat(),
-        "risk_off": risk_off,
-        "picks": [] if risk_off else current,
-        "ranking": ranking[:60],
-        "stats": res.stats,
-        "equity": ser.line(res.equity),
-        "benchmark": ser.line(res.benchmark),
-        "universe": ser.line(ew.equity),
-        "holdings": res.holdings[-36:][::-1],
-        "universe_size": len(frames),
-        "missing": sorted(set(symbols) - set(frames)),
-    })
+
+@router.get("/today")
+def today(request: Request):
+    """Precomputed 'Today' board: market mood, what to hold, changes, movers."""
+    data = _state(request).precompute.get("today")
+    if data is None:
+        raise HTTPException(503, "Today's board is being computed. It will be ready in about a minute.")
+    return data
 
 
 @router.get("/quotes")

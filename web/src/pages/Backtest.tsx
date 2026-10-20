@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { fmtDate, fmtNum, fmtPct, fmtPrice, tone } from "../lib/format";
 import type { BacktestResult, StrategyInfo } from "../lib/types";
@@ -36,6 +36,13 @@ export default function Backtest() {
     } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
   };
 
+  // Show a result immediately with the default setup; the form is for customizing.
+  const ranOnce = useRef(false);
+  useEffect(() => {
+    if (!ranOnce.current && current && Object.keys(params).length) { ranOnce.current = true; run(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
   const markers = useMemo<Marker[]>(() => (res?.trades ?? []).flatMap((t) => [
     { time: t.entry_time, position: t.side === "long" ? "belowBar" : "aboveBar", color: t.side === "long" ? upColor() : downColor(),
       shape: t.side === "long" ? "arrowUp" : "arrowDown", text: t.side === "long" ? "L" : "S" } as Marker,
@@ -51,7 +58,7 @@ export default function Backtest() {
   return (
     <div className="page">
       <div className="page-head"><div><h1>Backtest</h1>
-        <p className="muted">Test a setup on historical charts. Signals fill at the next bar's open, stop is assumed before target, fees and slippage included.</p></div></div>
+        <p className="muted">See how a trading setup would have performed on past charts. A result is shown right away; change the market, dates or setup and press Update. Realistic: orders fill at the next candle, fees and slippage included.</p></div></div>
       <Card>
         <form className="form" onSubmit={(e) => { e.preventDefault(); run(); }}>
           <MarketPicker value={sel} onChange={setSel} />
@@ -64,7 +71,7 @@ export default function Backtest() {
           <Field label="Risk / trade %"><input type="number" step="0.1" min="0.1" max="20" value={risk} onChange={(e) => setRisk(e.target.value)} /></Field>
           <Field label="Fee %"><input type="number" step="0.01" min="0" value={fee} onChange={(e) => setFee(e.target.value)} /></Field>
           <label className="check"><input type="checkbox" checked={allowShort} onChange={(e) => setAllowShort(e.target.checked)} /> Allow shorts</label>
-          <button className="btn primary" disabled={loading}>{loading ? <Spinner /> : "Run backtest"}</button>
+          <button className="btn primary" disabled={loading}>{loading ? <Spinner /> : "Update"}</button>
         </form>
         {current && (
           <div className="params">

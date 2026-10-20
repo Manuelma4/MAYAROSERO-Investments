@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .engine import Broadcaster, LiveEngine
 from .market import MarketData, ProviderFactory
+from .precompute import Precomputer
 from .routes import router, ws_router
 from .settings import Settings
 from .store import EventStore
@@ -34,13 +35,17 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
         app.state.broadcaster.bind(asyncio.get_running_loop())
         if settings.autostart_live:
             app.state.engine.start()
+        if settings.precompute:
+            app.state.precompute.start()
         yield
+        app.state.precompute.stop()
         app.state.engine.stop()
 
     app = FastAPI(title="tradebot", version="0.2.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.market = MarketData(provider_factory, ttl=settings.cache_seconds)
     app.state.store = EventStore(settings.db_path)
+    app.state.precompute = Precomputer(app.state.market, interval=settings.precompute_seconds)
     app.state.broadcaster = Broadcaster()
     kw = {"scanner_factory": scanner_factory} if scanner_factory else {}
     app.state.engine = LiveEngine(config, app.state.store, app.state.broadcaster, **kw)

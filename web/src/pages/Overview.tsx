@@ -1,16 +1,21 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { api } from "../lib/api";
 import { fmtPct, fmtPrice, fmtTime } from "../lib/format";
 import { useLive } from "../lib/live";
 import { MARKETS, STOCKS, marketName } from "../lib/markets";
 import { useQuotes } from "../lib/quotes";
-import type { Quote } from "../lib/types";
+import type { Quote, TodayBoard } from "../lib/types";
+import { Hint } from "../components/Hint";
 import { Sparkline } from "../components/Sparkline";
-import { Card, Empty } from "../components/ui";
+import { Card, Empty, Spinner } from "../components/ui";
 
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
 }
+
+const MOOD_TONE = { "Risk-on": "up", Neutral: "", "Risk-off": "down" } as const;
 
 function MarketCard({ symbol, name, q }: { symbol: string; name: string; q?: Quote }) {
   const pct = q?.change_pct ?? 0;
@@ -30,28 +35,97 @@ function MarketCard({ symbol, name, q }: { symbol: string; name: string; q?: Quo
   );
 }
 
+function TodayBoardView({ t }: { t: TodayBoard }) {
+  const core = t.core;
+  const ch = core?.changes;
+  return (
+    <>
+      <section className="mood">
+        <div className="mood-head">
+          <span className="kpi-label">Market mood<Hint>Combines the S&amp;P 500's trend (above or below its 200-day average), how many leading stocks are rising, and the fear index (VIX). It tells you whether the market wind is at your back.</Hint></span>
+          <span className={`mood-label ${MOOD_TONE[t.mood.label]}`}>{t.mood.label}</span>
+        </div>
+        <p className="mood-text">{t.mood.explanation}</p>
+        <p className="mood-advice">{t.mood.advice}</p>
+      </section>
+
+      <div className="grid-3">
+        <Card className="span-2" title={<>What to hold now<Hint>The engine's current top picks among the S&amp;P 500 leaders: strong 12-month performance, beating the index, in an uptrend, with calmer price action. Split your money equally between them and review once a month.</Hint></>}
+          actions={<Link to="/picks" className="link">All picks</Link>}>
+          {!core ? <Empty>Picks are being computed.</Empty> : core.risk_off ? (
+            <div className="notice">The S&amp;P 500 is in a downtrend, so the engine suggests holding cash until it recovers.</div>
+          ) : (
+            <ol className="hold-list">
+              {core.picks.slice(0, 5).map((p) => (
+                <li key={p.symbol}>
+                  <Link to={`/charts?symbol=${encodeURIComponent(p.symbol)}`} className="hold-sym">{p.symbol}</Link>
+                  <div className="hold-body"><strong>{p.name}</strong><span className="muted small">{p.reason}</span></div>
+                </li>))}
+              {core.picks.length > 5 && <li className="muted small hold-more"><Link to="/picks" className="link">+ {core.picks.length - 5} more picks</Link></li>}
+            </ol>
+          )}
+          {core && !core.risk_off && (
+            <p className="muted small edge-line">
+              Tested since {core.edge.start}: {fmtPct(core.edge["cagr_%"], 1)} a year vs {fmtPct(core.edge["benchmark_cagr_%"], 1)} for the S&amp;P 500.
+              <Hint>How this strategy would have done in the past (not a guarantee). Part of that lead comes from using today's index members; the honest "selection skill" is {fmtPct(core.edge["skill_vs_universe_%"], 1)} a year. Details in Picks › Track record.</Hint>
+            </p>
+          )}
+        </Card>
+
+        <Card title={<>Changes this month<Hint>What changed at the last monthly review: stocks to buy (new in the picks), to sell (dropped out) and to keep.</Hint></>}>
+          {!ch?.date ? <Empty>No changes yet.</Empty> : (
+            <div className="changes">
+              <p className="muted small">Review of {ch.date}</p>
+              {([["Buy", ch.buy, "up"], ["Sell", ch.sell, "down"], ["Keep", ch.keep, ""]] as const).map(([label, list, tone]) => (
+                <div key={label} className="change-row">
+                  <span className={`badge ${tone}`}>{label}</span>
+                  <span className="change-syms">{list.length ? list.join(" · ") : <span className="muted">None</span>}</span>
+                </div>))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid-2">
+        <Card title={<>Rising most today<Hint>The S&amp;P 500 leaders up the most today. A big jump is information, not a buy signal on its own: moves backed by news tend to continue, moves without news often fade.</Hint></>}>
+          <ul className="movers">{t.gainers.map((q) => (
+            <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol} <span className="muted small">{marketName(q.symbol)}</span></Link><span className="up">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
+        </Card>
+        <Card title={<>Falling most today<Hint>The S&amp;P 500 leaders down the most today. If one of your picks is here, check its stop-loss rather than reacting to one day.</Hint></>}>
+          <ul className="movers">{t.losers.map((q) => (
+            <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol} <span className="muted small">{marketName(q.symbol)}</span></Link><span className="down">{fmtPct(q.change_pct, 2)}</span></li>))}</ul>
+        </Card>
+      </div>
+    </>
+  );
+}
+
 export default function Overview() {
   const { events, status } = useLive();
+  const [today, setToday] = useState<TodayBoard | null>(null);
+  const [todayErr, setTodayErr] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.today().then((t) => { if (alive) { setToday(t); setTodayErr(null); } })
+      .catch((e) => alive && setTodayErr((e as Error).message));
+    load();
+    const id = setInterval(load, 60_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
   const watch = Array.from(new Set([...(status?.watchlist.map((w) => w.symbol) ?? []), ...STOCKS.map((s) => s.symbol)])).slice(0, 14);
   const { quotes } = useQuotes([...MARKETS.map((m) => m.symbol), ...watch]);
-
-  const ranked = watch.map((s) => quotes[s]).filter((q): q is Quote => q?.change_pct !== undefined)
-    .sort((a, b) => (b.change_pct ?? 0) - (a.change_pct ?? 0));
-  const gainers = ranked.filter((q) => (q.change_pct ?? 0) > 0).slice(0, 4);
-  const losers = [...ranked].reverse().filter((q) => (q.change_pct ?? 0) < 0).slice(0, 4);
   const anyError = MARKETS.every((m) => quotes[m.symbol]?.error);
 
   return (
     <div className="page">
       <section className="hero-x">
         <p className="eyebrow">{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · {greeting()}, Manuel</p>
-        <h1 className="display">Markets, live.</h1>
-        <p className="muted lead">Real-time prices, alerts and a stock-selection engine built to beat the S&amp;P&nbsp;500.</p>
-        <div className="hero-actions">
-          <Link to="/picks" className="btn primary">This month's picks</Link>
-          <Link to="/discover" className="btn">Discover stocks</Link>
-        </div>
+        <h1 className="display">Today</h1>
+        <p className="muted lead">Everything is already calculated: the market mood, what to hold, what changed and what is moving right now.</p>
       </section>
+
+      {today ? <TodayBoardView t={today} /> : <div className="empty">{todayErr ? todayErr : <><Spinner /> Preparing today's board…</>}</div>}
 
       {anyError && <div className="error">Market data is unreachable from this server. Check its network access to Yahoo Finance and your crypto exchange.</div>}
 
@@ -85,28 +159,17 @@ export default function Overview() {
             </table>
           </div>
         </Card>
-        <div className="stack">
-          <Card title="Top movers today">
-            {ranked.length ? (
-              <ul className="movers">
-                {[...gainers, ...losers].map((q) => (
-                  <li key={q.symbol}><Link to={`/charts?symbol=${encodeURIComponent(q.symbol)}`}>{q.symbol}</Link>
-                    <span className={(q.change_pct ?? 0) >= 0 ? "up" : "down"}>{fmtPct(q.change_pct, 2)}</span></li>))}
-              </ul>
-            ) : <Empty>Waiting for prices…</Empty>}
-          </Card>
-          <Card title="Latest alerts" actions={<Link to="/alerts" className="link">All</Link>}>
-            {events.length ? (
-              <ul className="movers">
-                {events.slice(0, 6).map((e) => (
-                  <li key={e.id}>
-                    <span><strong>{e.symbol}</strong> <span className="muted small">{e.type === "move" ? e.direction?.toLowerCase() : `${e.side} setup`} · {fmtTime(e.time)}</span></span>
-                    {e.type === "move" ? <span className={(e.move_pct ?? 0) >= 0 ? "up" : "down"}>{fmtPct(e.move_pct, 2)}</span> : <span className={e.side === "long" ? "up" : "down"}>{e.side === "long" ? "LONG" : "SHORT"}</span>}
-                  </li>))}
-              </ul>
-            ) : <Empty>No alerts yet. Start the engine on the Alerts page.</Empty>}
-          </Card>
-        </div>
+        <Card title="Latest alerts" actions={<Link to="/alerts" className="link">All</Link>}>
+          {events.length ? (
+            <ul className="movers">
+              {events.slice(0, 8).map((e) => (
+                <li key={e.id}>
+                  <span><strong>{e.symbol}</strong> <span className="muted small">{e.type === "move" ? e.direction?.toLowerCase() : `${e.side} setup`} · {fmtTime(e.time)}</span></span>
+                  {e.type === "move" ? <span className={(e.move_pct ?? 0) >= 0 ? "up" : "down"}>{fmtPct(e.move_pct, 2)}</span> : <span className={e.side === "long" ? "up" : "down"}>{e.side === "long" ? "LONG" : "SHORT"}</span>}
+                </li>))}
+            </ul>
+          ) : <Empty>No alerts yet. They appear here as soon as a stock surges or crashes.</Empty>}
+        </Card>
       </div>
     </div>
   );
