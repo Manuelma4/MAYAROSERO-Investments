@@ -45,7 +45,30 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
     app.state.settings = settings
     app.state.market = MarketData(provider_factory, ttl=settings.cache_seconds)
     app.state.store = EventStore(settings.db_path)
-    app.state.precompute = Precomputer(app.state.market, interval=settings.precompute_seconds)
+    from ..live import PaperBroker
+
+    paper_cfg = config.get("paper_trading", {})
+    app.state.paper = PaperBroker(settings.db_path.parent / "paper_state.json",
+                                  capital=paper_cfg.get("capital", 10_000))
+    import threading
+
+    app.state.paper_lock = threading.Lock()   # one order / exit at a time
+
+    def on_opportunity(o: dict) -> None:
+        ev = app.state.store.add("opportunity", o["symbol"], {k: v for k, v in o.items() if k != "symbol"})
+        app.state.broadcaster.publish(ev)
+        arrow = "RISING" if o["direction"] == "long" else "FALLING"
+        text = (f"[INVEST NOW] {o['symbol']} {arrow} {o['change_pct']:+.1f}% on {o['rel_volume']:.1f}x volume\n"
+                f"  {o.get('headline') or ''}\n  entry {o['entry']:.2f}  stop {o['stop']:.2f}  target {o['target']:.2f}")
+        try:
+            for n in app.state.engine._ensure_scanner().notifiers:
+                n.send(text)
+        except Exception as exc:
+            log.warning("notify failed: %s", exc)
+
+    app.state.precompute = Precomputer(app.state.market, interval=settings.precompute_seconds,
+                                       on_opportunity=on_opportunity, paper=app.state.paper,
+                                       paper_lock=app.state.paper_lock)
     app.state.broadcaster = Broadcaster()
     kw = {"scanner_factory": scanner_factory} if scanner_factory else {}
     app.state.engine = LiveEngine(config, app.state.store, app.state.broadcaster, **kw)

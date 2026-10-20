@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, PicksResult, PredictResult, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
+import type { BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, PicksResult, PredictResult, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -41,6 +41,11 @@ const qs = (o: Record<string, string | number | undefined>) =>
 
 export const api = {
   universe: () => request<Universe>("/api/universe"),
+  opportunities: () => request<OpportunitiesResult>("/api/opportunities"),
+  scanOpportunities: () => request<OpportunitiesResult>("/api/opportunities/scan", { method: "POST" }),
+  paperOrder: (body: object) => request<{ mode: string; plan: OrderPlan; placed?: boolean }>("/api/paper/orders", { method: "POST", body: JSON.stringify(body) }),
+  paperCloseAll: () => request<{ closed: unknown[] }>("/api/paper/close-all", { method: "POST" }),
+  paperAccount: () => request<PaperAccount>("/api/paper"),
   today: () => request<TodayBoard>("/api/today"),
   picksLatest: (preset: string) => request<PicksResult>(`/api/picks/latest?${qs({ preset })}`),
   picks: (body: object) => request<PicksResult>("/api/picks", { method: "POST", body: JSON.stringify(body) }),

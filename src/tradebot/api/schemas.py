@@ -49,3 +49,10 @@ class PicksRequest(BaseModel):
     cost_bps: float = Field(10, ge=0, le=200)
     symbols: list[str] | None = Field(None, max_length=300)   # default: S&P 500 members of the universe
     benchmark: str = "SPY"
+
+
+class PaperOrder(BaseModel):
+    """Only the idea is chosen by the client; prices, stop, target and expiry come from the server."""
+    symbol: str = Field(..., min_length=1, max_length=20)
+    side: Literal["long", "short"]
+    preview: bool = False      # True: only compute the plan (size, max loss), don't place it

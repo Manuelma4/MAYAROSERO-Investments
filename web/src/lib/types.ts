@@ -63,7 +63,9 @@ export interface LiveStatus {
 }
 
 export interface LiveEvent {
-  id: number; created_at: string; type: "signal" | "move"; symbol: string; time: string;
+  id: number; created_at: string; type: "signal" | "move" | "opportunity"; symbol: string; time: string;
+  // opportunity
+  name?: string; change_pct?: number; headline?: string | null; entry?: number; rel_volume?: number;
   // signal
   side?: "long" | "short"; strategy?: string; timeframe?: string; price: number; stop?: number; target?: number | null;
   // move
@@ -107,3 +109,15 @@ export interface TodayBoard {
     edge: { "cagr_%": number; "benchmark_cagr_%": number; "skill_vs_universe_%": number; start: string }; settings?: string };
   gainers: MoverLite[]; losers: MoverLite[];
 }
+
+export interface Opportunity {
+  symbol: string; name: string; direction: "long" | "short"; as_of: string; price: number; change_pct: number;
+  sigma: number; rel_volume: number; trend: string; pct_from_extreme: number; entry: number; stop: number;
+  target: number; risk_pct: number; hold_days: number; expires_at: string; score: number;
+  catalyst: string | null; headline: string | null; headline_url: string | null; headline_publisher: string | null;
+  qualified: boolean; reasons: string[];
+}
+export interface OpportunitiesResult { as_of: string; us_market_open: boolean; items: Opportunity[] }
+export interface OrderPlan { symbol: string; side: string; entry: number; stop: number; target: number | null; qty: number; value: number; max_loss: number; risk_pct_of_equity: number }
+export interface PaperPosition { symbol: string; strategy: string; side: string; entry_time: string; entry: number; qty: number; stop: number; target: number | null; price?: number | null; pnl?: number | null }
+export interface PaperAccount { enabled: boolean; cash: number; equity: number; open_pnl: number; positions: PaperPosition[]; history: { symbol: string; strategy: string; side: string; entry: number; exit: number; exit_time: string; reason: string; pnl: number }[] }

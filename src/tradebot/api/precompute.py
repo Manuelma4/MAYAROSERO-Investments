@@ -24,9 +24,16 @@ log = logging.getLogger(__name__)
 
 
 class Precomputer:
-    def __init__(self, market: MarketData, interval: int = 1800):
+    def __init__(self, market: MarketData, interval: int = 1800, opportunities_interval: int = 300,
+                 on_opportunity=None, paper=None, paper_lock=None):
         self.market = market
         self.interval = interval
+        self.opportunities_interval = opportunities_interval
+        self.on_opportunity = on_opportunity   # callback(dict) for each NEW qualified opportunity
+        self.paper = paper                     # PaperBroker for automatic exits of "Invest" positions
+        self.paper_lock = paper_lock or threading.Lock()
+        self._seen: set[tuple] = set()
+        self._scanner = None
         self._data: dict[str, dict] = {}
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -85,11 +92,81 @@ class Precomputer:
             "losers": [{k: q[k] for k in ("symbol", "name", "price", "change_pct")} for q in quotes[::-1][:6]],
         })
 
+    # ---- live opportunities ---------------------------------------------------------
+    def scan_opportunities(self) -> dict:
+        import pandas as pd
+
+        from ..live.opportunities import OpportunityScanner, session_fraction
+
+        if self._scanner is None:
+            self._scanner = OpportunityScanner(self.market)
+        now = pd.Timestamp.now(tz="UTC")
+        items = [o.to_dict() for o in self._scanner.scan(now)]
+        data = ser.clean({"as_of": now.isoformat(), "us_market_open": session_fraction(now, False) < 1.0,
+                          "items": items})
+        self.put("opportunities", data)
+        for o in items:
+            key = (o["symbol"], o["direction"], o["as_of"][:10])
+            if o["qualified"] and key not in self._seen:
+                self._seen.add(key)
+                if self.on_opportunity:
+                    try:
+                        self.on_opportunity(o)
+                    except Exception as exc:
+                        log.warning("opportunity callback failed: %s", exc)
+        return data
+
+    def manage_paper_exits(self) -> list[dict]:
+        """Close paper 'Invest' positions at their stop, target or time limit."""
+        import pandas as pd
+
+        if self.paper is None:
+            return []
+        closed = []
+        pos = [p for p in self.paper.positions.values() if p.strategy == "opportunity"]
+        if not pos:
+            return closed
+        quotes = {q["symbol"]: q for q in self.market.quotes([p.symbol for p in pos])}
+        now = pd.Timestamp.now(tz="UTC")
+        for p in pos:
+            price = quotes.get(p.symbol, {}).get("price")
+            if price is None:
+                if now - pd.Timestamp(p.entry_time) > pd.Timedelta(days=7):
+                    log.warning("time limit reached for %s but no price available; will retry", p.symbol)
+                continue
+            long = p.side == "long"
+            reason = None
+            if (price <= p.stop) if long else (price >= p.stop):
+                reason = "stop"
+            elif p.target is not None and ((price >= p.target) if long else (price <= p.target)):
+                reason = "target"
+            elif now - pd.Timestamp(p.entry_time) > pd.Timedelta(days=7):  # ~5 trading days
+                reason = "time limit"
+            if reason:
+                with self.paper_lock:
+                    rec = self.paper.close(p.symbol, p.strategy, price, now.isoformat(), reason)
+                if rec:
+                    closed.append(rec)
+        return closed
+
     def _loop(self) -> None:
         while not self._stop.is_set():
             started = time.time()
             self.run_once()
             self._stop.wait(max(60.0, self.interval - (time.time() - started)))
+
+    def _opp_loop(self) -> None:
+        while not self._stop.is_set():
+            started = time.time()
+            try:
+                self.scan_opportunities()
+            except Exception as exc:
+                log.warning("opportunity scan failed: %s", exc)
+            try:
+                self.manage_paper_exits()   # stops must fire even if the scan failed
+            except Exception as exc:
+                log.warning("paper exits failed: %s", exc)
+            self._stop.wait(max(60.0, self.opportunities_interval - (time.time() - started)))
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -97,6 +174,7 @@ class Precomputer:
         self._stop.clear()
         self._thread = threading.Thread(target=self._loop, name="precompute", daemon=True)
         self._thread.start()
+        threading.Thread(target=self._opp_loop, name="opportunities", daemon=True).start()
 
     def stop(self) -> None:
         self._stop.set()

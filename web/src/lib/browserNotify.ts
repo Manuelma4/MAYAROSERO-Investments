@@ -17,6 +17,12 @@ export async function setBrowserNotify(on: boolean): Promise<boolean> {
 
 export function notifyEvent(e: LiveEvent) {
   if (!browserNotifyEnabled()) return;
+  if (e.type === "opportunity") {
+    try {
+      new Notification(`Invest now: ${e.symbol} ${(e.change_pct ?? 0) > 0 ? "+" : ""}${e.change_pct?.toFixed(1)}%`, { body: e.headline ?? "", tag: `mri-${e.id}` });
+    } catch { /* ignore */ }
+    return;
+  }
   const title = e.type === "move"
     ? `${e.direction === "SURGE" ? "▲" : "▼"} ${e.symbol} ${e.move_pct && e.move_pct > 0 ? "+" : ""}${e.move_pct?.toFixed(2)}%`
     : `${e.side === "long" ? "LONG" : "SHORT"} setup: ${e.symbol}`;

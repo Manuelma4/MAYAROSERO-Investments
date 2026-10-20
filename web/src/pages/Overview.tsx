@@ -5,7 +5,7 @@ import { fmtPct, fmtPrice, fmtTime } from "../lib/format";
 import { useLive } from "../lib/live";
 import { MARKETS, STOCKS, marketName } from "../lib/markets";
 import { useQuotes } from "../lib/quotes";
-import type { Quote, TodayBoard } from "../lib/types";
+import type { OpportunitiesResult, Quote, TodayBoard } from "../lib/types";
 import { Hint } from "../components/Hint";
 import { Sparkline } from "../components/Sparkline";
 import { Card, Empty, Spinner } from "../components/ui";
@@ -113,6 +113,15 @@ export default function Overview() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
+  const [opps, setOpps] = useState<OpportunitiesResult | null>(null);
+  useEffect(() => {
+    const load = () => api.opportunities().then(setOpps).catch(() => undefined);
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const hot = (opps?.items ?? []).filter((o) => o.qualified).slice(0, 3);
+
   const watch = Array.from(new Set([...(status?.watchlist.map((w) => w.symbol) ?? []), ...STOCKS.map((s) => s.symbol)])).slice(0, 14);
   const { quotes } = useQuotes([...MARKETS.map((m) => m.symbol), ...watch]);
   const anyError = MARKETS.every((m) => quotes[m.symbol]?.error);
@@ -124,6 +133,15 @@ export default function Overview() {
         <h1 className="display">Today</h1>
         <p className="muted lead">Everything is already calculated: the market mood, what to hold, what changed and what is moving right now.</p>
       </section>
+
+      {hot.length > 0 && (
+        <Card title={<>Invest now · {hot.length} live idea{hot.length > 1 ? "s" : ""}<Hint>Stocks moving strongly right now with news, heavy volume and the trend on their side. Open Invest now for the full plan (entry, stop-loss, target).</Hint></>}
+          actions={<Link to="/now" className="link">Open</Link>}>
+          <ul className="movers">{hot.map((o) => (
+            <li key={o.symbol}><Link to="/now">{o.symbol} <span className="muted small">{o.headline ?? o.name}</span></Link>
+              <span className={o.direction === "long" ? "up" : "down"}>{fmtPct(o.change_pct, 1)}</span></li>))}</ul>
+        </Card>
+      )}
 
       {today ? <TodayBoardView t={today} /> : <div className="empty">{todayErr ? todayErr : <><Spinner /> Preparing today's board…</>}</div>}
 

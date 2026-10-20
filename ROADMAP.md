@@ -26,7 +26,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        - Fewer clicks, clearer labels, plain-language explanations ("what this means" hints on every
          number and option, beginner-friendly), stock rows open a detail view,
          consistent empty / loading states, mobile-first layout check.
-0b. [ ] **Live catalyst-momentum scanner ("invest now")** — the satellite strategy (20–30% of capital;
+0b. [x] **Live catalyst-momentum scanner ("invest now")** — the satellite strategy (20–30% of capital;
        the monthly picks stay the core). During market hours, every few minutes, over S&P 500 +
        popular stocks + crypto: flag only stocks that are (a) up strongly today on >= 2x normal volume,
        (b) have a real news catalyst (earnings, guidance, upgrade, contract — fetched from Yahoo news /

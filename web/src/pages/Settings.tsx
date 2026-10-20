@@ -21,6 +21,7 @@ export default function Settings() {
 
       <Card title="Tools" className="mobile-only">
         <div className="tool-links">
+          <Link to="/alerts" className="btn">Alerts</Link>
           <Link to="/charts" className="btn">Charts</Link>
           <Link to="/predict" className="btn">Predict</Link>
           <Link to="/backtest" className="btn">Backtest</Link>

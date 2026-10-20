@@ -9,6 +9,7 @@ import Backtest from "./pages/Backtest";
 import Discover from "./pages/Discover";
 import Live from "./pages/Live";
 import Markets from "./pages/Markets";
+import Opportunities from "./pages/Opportunities";
 import Overview from "./pages/Overview";
 import Picks from "./pages/Picks";
 import Predict from "./pages/Predict";
@@ -18,7 +19,8 @@ const NAV = [
   { to: "/", label: "Today", mobile: true, icon: "M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" },
   { to: "/discover", label: "Discover", mobile: true, icon: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15.5 8.5l-2 5-5 2 2-5z" },
   { to: "/picks", label: "Beat the S&P", short: "Picks", mobile: true, icon: "M5 19V9m7 10V5m7 14v-7" },
-  { to: "/alerts", label: "Alerts", mobile: true, badge: true, icon: "M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" },
+  { to: "/now", label: "Invest now", short: "Now", mobile: true, icon: "M13 3L4 14h7l-1 7 9-11h-7z" },
+  { to: "/alerts", label: "Alerts", badge: true, icon: "M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" },
   { to: "/charts", label: "Charts", icon: "M4 19h16M6 15l4-5 3 3 5-7" },
   { to: "/predict", label: "Predict", icon: "M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z" },
   { to: "/backtest", label: "Backtest", icon: "M4 4v16h16M8 14l3-3 3 2 5-6" },
@@ -65,6 +67,7 @@ function Shell() {
             <Route path="/" element={<Overview />} />
             <Route path="/discover" element={<Discover />} />
             <Route path="/picks" element={<Picks />} />
+            <Route path="/now" element={<Opportunities />} />
             <Route path="/alerts" element={<Live />} />
             <Route path="/charts" element={<Markets />} />
             <Route path="/predict" element={<Predict />} />

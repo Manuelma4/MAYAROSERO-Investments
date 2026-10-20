@@ -72,6 +72,7 @@ def main(out: Path) -> None:
         for p in PRESETS:
             save(f"picks_{p}.json", get("/api/picks/latest", preset=p))
         save("today.json", get("/api/today"))
+        save("opportunities.json", post("/api/opportunities/scan", {}))
         print("picks + today: ok")
         save("backtest.json", post("/api/backtest", {"provider": "yahoo", "symbol": "^GSPC", "timeframe": "1d",
                                                       "start": "2015-01-01", "strategy": "dow_pullback"}))

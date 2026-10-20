@@ -212,3 +212,54 @@ def test_completed_changes_skips_provisional_review():
 
 def test_unknown_preset_is_404(client):
     assert client.get("/api/picks/latest", params={"preset": "nope"}).status_code == 404
+
+
+def test_opportunities_and_paper_invest(client, monkeypatch):
+    import pandas as pd
+
+    pre = client.app.state.precompute
+    assert client.get("/api/opportunities").status_code == 503
+    fake = {"symbol": "AAA", "name": "Aaa", "direction": "long", "as_of": "2026-10-20T15:00:00+00:00",
+            "price": 100.0, "change_pct": 5.0, "sigma": 3.0, "rel_volume": 3.0, "trend": "uptrend",
+            "pct_from_extreme": 1.0, "entry": 100.0, "stop": 95.0, "target": 110.0, "risk_pct": 5.0,
+            "hold_days": 5, "expires_at": "2099-01-01T00:00:00+00:00", "score": 80.0, "catalyst": "earnings",
+            "headline": "Aaa beats earnings", "headline_url": "u", "headline_publisher": "X", "qualified": True,
+            "reasons": ["r"]}
+
+    class FakeScanner:
+        def scan(self, now=None):
+            class O:
+                def to_dict(self_inner):
+                    return dict(fake)
+            return [O()]
+
+    pre._scanner = FakeScanner()
+    sent = []
+    pre.on_opportunity = lambda o: sent.append(o["symbol"])
+    data = client.post("/api/opportunities/scan").json()
+    assert data["items"][0]["symbol"] == "AAA" and sent == ["AAA"]
+    pre.scan_opportunities()
+    assert sent == ["AAA"]  # notified once per day
+
+    # The fake provider's last close for AAA becomes the fresh fill price; align the idea with it.
+    px = client.app.state.market.quote("AAA")["price"]
+    fake.update(entry=px, price=px, stop=px * 0.95, target=px * 1.1)
+    pre.scan_opportunities()
+    order = {"symbol": "AAA", "side": "long"}
+    prev = client.post("/api/paper/orders", json={**order, "preview": True}).json()
+    assert prev["mode"] == "paper" and prev["plan"]["stop"] == pytest.approx(px * 0.95) and "placed" not in prev
+    placed = client.post("/api/paper/orders", json=order).json()
+    assert placed["placed"] is True
+    again = client.post("/api/paper/orders", json=order)
+    assert again.status_code == 400 and "already hold" in again.json()["detail"]
+    paper = client.get("/api/paper").json()
+    assert paper["positions"][0]["symbol"] == "AAA" and paper["positions"][0]["strategy"] == "opportunity"
+    gone = client.post("/api/paper/orders", json={"symbol": "BBB", "side": "long"})
+    assert gone.status_code == 400 and "no longer active" in gone.json()["detail"]
+    moved = dict(fake, symbol="AAA", entry=px * 1.05)  # signal far from the current price
+    pre._scanner = type("S", (), {"scan": lambda self, now=None: [type("O", (), {"to_dict": lambda s2: dict(moved)})()]})()
+    pre.scan_opportunities()
+    client.post("/api/paper/close-all")
+    r = client.post("/api/paper/orders", json=order)
+    assert r.status_code == 400 and "moved" in r.json()["detail"]
+    assert client.get("/api/paper").json()["positions"] == []
