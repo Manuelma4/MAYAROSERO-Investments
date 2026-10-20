@@ -20,7 +20,9 @@ export default function Settings() {
       <div className="page-head"><div><h1>Settings</h1><p className="muted">Appearance, notifications and access.</p></div></div>
 
       <Card title="Tools" className="mobile-only">
-        <div className="tool-links">
+        <div className="tool-links wrap">
+          <Link to="/picks" className="btn">Picks</Link>
+          <Link to="/discover" className="btn">Discover</Link>
           <Link to="/alerts" className="btn">Alerts</Link>
           <Link to="/charts" className="btn">Charts</Link>
           <Link to="/predict" className="btn">Predict</Link>

@@ -38,7 +38,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        optional service — analysts (news, fundamentals, sentiment, technicals), bull/bear debate and a
        risk check produce a short verdict + reasons shown on each opportunity before "Invest". Enabled by
        `ANTHROPIC_API_KEY` in `.env` (documented in LATER.md); app works without it.
-0d. [ ] **Portfolio builder ("My portfolio")**: enter an amount (e.g. EUR 10,000) and risk level → a diversified,
+0d. [x] **Portfolio builder ("My portfolio")**: enter an amount (e.g. EUR 10,000) and risk level → a diversified,
        ready-to-execute plan built to beat the S&P 500: core (monthly picks, 70-80%) + satellite (live
        opportunities, 20-30%) + optional SPY anchor; sector cap 25%, single-stock cap ~10%, volatility-aware
        weights; shows shares to buy per stock, expected risk vs S&P 500, and what changed since last month

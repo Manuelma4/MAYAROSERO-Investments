@@ -56,3 +56,10 @@ class PaperOrder(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=20)
     side: Literal["long", "short"]
     preview: bool = False      # True: only compute the plan (size, max loss), don't place it
+
+
+class PortfolioRequest(BaseModel):
+    amount: float = Field(10_000, gt=0, le=100_000_000)
+    currency: Literal["EUR", "USD"] = "EUR"
+    risk: Literal["cautious", "balanced", "bold"] = "balanced"
+    fractional: bool = True

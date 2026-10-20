@@ -127,3 +127,12 @@ export interface AIAnalysis {
   bull_case: string; bear_case: string; verdict: "favorable" | "neutral" | "avoid"; confidence: number;
   summary: string; main_risk: string; invalidation: string;
 }
+
+export interface PlanLine { symbol: string; name: string; role: "core" | "satellite" | "anchor" | "cash"; sector: string | null; weight: number; amount: number; price: number | null; shares: number; invested: number; stop: number | null; note: string }
+export interface PortfolioPlan {
+  currency: "EUR" | "USD"; fx_usd_per_unit: number; risk: string; amount: number; lines: PlanLine[]; cash: number;
+  by_role: Record<string, number>; by_sector: Record<string, number>;
+  risk_metrics: Partial<Record<"volatility_%" | "spy_volatility_%" | "beta" | "return_1y_%" | "spy_return_1y_%" | "max_drawdown_1y_%" | "spy_max_drawdown_1y_%", number>>;
+  track_record: { start: string; "cagr_%": number; "spy_cagr_%": number; "max_drawdown_%": number; "spy_max_drawdown_%": number };
+  changes: Changes | null; core_risk_off: boolean; as_of: string; mix: Record<string, number>;
+}

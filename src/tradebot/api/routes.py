@@ -13,7 +13,7 @@ from ..report import analyze_structure
 from ..strategies import REGISTRY, get_strategy
 from . import serialize as ser
 from .market import DataUnavailable
-from .schemas import BacktestRequest, DataQuery, PaperOrder, PicksRequest, PredictRequest
+from .schemas import BacktestRequest, DataQuery, PaperOrder, PicksRequest, PortfolioRequest, PredictRequest
 
 router = APIRouter(prefix="/api")
 
@@ -182,6 +182,66 @@ def paper_close_all(request: Request):
             if rec:
                 closed.append(rec)
     return ser.clean({"closed": closed})
+
+
+@router.post("/portfolio")
+def portfolio(request: Request, body: PortfolioRequest):
+    """Diversified, ready-to-buy plan built from the precomputed picks, live ideas and SPY."""
+    import numpy as np
+    import pandas as pd
+
+    from ..portfolio import RISK_LEVELS, build_plan, plan_risk
+
+    st = _state(request)
+    core = st.precompute.get("picks:quality_momentum")
+    if core is None:
+        raise HTTPException(503, "The picks are being computed. Try again in about a minute.")
+    fx = 1.0
+    if body.currency == "EUR":
+        fx = st.market.quote("EURUSD=X").get("price") or 0
+        if not fx:
+            raise HTTPException(502, "EUR/USD rate unavailable. Try again or use USD.")
+    amount_usd = body.amount * fx
+    spy_price = st.market.quote("SPY").get("price")
+    candidates = [r for r in core["ranking"] if r["eligible"]]
+    ideas = (st.precompute.get("opportunities") or {}).get("items", [])
+    try:
+        plan = build_plan(amount_usd, body.risk, candidates, core["risk_off"], ideas, spy_price,
+                          fractional=body.fractional)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    syms = [l.symbol for l in plan.lines if l.invested > 0]
+    frames = st.market.history_many("yahoo", list(dict.fromkeys(syms + ["SPY"])), "1d", limit=300)
+    closes = pd.DataFrame({s: f["close"] for s, f in frames.items()})
+    closes.index = closes.index.normalize()
+    closes = closes[~closes.index.duplicated(keep="last")]
+    risk = plan_risk(plan, closes, closes["SPY"]) if "SPY" in closes else {}
+
+    # Honest track record of the core + anchor mix (satellite ideas are not included).
+    c_share, _, a_share = RISK_LEVELS[body.risk]
+    eq = pd.Series({p["time"]: p["value"] for p in core["equity"]})
+    bm = pd.Series({p["time"]: p["value"] for p in core["benchmark"]})
+    r = (c_share * eq.pct_change() + a_share * bm.pct_change()).fillna(0) if not core["risk_off"] else bm.pct_change() * a_share
+    blend = (1 + r.fillna(0)).cumprod()
+    years = max((eq.index[-1] - eq.index[0]) / 86400 / 365.25, 1e-9)
+    track = {"start": core["stats"].get("start"),
+             "cagr_%": float((blend.iloc[-1] ** (1 / years) - 1) * 100),
+             "spy_cagr_%": float(((bm.iloc[-1] / bm.iloc[0]) ** (1 / years) - 1) * 100),
+             "max_drawdown_%": float((blend / blend.cummax() - 1).min() * 100),
+             "spy_max_drawdown_%": float((bm / bm.cummax() - 1).min() * 100)}
+
+    def money(x):
+        return None if x is None else x / fx
+
+    return ser.clean({
+        "currency": body.currency, "fx_usd_per_unit": fx, "risk": body.risk, "amount": body.amount,
+        "lines": [{**vars(l), "amount": money(l.amount), "invested": money(l.invested)} for l in plan.lines],
+        "cash": money(plan.cash), "by_role": plan.by_role(), "by_sector": plan.by_sector(),
+        "risk_metrics": risk, "track_record": track, "changes": core.get("changes"),
+        "core_risk_off": core["risk_off"], "as_of": core["as_of"],
+        "mix": dict(zip(("core", "satellite", "anchor"), RISK_LEVELS[body.risk])),
+    })
 
 
 @router.get("/ai/status")

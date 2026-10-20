@@ -298,3 +298,17 @@ def test_ai_analyst_with_fake_client(client):
     assert "technical" in sent["messages"][0]["content"]
     client.post("/api/ai/analyze", params={"symbol": "AAA"})
     assert len(calls) == 1  # cached for the day
+
+
+def test_portfolio_endpoint(client):
+    pre = client.app.state.precompute
+    assert client.post("/api/portfolio", json={}).status_code == 503
+    pre.run_once()
+    d = client.post("/api/portfolio", json={"amount": 10000, "currency": "USD", "risk": "balanced"}).json()
+    invested = sum(l["invested"] for l in d["lines"])
+    assert abs(invested + d["cash"] - 10000) < 1e-6
+    assert all(v <= 0.25 + 1e-6 for v in d["by_sector"].values())
+    assert {"cagr_%", "spy_cagr_%"} <= set(d["track_record"])
+    eur = client.post("/api/portfolio", json={"amount": 10000, "currency": "EUR", "risk": "cautious"}).json()
+    assert eur["currency"] == "EUR" and eur["fx_usd_per_unit"] > 0
+    assert client.post("/api/portfolio", json={"risk": "yolo"}).status_code == 422

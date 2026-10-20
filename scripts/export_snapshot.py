@@ -73,6 +73,8 @@ def main(out: Path) -> None:
             save(f"picks_{p}.json", get("/api/picks/latest", preset=p))
         save("today.json", get("/api/today"))
         save("opportunities.json", post("/api/opportunities/scan", {}))
+        for risk in ("cautious", "balanced", "bold"):
+            save(f"portfolio_{risk}.json", post("/api/portfolio", {"amount": 10000, "currency": "EUR", "risk": risk}))
         print("picks + today: ok")
         save("backtest.json", post("/api/backtest", {"provider": "yahoo", "symbol": "^GSPC", "timeframe": "1d",
                                                       "start": "2015-01-01", "strategy": "dow_pullback"}))
