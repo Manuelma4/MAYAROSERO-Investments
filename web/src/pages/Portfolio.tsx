@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { fmtDay, fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
-import type { PortfolioDrift, PortfolioPlan } from "../lib/types";
+import type { PortfolioDrift, PortfolioPlan, PortfolioRiskView } from "../lib/types";
 import { STATIC } from "../lib/snapshot";
 import { Hint } from "../components/Hint";
 import { Badge, Card, Empty, ErrorBox, Spinner } from "../components/ui";
+import { RiskCard } from "../components/RiskCard";
 
 const KEY = "mri.portfolio";
 const RISKS = [
@@ -114,17 +115,17 @@ export default function Portfolio() {
             </ul>}
           </Card>
 
+          <RiskCard risk={plan.risk_view} />
+
           <DriftCard drift={drift} busy={tBusy} err={tErr} onSave={saveTarget} onRemove={removeTarget} />
 
           <div className="grid-2">
-            <Card title={<>Risk compared with the S&amp;P 500<Hint>Measured on the last 12 months of prices of exactly this mix. Volatility = how much it swings; beta = how much it moves when the S&amp;P 500 moves 1% (1.2 means about 1.2%).</Hint></>}>
+            <Card title={<>Last 12 months of this mix<Hint>What exactly these holdings, with these weights, did over the past year, next to the S&amp;P 500. The worst drop is the biggest fall from a high to a low point. Past results, not a forecast.</Hint></>}>
               <dl className="kv">
-                <dt>Volatility (yearly swing)</dt><dd>{fmtPct(m["volatility_%"], 0, false)} <span className="muted">vs {fmtPct(m["spy_volatility_%"], 0, false)}</span></dd>
-                <dt>Beta</dt><dd>{fmtNum(m.beta, 2)}</dd>
-                <dt>Last 12 months</dt><dd className={(m["return_1y_%"] ?? 0) >= (m["spy_return_1y_%"] ?? 0) ? "up" : "down"}>{fmtPct(m["return_1y_%"], 1)} <span className="muted">vs {fmtPct(m["spy_return_1y_%"], 1)}</span></dd>
-                <dt>Worst drop in 12 months</dt><dd>{fmtPct(m["max_drawdown_1y_%"], 1)} <span className="muted">vs {fmtPct(m["spy_max_drawdown_1y_%"], 1)}</span></dd>
+                <dt>Return<Hint>Gain or loss over the last 12 months, dividends included.</Hint></dt><dd className={(m["return_1y_%"] ?? 0) >= (m["spy_return_1y_%"] ?? 0) ? "up" : "down"}>{fmtPct(m["return_1y_%"], 1)} <span className="muted">vs {fmtPct(m["spy_return_1y_%"], 1)}</span></dd>
+                <dt>Worst drop<Hint>The biggest fall from a high point to a later low point within those 12 months.</Hint></dt><dd>{fmtPct(m["max_drawdown_1y_%"], 1)} <span className="muted">vs {fmtPct(m["spy_max_drawdown_1y_%"], 1)}</span></dd>
               </dl>
-              <p className="muted small">Past 12 months of these stocks, not a forecast.</p>
+              <p className="muted small">Today's holdings over the past 12 months. Today's picks were chosen partly because they rose, so this flatters them.</p>
             </Card>
             <Card title={<>Diversification by sector<Hint>No sector gets more than 25% of the portfolio and no single stock more than 10%. When the top picks crowd into one sector, the next-best picks from other sectors are added instead.</Hint></>}>
               <ul className="sector-bars">
@@ -168,6 +169,13 @@ function DriftCard({ drift, busy, err, onSave, onRemove }: { drift: PortfolioDri
   const rows = (drift?.rows ?? []).filter((r) => r["target_%"] > 0.05 || r["current_%"] > 0.05);
   const limit = drift?.position_limit ?? 5;
   const live = drift && (drift.status === "on_target" || drift.status === "drifted");
+  const [tRisk, setTRisk] = useState<PortfolioRiskView | null>(null);
+  const savedAt = t?.saved_at;
+  useEffect(() => {
+    setTRisk(null);
+    if (savedAt) api.portfolioRisk().then(setTRisk).catch(() => setTRisk(null));
+  }, [savedAt]);
+  const rm = tRisk?.status === "ok" ? tRisk.month : undefined;
   return (
     <Card title={<>My target and drift<Hint>Save the plan you actually bought as your target. Prices move, so over time some positions grow bigger than planned and others smaller: that gap is the drift. The app compares what you hold with your target every 30 minutes and sends you one alert (at most once a week) when it drifts too far, with what to sell and buy to get back on plan. It never buys or sells for you.</Hint></>}
       actions={t ? <button className="btn small ghost" onClick={onRemove} disabled={busy || STATIC}>Remove target</button> : undefined}>
@@ -176,6 +184,10 @@ function DriftCard({ drift, busy, err, onSave, onRemove }: { drift: PortfolioDri
           {" "}Live ideas ({fmtNum(t.ideas_share * 100, 0)}%) come and go within days, so they count with cash.</p>
       ) : (
         <p className="muted small">No target yet. When you have bought this plan, save it here so the app can tell you when it needs a rebalance.</p>
+      )}
+      {t && rm && (
+        <p className="small target-risk">Risk of your target: in a bad month (1 in 20) it could lose about <strong>{cur(rm.plan.loss_95, t.currency)}</strong> ({fmtNum(rm.plan["loss_95_%"], 0)}%), against {cur(rm.spy.loss_95, t.currency)} ({fmtNum(rm.spy["loss_95_%"], 0)}%) for the S&amp;P&nbsp;500 with the same money.
+          <Hint>The same simulation as "How risky is this plan?", run on the positions you saved as your target (the cash and live-ideas part counts as cash), for the amount you saved.</Hint></p>
       )}
       {drift && drift.status !== "no_target" && (
         <div className={drift.status === "drifted" ? "notice" : ""} style={{ margin: "12px 0" }}>

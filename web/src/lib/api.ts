@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, DigestPreview, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioDrift, PortfolioPlan, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, TrackRecord, Universe } from "./types";
+import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, DigestPreview, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioDrift, PortfolioPlan, PortfolioRiskView, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, TrackRecord, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -64,6 +64,7 @@ export const api = {
   aiAnalyze: (symbol: string) => request<AIAnalysis>(`/api/ai/analyze?${qs({ symbol })}`, { method: "POST" }),
   portfolio: (body: object) => request<PortfolioPlan>("/api/portfolio", { method: "POST", body: JSON.stringify(body) }),
   portfolioDrift: () => request<PortfolioDrift>("/api/portfolio/drift"),
+  portfolioRisk: () => request<PortfolioRiskView>("/api/portfolio/risk"),
   saveTarget: (body: object) => request<PortfolioDrift>("/api/portfolio/target", { method: "POST", body: JSON.stringify(body) }),
   deleteTarget: () => request<{ deleted: boolean }>("/api/portfolio/target", { method: "DELETE" }),
   digestPreview: () => request<DigestPreview>("/api/digest/preview"),

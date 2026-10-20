@@ -211,12 +211,17 @@ def test_digest_endpoints(client):  # noqa: F811
 def test_portfolio_target_and_drift_endpoints(client):  # noqa: F811
     st = client.app.state
     assert client.get("/api/portfolio/drift").json()["status"] == "no_target"
+    assert client.get("/api/portfolio/risk").json()["status"] == "no_target"
     st.precompute.run_once(predictions=False)
     body = {"amount": 10000, "currency": "USD", "risk": "balanced"}
     d = client.post("/api/portfolio/target", json=body).json()
     target = st.store.get_value("portfolio_target")
     assert target["currency"] == "USD" and target["weights"] and target["risk"] == "balanced"
     assert d["status"] == "not_invested" and d["target"]["amount"] == 10000   # practice account holds none of it
+    risk = client.get("/api/portfolio/risk").json()
+    assert risk["status"] == "ok" and risk["amount"] == 10000 and risk["target"]["risk"] == "balanced"
+    assert risk["month"]["plan"]["loss_99"] > risk["month"]["plan"]["loss_95"] > 0
+    assert risk["invested_share"] == pytest.approx(sum(target["weights"].values()))
     # hold the plan's first position at 3x its weight in the practice account: drift alert, once a week
     sym, w = next(iter(target["weights"].items()))
     price = st.market.quote(sym)["price"]

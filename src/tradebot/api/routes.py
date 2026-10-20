@@ -197,11 +197,17 @@ def _portfolio(st, body: PortfolioRequest) -> dict:
         raise HTTPException(400, str(exc)) from exc
 
     syms = [l.symbol for l in plan.lines if l.invested > 0]
-    frames = st.market.history_many("yahoo", list(dict.fromkeys(syms + ["SPY"])), "1d", limit=300)
-    closes = pd.DataFrame({s: f["close"] for s, f in frames.items()})
-    closes.index = closes.index.normalize()
-    closes = closes[~closes.index.duplicated(keep="last")]
+    closes = _daily_closes(st, syms)
     risk = plan_risk(plan, closes, closes["SPY"]) if "SPY" in closes else {}
+    # Forward-looking risk view: lasting holdings (picks + index); live ideas count as cash (see portfolio_risk).
+    lasting = {}
+    for l in plan.lines:
+        if l.role in ("core", "anchor") and l.invested > 0:
+            lasting[l.symbol] = lasting.get(l.symbol, 0.0) + l.invested / amount_usd
+    sats = [l for l in plan.lines if l.role == "satellite" and l.invested > 0]
+    stop_loss = sum(max(0.0, (l.price or 0) - (l.stop or 0)) * l.shares for l in sats if l.stop) / fx
+    risk_block = _risk_block(st, closes, lasting, {l.symbol: l.sector for l in plan.lines}, body.amount,
+                             body.currency, sum(l.invested for l in sats) / amount_usd, stop_loss or None)
 
     # Honest track record of the core + anchor mix (satellite ideas are not included).
     c_share, _, a_share = RISK_LEVELS[body.risk]
@@ -223,10 +229,78 @@ def _portfolio(st, body: PortfolioRequest) -> dict:
         "currency": body.currency, "fx_usd_per_unit": fx, "risk": body.risk, "amount": body.amount,
         "lines": [{**vars(l), "amount": money(l.amount), "invested": money(l.invested)} for l in plan.lines],
         "cash": money(plan.cash), "by_role": plan.by_role(), "by_sector": plan.by_sector(),
-        "risk_metrics": risk, "track_record": track, "changes": core.get("changes"),
+        "risk_metrics": risk, "risk_view": risk_block, "track_record": track, "changes": core.get("changes"),
         "core_risk_off": core["risk_off"], "as_of": core["as_of"],
         "mix": dict(zip(("core", "satellite", "anchor"), RISK_LEVELS[body.risk])),
     })
+
+
+RISK_LOOKBACK_BARS = 800      # ~3 years of daily bars (the risk view uses the last 756 returns)
+RISK_TTL = 1800               # seconds; the inputs only change with new daily closes
+_RISK_CACHE: dict[tuple, tuple[float, dict]] = {}
+
+
+def _daily(s: pd.Series) -> pd.Series:
+    """One value per calendar day, dated in the exchange's local time (tz-naive)."""
+    idx = s.index.tz_localize(None) if getattr(s.index, "tz", None) is not None else s.index
+    s = pd.Series(s.to_numpy(), index=idx.normalize())
+    return s[~s.index.duplicated(keep="last")]
+
+
+def _daily_closes(st, symbols: list[str]) -> pd.DataFrame:
+    frames = st.market.history_many("yahoo", list(dict.fromkeys(list(symbols) + ["SPY"])), "1d",
+                                    limit=RISK_LOOKBACK_BARS)
+    return pd.DataFrame({s: _daily(f["close"]) for s, f in frames.items()}).sort_index()
+
+
+def _risk_block(st, closes: pd.DataFrame, weights: dict[str, float], sectors: dict, amount: float,
+                currency: str, ideas_share: float = 0.0, ideas_stop_loss: float | None = None) -> dict:
+    """portfolio_risk.risk_view with EUR/USD conversion and a 30-minute cache. Never fails the caller."""
+    import time
+
+    from ..portfolio_risk import risk_view
+
+    try:
+        if "SPY" not in closes:
+            raise ValueError("S&P 500 prices unavailable")
+        fx = _daily(st.market.history("yahoo", "EURUSD=X", "1d", limit=RISK_LOOKBACK_BARS)["close"]) \
+            if currency == "EUR" else None
+        key = (tuple(sorted((s, round(w, 4)) for s, w in weights.items())), currency, round(amount, 2),
+               round(ideas_share, 4), round(ideas_stop_loss or 0.0, 2), str(closes.index[-1]),
+               None if fx is None else str(fx.index[-1]))
+        hit = _RISK_CACHE.get(key)
+        if hit and time.time() - hit[0] < RISK_TTL:
+            return hit[1]
+        out = ser.clean(risk_view(closes, weights, amount, currency, sectors=sectors, fx=fx,
+                                  ideas_share=ideas_share, ideas_stop_loss=ideas_stop_loss))
+        if len(_RISK_CACHE) > 64:
+            _RISK_CACHE.clear()
+        _RISK_CACHE[key] = (time.time(), out)
+        return out
+    except Exception as exc:  # the plan is still useful without its risk view
+        return {"status": "error", "message": f"The risk view could not be computed: {exc}"}
+
+
+@router.get("/portfolio/risk")
+def portfolio_target_risk(request: Request):
+    """Risk view of the saved target (its lasting positions; the cash and live-ideas bucket counts as cash)."""
+    from ..live.drift import risk_inputs
+    from ..universe import by_symbol
+
+    st = _state(request)
+    target = st.store.get_value(st.precompute.TARGET_KEY)
+    if not target:
+        return {"status": "no_target", "message": "No target saved yet. Build a plan and save it as your target."}
+    weights, ideas_share = risk_inputs(target)
+    info = by_symbol()
+    sectors = {s: (info[s].sector if s in info and s != "SPY" else None) for s in weights}
+    try:
+        closes = _daily_closes(st, list(weights))
+    except Exception as exc:
+        raise HTTPException(502, f"Prices for the risk view are unavailable: {exc}") from exc
+    out = _risk_block(st, closes, weights, sectors, float(target["amount"]), target.get("currency", "USD"),
+                      ideas_share)
+    return {**out, "target": {"saved_at": target.get("saved_at"), "risk": target.get("risk")}}
 
 
 @router.get("/portfolio/drift")

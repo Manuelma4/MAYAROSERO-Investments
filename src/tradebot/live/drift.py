@@ -51,6 +51,13 @@ def target_from_plan(plan: dict, saved_at: str) -> dict:
             "bucket_share": max(0.0, 1.0 - sum(weights.values()))}
 
 
+def risk_inputs(target: dict) -> tuple[dict[str, float], float]:
+    """Weights (share of the whole amount) and live-ideas share for the risk view of a saved target.
+    The "cash and live ideas" bucket earns nothing in the simulation: live ideas are short trades with stops."""
+    weights = {_key(s): float(w) for s, w in (target.get("weights") or {}).items() if float(w) > 0}
+    return weights, float(target.get("ideas_share") or 0.0)
+
+
 def _key(symbol: str) -> str:
     return symbol.strip().upper()
 

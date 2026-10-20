@@ -309,8 +309,16 @@ def test_portfolio_endpoint(client):
     assert abs(invested + d["cash"] - 10000) < 1e-6
     assert all(v <= 0.25 + 1e-6 for v in d["by_sector"].values())
     assert {"cagr_%", "spy_cagr_%"} <= set(d["track_record"])
+    r = d["risk_view"]
+    assert r["status"] == "ok" and r["currency"] == "USD" and not r["currency_risk"]
+    assert r["month"]["plan"]["loss_99"] > r["month"]["plan"]["loss_95"] > 0 and r["month"]["spy"]["loss_95"] > 0
+    assert r["days"] >= 700 and r["summary"] and r["diversification"]["independent_bets"] >= 0.99
+    sat = sum(l["invested"] for l in d["lines"] if l["role"] == "satellite") / 10000
+    assert r["ideas_share"] == pytest.approx(sat)   # live ideas are not simulated (counted as cash)
+    assert client.post("/api/portfolio", json={"amount": 10000, "currency": "USD", "risk": "balanced"}).json()["risk_view"] == r
     eur = client.post("/api/portfolio", json={"amount": 10000, "currency": "EUR", "risk": "cautious"}).json()
     assert eur["currency"] == "EUR" and eur["fx_usd_per_unit"] > 0
+    assert eur["risk_view"]["status"] == "ok" and eur["risk_view"]["currency_risk"]
     assert client.post("/api/portfolio", json={"risk": "yolo"}).status_code == 422
 
 

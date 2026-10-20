@@ -153,6 +153,25 @@ export interface PortfolioPlan {
   risk_metrics: Partial<Record<"volatility_%" | "spy_volatility_%" | "beta" | "return_1y_%" | "spy_return_1y_%" | "max_drawdown_1y_%" | "spy_max_drawdown_1y_%", number>>;
   track_record: { start: string; "cagr_%": number; "spy_cagr_%": number; "max_drawdown_%": number; "spy_max_drawdown_%": number };
   changes: Changes | null; core_risk_off: boolean; as_of: string; mix: Record<string, number>;
+  risk_view?: PortfolioRiskView;
+}
+
+export interface MonthLoss { "loss_95_%": number; loss_95: number; "loss_99_%": number; loss_99: number; "avg_worst_5_%": number | null; p_loss_10: number; p_gain: number; "median_%": number }
+export interface WorstDrop { "drop_%": number; peak: string; trough: string; recovered: string | null; fall_days: number; recovery_days: number | null; underwater_days: number }
+export interface RiskContributor { symbol: string; "weight_%": number; "risk_share_%": number }
+export interface SectorRisk { sector: string; "weight_%": number; "risk_share_%": number }
+export interface PortfolioRiskView {
+  status: "ok" | "empty" | "short" | "error" | "no_target"; message?: string;
+  currency?: "EUR" | "USD"; amount?: number; as_of?: string; start?: string; days?: number; horizon_days?: number; paths?: number;
+  invested_share?: number; ideas_share?: number; ideas_stop_loss?: number | null; cash_share?: number;
+  month?: { plan: MonthLoss; spy: MonthLoss };
+  histogram?: { "edges_%": number[]; plan: number[]; spy: number[] };
+  worst_drop?: { plan: WorstDrop; spy: WorstDrop };
+  "volatility_%"?: number; "spy_volatility_%"?: number; "volatility_now_%"?: number; "spy_volatility_now_%"?: number; beta?: number | null;
+  diversification?: { holdings: number; avg_correlation: number | null; equal_size_count: number; independent_bets: number | null;
+    contributors: RiskContributor[]; top_contributor: RiskContributor | null; sectors: SectorRisk[]; top_sector: SectorRisk | null };
+  summary?: string[]; method?: string; notes?: string[]; currency_risk?: boolean;
+  target?: { saved_at: string; risk: string };
 }
 
 export interface PortfolioTarget {

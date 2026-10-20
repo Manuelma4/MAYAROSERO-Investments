@@ -67,6 +67,7 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
     }
     case "/api/portfolio/drift": return { status: "no_target", target: null,
       message: "Saving a target and the weekly drift check run on the live server. This preview has no saved target." };
+    case "/api/portfolio/risk": return { status: "no_target", message: "The risk view of a saved target runs on the live server." };
     case "/api/portfolio/target": return limit("Saving a target");
     case "/api/digest/preview": {
       try { return await load("digest.json"); } catch {

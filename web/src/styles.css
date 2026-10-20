@@ -638,3 +638,20 @@ tbody tr:hover { background: var(--surface-2); }
 .drift-list li:last-child { border-bottom: 0; }
 .drift-list .num { font-variant-numeric: tabular-nums; text-align: right; }
 .drift-list .gap-big { font-weight: 600; color: var(--text); }
+
+/* ---------- portfolio risk ---------- */
+.risk-summary { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-width: 760px; }
+.risk-summary p { margin: 0; font-size: 14px; line-height: 1.6; }
+.risk-summary p:first-child { font-size: 16px; color: var(--text); }
+.risk-table td:first-child { white-space: normal; color: var(--text-2); }
+.risk-table td:not(:first-child), .risk-table th:not(:first-child) { text-align: right; }
+.risk-chart { margin: 20px 0 16px; }
+.risk-chart figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 6px; }
+.risk-legend { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.risk-legend i { display: inline-block; width: 12px; }
+.risk-legend .sw-bar { height: 8px; background: var(--text-2); margin-left: 6px; }
+.risk-legend .sw-line { height: 0; border-top: 1.5px solid var(--text); margin-left: 6px; }
+.risk-chart svg { display: block; touch-action: pan-y; }
+.risk-readout { margin: 4px 0 0; min-height: 1.5em; }
+.target-risk { margin: 12px 0 0; }
+@media (max-width: 860px) { .risk-table td, .risk-table th { padding: 10px 6px; } }
