@@ -99,6 +99,15 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 13. [x] **Preview completeness**: static preview covers the new pages (movers board, alerts,
         watchlists, order ticket preview, stock pages for all picks).
 
+## Phase 3: proof and habits (overnight Oct 20-21)
+
+14. [ ] **Live track record from today**: record the engine's picks (and Invest-now ideas) every day from
+        now on and show their real forward performance vs SPY (no backtest, no hindsight) on Today and Picks.
+15. [ ] **Weekly digest**: one short Sunday-evening message (email / WhatsApp) with the week's picks changes,
+        your alerts, portfolio drift and the live track record; previewable in Settings.
+16. [ ] **Portfolio drift alert**: when My portfolio's real weights drift far from the plan, suggest a simple
+        rebalance (plain-English, with amounts).
+
 ## Later research track
 - Microsoft Qlib + RD-Agent to discover better ranking factors for the monthly core picks
   (offline, validated walk-forward before adoption).
