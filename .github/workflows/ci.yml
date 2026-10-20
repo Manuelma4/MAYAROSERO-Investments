@@ -1,7 +1,8 @@
 name: CI
+# Paused at Manuel's request (Oct 20): runs only when started by hand from the Actions tab.
+# To switch automatic checks back on, replace this block with:  on: [push, pull_request]
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
