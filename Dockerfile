@@ -15,6 +15,7 @@ COPY pyproject.toml README.md ./
 COPY src/ src/
 RUN pip install --no-cache-dir .
 COPY config/ config/
+COPY scripts/ scripts/
 RUN [ -f config/config.yaml ] || cp config/config.example.yaml config/config.yaml
 COPY --from=web /web/dist web/dist
 VOLUME /app/data

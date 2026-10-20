@@ -36,16 +36,20 @@ class EmailNotifier:
         if not (self.host and self.user and self.password and self.to):
             raise ValueError("SMTP_HOST, SMTP_USER, SMTP_PASSWORD and ALERT_EMAIL_TO must be set")
 
-    def send(self, text: str) -> None:
+    def deliver(self, text: str) -> None:
+        """Send and raise on failure (used by scripts/test_alerts.py)."""
         msg = EmailMessage()
-        msg["Subject"] = "tradebot: " + text.splitlines()[0][:120]
+        msg["Subject"] = "MAYAROSERO: " + text.splitlines()[0][:120]
         msg["From"], msg["To"] = self.sender, ", ".join(self.to)
         msg.set_content(text)
+        with smtplib.SMTP(self.host, self.port, timeout=15) as s:
+            s.starttls()
+            s.login(self.user, self.password)
+            s.send_message(msg)
+
+    def send(self, text: str) -> None:
         try:
-            with smtplib.SMTP(self.host, self.port, timeout=15) as s:
-                s.starttls()
-                s.login(self.user, self.password)
-                s.send_message(msg)
+            self.deliver(text)
         except Exception as exc:  # never let an alert failure kill the bot
             log.warning("Email send failed: %s", exc)
 
@@ -69,16 +73,20 @@ class WhatsAppNotifier:
         self.sender = self.sender if self.sender.startswith("whatsapp:") else f"whatsapp:{self.sender}"
         self.to = self.to if self.to.startswith("whatsapp:") else f"whatsapp:{self.to}"
 
-    def send(self, text: str) -> None:
+    def deliver(self, text: str) -> None:
+        """Send and raise on failure (used by scripts/test_alerts.py)."""
         import requests
 
+        r = requests.post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{self.sid}/Messages.json",
+            data={"From": self.sender, "To": self.to, "Body": text[:1500]},
+            auth=(self.sid, self.token), timeout=15)
+        if r.status_code >= 300:
+            raise RuntimeError(f"Twilio answered {r.status_code}: {r.text[:200]}")
+
+    def send(self, text: str) -> None:
         try:
-            r = requests.post(
-                f"https://api.twilio.com/2010-04-01/Accounts/{self.sid}/Messages.json",
-                data={"From": self.sender, "To": self.to, "Body": text[:1500]},
-                auth=(self.sid, self.token), timeout=15)
-            if r.status_code >= 300:
-                log.warning("WhatsApp send failed: %s %s", r.status_code, r.text[:200])
+            self.deliver(text)
         except Exception as exc:
             log.warning("WhatsApp send failed: %s", exc)
 
