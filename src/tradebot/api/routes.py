@@ -541,6 +541,37 @@ def earnings_upcoming(request: Request, days: int = Query(14, ge=0, le=90), mine
     return _state(request).precompute.upcoming_earnings(days, mine_only=mine)
 
 
+@router.get("/screener")
+def screener(request: Request,
+             sector: str | None = Query(None, max_length=400, description="Comma-separated GICS sectors"),
+             size: str | None = Query(None, max_length=60, description="small, mid, large, mega (comma-separated)"),
+             valuation: str | None = Query(None, max_length=60, description="cheap, fair, expensive, no_profit"),
+             min_cap: float | None = Query(None, ge=0, description="Market value in US dollars"),
+             max_cap: float | None = Query(None, ge=0),
+             min_pe: float | None = Query(None, ge=0), max_pe: float | None = Query(None, ge=0),
+             min_div: float | None = Query(None, ge=0, le=100, description="Dividend yield in percent"),
+             dividends: bool | None = None,
+             trend: str | None = Query(None, pattern="^(up|down)$"),
+             momentum: str | None = Query(None, pattern="^(positive|strong)$"),
+             q: str | None = Query(None, max_length=60),
+             sort: str = Query("market_cap", max_length=20), order: str = Query("desc", pattern="^(asc|desc)$"),
+             limit: int | None = Query(None, ge=1, le=5000, description="Rows to return (default: every match)")):
+    """The stock screener over the whole universe: daily fundamentals (cached once a day) + technicals from the
+    daily bars already loaded. Instant (precomputed data only); `coverage` says how many stocks have data yet."""
+    from .. import screener as sc
+
+    if sort not in sc.SORT_KEYS:
+        raise HTTPException(422, f"sort must be one of: {', '.join(sc.SORT_KEYS)}")
+    sizes, vals = sc.csv_list(size), sc.csv_list(valuation)
+    if bad := [s for s in sizes if s not in {b[0] for b in sc.SIZE_BANDS}]:
+        raise HTTPException(422, f"Unknown size {bad[0]!r}: use small, mid, large or mega.")
+    if bad := [v for v in vals if v not in {b[0] for b in sc.PE_BANDS} | {sc.NO_PROFIT}]:
+        raise HTTPException(422, f"Unknown valuation {bad[0]!r}: use cheap, fair, expensive or no_profit.")
+    f = sc.Filters(sector=sector, size=sizes, valuation=vals, min_cap=min_cap, max_cap=max_cap, min_pe=min_pe,
+                   max_pe=max_pe, min_div=min_div, dividends=dividends, trend=trend, momentum=momentum, q=q)
+    return _state(request).precompute.screener(f, sort, order == "desc", limit)
+
+
 @router.get("/ai/status")
 def ai_status(request: Request):
     a = _state(request).analyst

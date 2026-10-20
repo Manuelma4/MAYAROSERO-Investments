@@ -115,7 +115,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 18. [x] **Learn**: a glossary of every term the app uses and a short first-visit tour, written for a beginner.
 19. [x] **Portfolio risk**: how much the plan could lose in a bad month (Monte Carlo), how much its holdings
         move together, its worst historical drop, compared with simply holding the S&P 500.
-20. [ ] **Screener**: filter the S&P 500 by sector, size, valuation (P/E), dividend yield, momentum and trend
+20. [x] **Screener**: filter the S&P 500 by sector, size, valuation (P/E), dividend yield, momentum and trend
         on Discover, with fundamentals cached once a day.
 21. [ ] **Euro everywhere**: show amounts in € (live EUR/USD) with the dollar price on hover, set in Settings.
 

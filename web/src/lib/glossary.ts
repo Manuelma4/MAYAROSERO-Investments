@@ -29,6 +29,13 @@ export const GLOSSARY = [
     related: ["uptrend", "risk-on-off"],
   },
   {
+    id: "52-week-high", term: "52-week high", aka: ["year high", "from high", "distance from high"],
+    definition: "The highest price a stock reached over the last year (52 weeks).",
+    inApp: "Discover › Screener shows how far each stock is below it.",
+    example: "High 200, price now 150: 25% below its 52-week high. Close to 0% means it trades near the top of its year.",
+    related: ["momentum", "drawdown"],
+  },
+  {
     id: "atr", term: "ATR (daily range)", aka: ["average true range", "daily range"],
     definition: "How much a price typically moves in one candle, shown as a percentage of the price.",
     inApp: "Charts › Structure shows it as Daily range; Invest-now stop-losses are placed about 1.5 times this range away.",
@@ -182,7 +189,7 @@ export const GLOSSARY = [
   {
     id: "market-cap", term: "Market cap", aka: ["market value", "market capitalisation", "company size"],
     definition: "What the whole company is worth on the stock market: share price times number of shares.",
-    inApp: "\"Market value\" in Key figures on every stock page.",
+    inApp: "\"Market value\" in Key figures on every stock page, and the Size filter of Discover › Screener.",
     example: "15 billion shares at 200 each is a 3 trillion market cap.",
   },
   {
@@ -216,7 +223,7 @@ export const GLOSSARY = [
   {
     id: "pe-ratio", term: "P/E ratio", aka: ["price/earnings", "PE", "price to earnings"],
     definition: "Share price divided by yearly profit per share: how many years of current profits you pay for.",
-    inApp: "Key figures on every stock page, for the last and the next 12 months.",
+    inApp: "Key figures on every stock page, for the last and the next 12 months; the Valuation filter of Discover › Screener.",
     example: "Price 100, profit 5 per share: a P/E of 20. The S&P 500 is usually around 20 to 25.",
     related: ["earnings"],
   },
@@ -277,9 +284,16 @@ export const GLOSSARY = [
     related: ["momentum"],
   },
   {
+    id: "screener", term: "Screener", aka: ["stock screener", "filter stocks"],
+    definition: "A tool that filters a long list of stocks down to the ones matching your conditions.",
+    inApp: "Discover › Screener filters the 520 stocks by sector, size, P/E, dividend, trend and momentum. A starting list to study, not a list to buy.",
+    example: "\"Pays 2%+ dividend\" and \"in an uptrend\" might leave 60 of 520 stocks to look at more closely.",
+    related: ["pe-ratio", "dividend-yield", "momentum"],
+  },
+  {
     id: "sector", term: "Sector", aka: ["industry"],
     definition: "A group of companies in the same kind of business, like technology, health care or energy.",
-    inApp: "Discover groups stocks by sector; My portfolio keeps any sector under 25%.",
+    inApp: "Discover groups stocks by sector (and the Screener filters by it); My portfolio keeps any sector under 25%.",
     example: "Apple, Microsoft and Nvidia are all technology: 3 of 10 equal picks is 30% in one sector.",
     related: ["diversification"],
   },

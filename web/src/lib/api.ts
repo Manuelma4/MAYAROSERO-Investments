@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, DigestPreview, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioDrift, PortfolioPlan, PortfolioRiskView, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, TrackRecord, Universe, EarningsResult, UpcomingEarnings } from "./types";
+import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, DigestPreview, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioDrift, PortfolioPlan, PortfolioRiskView, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, TrackRecord, Universe, EarningsResult, UpcomingEarnings, ScreenerResult } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -74,6 +74,7 @@ export const api = {
   forecast: (symbol: string, horizon: number) => request<ForecastResult>(`/api/forecast?${qs({ symbol, horizon })}`),
   stock: (symbol: string) => request<StockInfo>(`/api/stock?${qs({ symbol })}`),
   today: () => request<TodayBoard>("/api/today"),
+  screener: () => request<ScreenerResult>("/api/screener"),
   earnings: (symbols: string[]) => request<EarningsResult>(`/api/earnings?${qs({ symbols: symbols.join(",") })}`),
   earningsUpcoming: (days = 14, mine = false) => request<UpcomingEarnings>(`/api/earnings/upcoming?${qs({ days, mine: mine ? "true" : undefined })}`),
   trackRecord: (preset = "quality_momentum") => request<TrackRecord>(`/api/track-record?${qs({ preset })}`),

@@ -7,8 +7,10 @@ import type { Quote, Universe, UniverseStock } from "../lib/types";
 import { Sparkline } from "../components/Sparkline";
 import { Empty, ErrorBox, Spinner } from "../components/ui";
 import { Hint } from "../components/Hint";
+import Screener from "../components/Screener";
 
-type Mode = "themes" | "sectors" | "regions";
+type Mode = "themes" | "sectors" | "regions" | "screener";
+const MODES: Mode[] = ["themes", "sectors", "regions", "screener"];
 const REGIONS = ["US", "Europe", "Asia", "Global"];
 
 function avgChange(stocks: UniverseStock[], quotes: Record<string, Quote>) {
@@ -40,7 +42,8 @@ export default function Discover() {
   const [uni, setUni] = useState<Universe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
-  const mode = (params.get("by") as Mode) || "themes";
+  const mode: Mode = MODES.includes(params.get("by") as Mode) ? (params.get("by") as Mode) : "themes";
+  const screener = mode === "screener";
   const [query, setQuery] = useState("");
 
   useEffect(() => { api.universe().then(setUni).catch((e) => setError(`The list of companies could not be loaded. ${(e as Error).message}`)); }, []);
@@ -63,8 +66,9 @@ export default function Discover() {
 
   // One batched request for every symbol in the universe (cached server-side), refreshed every minute.
   // Group tiles need every quote (refreshed every 5 min); the cards on screen refresh every minute.
-  const { quotes: allQuotes } = useQuotes(all.map((s) => s.symbol), 300_000);
-  const { quotes: onScreen } = useQuotes(visible.slice(0, 200).map((s) => s.symbol), 60_000);
+  // The Screener brings its own prices (precomputed with the rest of its figures).
+  const { quotes: allQuotes } = useQuotes(screener ? [] : all.map((s) => s.symbol), 300_000);
+  const { quotes: onScreen } = useQuotes(screener ? [] : visible.slice(0, 200).map((s) => s.symbol), 60_000);
   const quotes = useMemo(() => ({ ...allQuotes, ...onScreen }), [allQuotes, onScreen]);
 
   const setMode = (m: Mode) => setParams({ by: m });
@@ -74,16 +78,19 @@ export default function Discover() {
     <div className="page">
       <section className="hero-x">
         <p className="eyebrow">Discover</p>
-        <h1 className="display">The world's leading companies</h1>
-        <p className="muted lead">{uni ? `${uni.stocks.length} stocks and ${uni.crypto.length} crypto assets` : "Stocks and crypto"}, organized by theme, sector and region. Prices update live.</p>
+        <h1 className="display">{screener ? "Stock screener" : "The world's leading companies"}</h1>
+        <p className="muted lead">{screener
+          ? `Narrow ${uni ? uni.stocks.length : "the"} stocks down by sector, size, valuation, dividend, trend and momentum. Figures are ready: tap a filter and the list updates.`
+          : `${uni ? `${uni.stocks.length} stocks and ${uni.crypto.length} crypto assets` : "Stocks and crypto"}, organized by theme, sector and region. Prices update live.`}</p>
         <div className="discover-controls">
-          <div className="segmented" role="tablist">
-            {(["themes", "sectors", "regions"] as Mode[]).map((m) => (
+          <div className="segmented discover-modes" role="tablist">
+            {MODES.map((m) => (
               <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? "active" : ""} onClick={() => setMode(m)}>{m}</button>))}
           </div>
-          <input className="filter" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter by name, ticker or industry" aria-label="Filter" />
+          <input className="filter" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={screener ? "Search the list by name, ticker or industry" : "Filter by name, ticker or industry"} aria-label="Filter" />
         </div>
       </section>
+      {screener ? <Screener query={query} /> : <>
       <ErrorBox error={error} />
       {!uni && !error && <div className="empty"><Spinner /> Loading the companies…</div>}
 
@@ -114,6 +121,7 @@ export default function Discover() {
           ) : <Empty>{q ? `Nothing matches "${query}". Try a company name (Apple), a ticker (AAPL) or an industry (Semiconductors).` : "No companies in this group."}</Empty>}
         </section>
       )}
+      </>}
     </div>
   );
 }

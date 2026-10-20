@@ -8,6 +8,8 @@ Jobs run at startup and then every `interval` seconds in a daemon thread:
 - the weekly digest (once per week at the configured slot) and the portfolio drift alert (at most weekly)
 - the earnings calendar (once a day) for every preset's picks, watchlists, held stocks and popular names,
   and the "earnings tomorrow" alert for picks, watchlist and held stocks (once per report)
+- the screener: fundamentals refreshed once a day in their own slow thread (one symbol at a time, saved to SQLite
+  as they arrive), and technicals recomputed after each opportunity scan from the daily bars it just loaded
 """
 
 from __future__ import annotations
@@ -18,12 +20,14 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
+from .. import screener as sc
 from ..data import earnings as er
+from ..data import fundamentals as fd
 from ..live import alerts
 from ..live import digest as dg
 from ..live import drift as dr
 from ..picker import PRESETS
-from ..universe import CURATED, POP, by_symbol, sp500_symbols
+from ..universe import CURATED, POP, STOCKS, by_symbol, sp500_symbols
 from . import serialize as ser
 from .market import MarketData
 from .schemas import PicksRequest
@@ -37,7 +41,9 @@ class Precomputer:
                  on_opportunity=None, paper=None, paper_lock=None, store=None, on_alert=None,
                  on_picks_change=None, alert_preset: str = "quality_momentum", broker_exits=None,
                  notify=None, holdings=None, digest_schedule: dg.Schedule | None = None,
-                 earnings: er.EarningsCalendar | None = None, on_earnings=None):
+                 earnings: er.EarningsCalendar | None = None, on_earnings=None,
+                 fundamentals: fd.Fundamentals | None = None, fundamentals_delay: float = 45.0,
+                 fundamentals_check: float = 600.0):
         self.market = market
         self.interval = interval
         self.opportunities_interval = opportunities_interval
@@ -54,6 +60,10 @@ class Precomputer:
         self.digest_schedule = digest_schedule or dg.Schedule()
         self.earnings = earnings or er.EarningsCalendar(store)
         self.on_earnings = on_earnings         # callback(event, text) for each "earnings tomorrow" alert
+        self.fundamentals = fundamentals or fd.Fundamentals(store)
+        self.fundamentals_delay = fundamentals_delay   # let the startup jobs load prices first
+        self.fundamentals_check = fundamentals_check   # how often the daily-refresh thread looks for due symbols
+        self._tech_lock = threading.Lock()
         self._earnings_day: str | None = None
         self._held: tuple[float, set[str]] | None = None
         self._seen: set[tuple] = set()
@@ -490,6 +500,99 @@ class Precomputer:
                 log.warning("earnings alert %s delivery failed: %s", sym, exc)
         return sent
 
+    # ---- screener -------------------------------------------------------------------------
+    SCREENER_BARS = 262   # the opportunity scanner's daily window: technicals reuse its cached download
+
+    @staticmethod
+    def screener_symbols() -> list[str]:
+        return [s.symbol for s in STOCKS]
+
+    def refresh_fundamentals(self) -> dict:
+        """Fetch the symbols whose daily refresh is due (slow and polite; runs in its own thread)."""
+        return self.fundamentals.refresh(self.screener_symbols(), stop=self._stop)
+
+    def refresh_screener_technicals(self) -> dict:
+        """Returns, trend, 52-week high and volatility for every stock from the daily bars already in the cache
+        (the opportunity scan loads the same window every few minutes), plus FX rates for non-dollar market values."""
+        with self._tech_lock:
+            syms = self.screener_symbols()
+            frames = self.market.history_many("yahoo", syms, "1d", limit=self.SCREENER_BARS)
+            rows = {}
+            for s, df in frames.items():
+                try:
+                    t = sc.technicals(df)
+                except Exception as exc:   # one bad frame must not hide the others
+                    log.debug("screener technicals %s: %s", s, exc)
+                    t = None
+                if t:
+                    rows[s] = t
+            ccys = sorted({"GBP" if c == "GBp" else c for r in self.fundamentals.cached(syms).values()
+                           if (c := r.get("currency")) and c != "USD"})
+            prev = self.get("screener_tech") or {}
+            fx = dict(prev.get("fx", {}))
+            fx_at = prev.get("fx_at", 0.0)
+            if ccys and (time.time() - fx_at > 3600 or not set(ccys) <= set(fx)):   # FX rates: hourly is plenty
+                fx_at = time.time()
+                try:
+                    for q in self.market.quotes([f"{c}USD=X" for c in ccys], spark_bars=1):
+                        if q.get("price"):
+                            fx[q["symbol"][:3]] = float(q["price"])
+                except Exception as exc:
+                    log.warning("screener FX rates unavailable: %s", exc)
+            data = {"as_of": datetime.now(timezone.utc).isoformat(), "rows": rows, "fx": fx, "fx_at": fx_at}
+            self.put("screener_tech", data)
+            return data
+
+    def _technicals_soon(self) -> None:
+        """First request before any scan: compute in the background, never on the request thread."""
+        if self._tech_lock.locked():
+            return
+
+        def run():
+            try:
+                self.refresh_screener_technicals()
+            except Exception as exc:
+                log.warning("screener technicals failed: %s", exc)
+
+        threading.Thread(target=run, name="screener-technicals", daemon=True).start()
+
+    @staticmethod
+    def _compact(r: dict) -> dict:
+        """Rounded figures (the full list is ~520 rows: keep the response small)."""
+        return {k: (round(v) if k == "market_cap" else round(v, 2)) if isinstance(v, float) and math.isfinite(v) else v
+                for k, v in r.items()}
+
+    def screener(self, filters: sc.Filters | None = None, sort: str = "market_cap", desc: bool = True,
+                 limit: int | None = None) -> dict:
+        """Rows matching `filters`, sorted, with coverage (how many stocks have fundamentals / prices yet)."""
+        filters = filters or sc.Filters()
+        tech = self.get("screener_tech")
+        if tech is None:
+            self._technicals_soon()
+        syms = self.screener_symbols()
+        rows = sc.build_rows(STOCKS, self.fundamentals.cached(syms), (tech or {}).get("rows", {}),
+                             (tech or {}).get("fx", {}))
+        hits = sc.sort_rows(sc.apply(rows, filters), sort, desc)
+        cov = self.fundamentals.coverage(syms)
+        cov.update(with_technicals=sum(r["has_technicals"] for r in rows), technicals_as_of=(tech or {}).get("as_of"),
+                   technicals_ready=tech is not None)
+        return ser.clean({
+            "as_of": datetime.now(timezone.utc).isoformat(), "total": len(rows), "count": len(hits),
+            "rows": [self._compact(r) for r in (hits if limit is None else hits[:limit])],
+            "coverage": cov, "bands": sc.bands(), "filters": filters.active(), "sort": sort,
+            "order": "desc" if desc else "asc", "sectors": sorted({r["sector"] for r in rows}),
+        })
+
+    def _fund_loop(self) -> None:
+        if self._stop.wait(self.fundamentals_delay):
+            return
+        while not self._stop.is_set():
+            try:
+                self.refresh_fundamentals()
+            except Exception as exc:
+                log.warning("screener fundamentals failed: %s", exc)
+            self._stop.wait(self.fundamentals_check)
+
     def _loop(self) -> None:
         while not self._stop.is_set():
             started = time.time()
@@ -503,6 +606,10 @@ class Precomputer:
                 self.scan_opportunities()
             except Exception as exc:
                 log.warning("opportunity scan failed: %s", exc)
+            try:
+                self.refresh_screener_technicals()   # same daily bars the scan just loaded (cache hits)
+            except Exception as exc:
+                log.warning("screener technicals failed: %s", exc)
             try:
                 self.manage_paper_exits()   # stops must fire even if the scan failed
             except Exception as exc:
@@ -533,6 +640,7 @@ class Precomputer:
         self._thread = threading.Thread(target=self._loop, name="precompute", daemon=True)
         self._thread.start()
         threading.Thread(target=self._opp_loop, name="opportunities", daemon=True).start()
+        threading.Thread(target=self._fund_loop, name="fundamentals", daemon=True).start()
 
     def stop(self) -> None:
         self._stop.set()

@@ -260,3 +260,23 @@ export interface UpcomingEarning {
   eps_estimate: number | null; "avg_move_%": number | null; reports_measured: number; pick: boolean; watchlist: boolean; held: boolean;
 }
 export interface UpcomingEarnings { as_of: string; days: number; today: string; items: UpcomingEarning[]; last_refresh: string | null; hint: string }
+
+export type SizeBand = "small" | "mid" | "large" | "mega";
+export type ValuationBand = "cheap" | "fair" | "expensive" | "no_profit";
+export interface ScreenerRow {
+  symbol: string; name: string; sector: string; industry: string; region: string; currency: string | null;
+  market_cap: number | null; size: SizeBand | null; pe: number | null; forward_pe: number | null; valuation: ValuationBand | null;
+  dividend_yield: number | null; beta: number | null; price: number | null; change_pct: number | null;
+  ret_1m: number | null; ret_6m: number | null; ret_12m: number | null; above_200d: boolean | null; vs_200d_pct: number | null;
+  from_high_pct: number | null; volatility: number | null; momentum_pct: number | null; has_fundamentals: boolean; has_technicals: boolean;
+}
+export interface ScreenerBand { id: string; min: number; max: number | null }
+export interface ScreenerCoverage {
+  total: number; with_fundamentals: number; fresh: number; last_update: string | null; refreshing: boolean;
+  progress: { done: number; todo: number } | null; with_technicals: number; technicals_as_of: string | null; technicals_ready: boolean;
+}
+export interface ScreenerResult {
+  as_of: string; total: number; count: number; rows: ScreenerRow[]; coverage: ScreenerCoverage; sectors: string[];
+  bands: { size: ScreenerBand[]; valuation: ScreenerBand[]; strong_momentum_pct: number };
+  filters: Record<string, unknown>; sort: string; order: "asc" | "desc";
+}

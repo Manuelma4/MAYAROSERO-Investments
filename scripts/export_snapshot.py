@@ -75,6 +75,15 @@ def main(out: Path) -> None:
         for p in PRESETS:
             save(f"picks_{p}.json", get("/api/picks/latest", preset=p))
         save("today.json", get("/api/today"))
+        # Screener: a full fundamentals pass (polite: ~1 stock per second, several minutes) and technicals from
+        # the daily bars, then the whole universe in one file (the app filters it in the browser).
+        pre = app.state.precompute
+        print("screener fundamentals:", pre.fundamentals.refresh(pre.screener_symbols(), wait=True))
+        pre.refresh_screener_technicals()
+        scr = get("/api/screener")
+        save("screener.json", scr)
+        print(f"screener: {scr['coverage']['with_fundamentals']}/{scr['total']} with fundamentals, "
+              f"{scr['coverage']['with_technicals']} with prices")
         # Live forward record: this export starts from an empty database, so it shows the honest
         # "just started" state (the preview has no recorded history of its own).
         save("track_record.json", get("/api/track-record"))

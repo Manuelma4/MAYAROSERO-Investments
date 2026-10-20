@@ -46,6 +46,10 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
       }
     }
     case "/api/today": return load("today.json");
+    // The whole universe in one file: the Screener filters and sorts it in the browser, as on the live app.
+    case "/api/screener": {
+      try { return await load("screener.json"); } catch { return limit("The screener"); }
+    }
     case "/api/earnings": {
       let all: Record<string, unknown> = {};
       try { all = await load<Record<string, unknown>>("earnings.json"); } catch { /* older snapshot */ }

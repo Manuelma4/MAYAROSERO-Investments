@@ -159,3 +159,9 @@ Any of: a small VPS (Hetzner / OVH ~€5/month), Railway, Render or Fly.io. Run
   confirmed dates for every listing, a paid calendar (e.g. Finnhub or Polygon earnings endpoints) could replace
   it in `src/tradebot/data/earnings.py`. The "earnings tomorrow" alert is sent from 08:00 in the digest time zone
   (`DIGEST_TIMEZONE`, Europe/Paris by default) through the same channels as the other alerts.
+- **Screener figures** (Discover › Screener): free from Yahoo Finance, nothing to set up. Market value, P/E,
+  dividend yield and beta are fetched once a day (from 06:00 New York) one stock at a time, about 1 per second,
+  so after the very first start the list fills in over roughly 10 minutes (prices and returns are there at once);
+  they are kept in the database, so restarts don't fetch them again. Yahoo occasionally rate-limits: the app then
+  pauses and retries later. If that becomes a problem, a paid fundamentals feed (e.g. Financial Modeling Prep
+  ~$20/month, or Polygon's financials) could replace `fetch_fundamentals` in `src/tradebot/data/fundamentals.py`.

@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -143,6 +144,8 @@ def create_app(settings: Settings | None = None, provider_factory: ProviderFacto
 
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                        allow_methods=["*"], allow_headers=["*"])
+    # Big JSON lists (the screener's ~520 rows, quotes for the whole universe) shrink ~5x on the phone's connection.
+    app.add_middleware(GZipMiddleware, minimum_size=4096)
 
     @app.middleware("http")
     async def auth(request: Request, call_next):

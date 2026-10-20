@@ -130,6 +130,8 @@ def server(tmp_path_factory):
     assert pre.get("today") is not None, pre.last_error
     pre.put("opportunities", {"as_of": pd.Timestamp.now(tz="UTC").isoformat(), "us_market_open": False,
                               "items": []})   # the live news scan needs the network: start from "nothing now"
+    pre.fundamentals.refresh(pre.screener_symbols(), wait=True)   # offline fake fundamentals (tests/conftest.py)
+    pre.refresh_screener_technicals()
 
     port = _free_port()
     srv = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", lifespan="on"))
@@ -394,6 +396,48 @@ def test_customize_picks_changes_number_of_stocks(ui):
     expect(hold).to_contain_text("5 stocks", timeout=60_000)
     expect(ui.page.locator("details.customize summary")).to_contain_text("5 stocks")
     expect(ui.page.locator("ul.pick-cards > li")).to_have_count(5)
+    ui.check()
+
+
+def test_screener_preset_filters_sorts_and_opens_a_stock(ui):
+    from tradebot.universe import STOCKS
+
+    ui.goto("/discover")
+    ui.page.get_by_role("tab", name="screener").click()
+    expect(ui.heading("Stock screener")).to_be_visible()
+    title = ui.page.locator(".scr-head .section-title")
+    expect(title).to_contain_text(f"{len(STOCKS)} of {len(STOCKS)} stocks")
+
+    def count() -> int:
+        return int(re.match(r"\s*(\d+) of", title.text_content()).group(1))
+
+    preset = ui.page.get_by_role("button", name="Dividend payers in an uptrend")
+    preset.click()
+    expect(preset).to_have_attribute("aria-pressed", "true")
+    expect(title).not_to_contain_text(f"{len(STOCKS)} of")
+    n = count()
+    assert 0 < n < len(STOCKS)
+    assert "div=2" in ui.page.url and "trend=up" in ui.page.url
+    # Another filter narrows the list further; clearing brings everything back. On a phone the filters start
+    # folded (results first) and open with one tap.
+    if ui.viewport == "phone":
+        ui.page.locator("details.scr-box > summary").click()
+    ui.page.get_by_role("group", name="Size").get_by_role("button", name="Mega").click()
+    expect(title).not_to_contain_text(f"{n} of")
+    assert count() <= n
+    rows = ui.page.locator(".scr-table tbody tr a" if ui.viewport == "desktop" else ".scr-cards a")
+    if ui.viewport == "desktop":   # sort by P/E (cheapest first) from the column header
+        ui.page.get_by_role("button", name="P/E", exact=True).click()
+        expect(ui.page.locator("th[aria-sort='ascending']")).to_contain_text("P/E")
+    if count():
+        href = rows.first.get_attribute("href")
+        rows.first.click()
+        ui.page.wait_for_url(ui.base + href)
+        ui.page.go_back()
+        expect(preset).to_be_visible()
+        assert "size=mega" in ui.page.url
+    ui.page.get_by_role("button", name="Clear filters").click()
+    expect(title).to_contain_text(f"{len(STOCKS)} of {len(STOCKS)} stocks")
     ui.check()
 
 

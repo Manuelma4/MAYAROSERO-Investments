@@ -1,6 +1,6 @@
 """SQLite store for live events (signals, abnormal moves), watchlists, price alerts and the live
 track record (daily picks snapshots and Invest-now ideas, recorded as they happen), the saved portfolio target,
-the earnings calendar cache and the "already sent" marks of the weekly digest and drift alerts (so a restart never repeats them)."""
+the earnings calendar cache, the screener's daily fundamentals and the "already sent" marks of the weekly digest and drift alerts (so a restart never repeats them)."""
 
 from __future__ import annotations
 
@@ -65,6 +65,10 @@ CREATE TABLE IF NOT EXISTS notices (
     PRIMARY KEY (kind, period)
 );
 CREATE TABLE IF NOT EXISTS earnings_cache (
+    symbol TEXT PRIMARY KEY,
+    data TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS fundamentals_cache (
     symbol TEXT PRIMARY KEY,
     data TEXT NOT NULL
 );
@@ -248,6 +252,18 @@ class EventStore:
     def earnings_put(self, symbol: str, data: dict) -> None:
         with self._lock:
             self._conn.execute("INSERT INTO earnings_cache(symbol, data) VALUES (?, ?) ON CONFLICT(symbol) DO UPDATE "
+                               "SET data = excluded.data", (symbol, json.dumps(data, default=str)))
+            self._conn.commit()
+
+    # --- screener fundamentals (refreshed once a day; survive restarts) ----------------------------
+    def fundamentals_all(self) -> dict[str, dict]:
+        with self._lock:
+            rows = self._conn.execute("SELECT symbol, data FROM fundamentals_cache").fetchall()
+        return {r["symbol"]: json.loads(r["data"]) for r in rows}
+
+    def fundamentals_put(self, symbol: str, data: dict) -> None:
+        with self._lock:
+            self._conn.execute("INSERT INTO fundamentals_cache(symbol, data) VALUES (?, ?) ON CONFLICT(symbol) DO UPDATE "
                                "SET data = excluded.data", (symbol, json.dumps(data, default=str)))
             self._conn.commit()
 

@@ -63,3 +63,29 @@ def _offline_earnings():
     mp.setattr(er, "PAUSE", 0.0)
     yield
     mp.undo()
+
+
+def fake_fundamentals(symbol: str) -> dict | None:
+    """Deterministic offline stand-in for Yahoo's `Ticker.info` (parsed): market values from 5bn to 3tn,
+    P/E from losses (None) to 60, about two thirds paying a dividend."""
+    import zlib
+
+    seed = zlib.crc32(symbol.encode())
+    pe = None if seed % 9 == 0 else 6.0 + seed % 55
+    return {"name": symbol, "market_cap": float(5e9 * (1.0 + seed % 600)), "currency": "USD", "pe": pe,
+            "forward_pe": None if pe is None else pe * 0.9, "eps": -1.0 if pe is None else 3.0,
+            "dividend_yield": 0.0 if seed % 3 == 0 else round((seed % 50) / 10, 2), "beta": 0.5 + (seed % 15) / 10,
+            "sector_yahoo": None, "industry_yahoo": None}
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _offline_fundamentals():
+    """The screener's daily fundamentals must never call Yahoo from the test suite."""
+    from tradebot.data import fundamentals as fd
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(fd, "FETCH", fake_fundamentals)
+    mp.setattr(fd, "PAUSE", 0.0)
+    mp.setattr(fd, "BACKOFF", 0.0)
+    yield
+    mp.undo()
