@@ -1,5 +1,5 @@
 name: CI
-# Paused at Manuel's request (Oct 20): runs only when started by hand from the Actions tab.
+# Paused at Manuel's request (Oct 20) until the final commit of the overnight work; runs only by hand meanwhile.
 # To switch automatic checks back on, replace this block with:  on: [push, pull_request]
 on:
   workflow_dispatch:
