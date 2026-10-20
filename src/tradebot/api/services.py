@@ -163,7 +163,7 @@ def market_mood(market: MarketData, breadth_pct: float | None) -> dict:
     parts = [f"The S&P 500 is {abs(dist):.1f}% {'above' if dist >= 0 else 'below'} its 200-day average "
              f"({'uptrend' if dist >= 0 else 'downtrend'})"]
     if breadth_pct is not None:
-        parts.append(f"{breadth_pct:.0f}% of the leading stocks are in an uptrend")
+        parts.append(f"{breadth_pct:.0f}% of S&P 500 stocks are in an uptrend")
     if vix is not None:
         parts.append(f"fear index (VIX) at {vix:.0f} ({'calm' if vix < 18 else 'nervous' if vix > 25 else 'normal'})")
     advice = {"Risk-on": "Conditions favor staying fully invested in the picks.",

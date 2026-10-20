@@ -54,7 +54,7 @@ function TodayBoardView({ t, ideas }: { t: TodayBoard; ideas: ReactNode }) {
     <>
       {t.mood && <section className="mood">
         <div className="mood-head">
-          <span className="kpi-label">Market mood<Hint>Combines the S&amp;P 500's trend (above or below its 200-day average), how many leading stocks are rising, and the fear index (VIX). It tells you whether the market wind is at your back.</Hint></span>
+          <span className="kpi-label">Market mood<Hint>Combines the S&amp;P 500's trend (above or below its 200-day average), how many S&amp;P 500 stocks are in an uptrend, and the fear index (VIX). It tells you whether the market wind is at your back.</Hint></span>
           <span className={`mood-label ${MOOD_TONE[t.mood.label]}`}>{t.mood.label}</span>
         </div>
         <p className="mood-text">{t.mood.explanation}</p>
