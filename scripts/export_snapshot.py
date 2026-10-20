@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 from tradebot.api import create_app
 from tradebot.api.settings import Settings
-from tradebot.universe import CRYPTO, STOCKS
+from tradebot.universe import CRYPTO, CURATED, STOCKS
 
 MARKETS = ["^GSPC", "^NDX", "^DJI", "^FCHI", "^GDAXI", "^STOXX50E", "BTC/USDT", "ETH/USDT", "SOL/USDT",
            "GC=F", "CL=F", "EURUSD=X"]
@@ -56,15 +56,18 @@ def main(out: Path) -> None:
         save("quotes.json", {q["symbol"]: q for q in quotes})
         print(f"quotes: {sum('price' in q for q in quotes)}/{len(quotes)}")
 
+        # Charts and default forecasts only for featured symbols (markets, curated names, crypto): the preview
+        # is published as files and the full S&P 500 would be ~75 MB. Prices for every stock are in quotes.json.
+        featured = list(dict.fromkeys(MARKETS + [s.symbol for s in CURATED] + [s for s, _ in CRYPTO]))
         ok = 0
-        for s in symbols:
+        for s in featured:
             try:
                 tf = "4h" if "/" in s else "1d"
                 save(f"charts/{safe(s)}_{tf}.json", get("/api/chart", symbol=s, timeframe=tf, limit=320))
                 ok += 1
             except Exception as exc:
                 print("chart failed", s, exc)
-        print(f"charts: {ok}/{len(symbols)}")
+        print(f"charts: {ok}/{len(featured)}")
 
         app.state.precompute.run_once()   # same precomputed results the live app serves
         if app.state.precompute.last_error:
@@ -74,7 +77,7 @@ def main(out: Path) -> None:
         save("today.json", get("/api/today"))
         save("opportunities.json", post("/api/opportunities/scan", {}))
         (out / "forecasts").mkdir(exist_ok=True)
-        fc_targets = {(s, 5) for s in symbols}
+        fc_targets = {(s, 5) for s in featured}
         for h in (1, 5, 21):
             pr = get("/api/predictions", horizon=h)
             save(f"predictions_{h}.json", pr)

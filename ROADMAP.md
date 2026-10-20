@@ -96,7 +96,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         (was 21 min per horizon) without losing its edge.
 12. [x] **Design review pass**: product-designer screenshot review of every page on real data
         (desktop + phone), fix polish issues; refresh the preview link.
-13. [ ] **Preview completeness**: static preview covers the new pages (movers board, alerts,
+13. [x] **Preview completeness**: static preview covers the new pages (movers board, alerts,
         watchlists, order ticket preview, stock pages for all picks).
 
 ## Later research track
