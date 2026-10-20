@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pandas as pd
 
 from ..picker import PRESET_INFO, PickerConfig, run_picker
@@ -36,7 +38,29 @@ def pick_reason(r: dict) -> str:
     return text[:1].upper() + text[1:] + "." if text else ""
 
 
-def compute_picks(market: MarketData, body: PicksRequest) -> dict:
+_PERIOD_END = {"ME": pd.offsets.MonthEnd(0), "QE": pd.offsets.QuarterEnd(0), "W-FRI": pd.offsets.Week(weekday=4)}
+
+
+def completed_changes(holdings: list[dict], rebalance: str, as_of: pd.Timestamp) -> dict:
+    """Buy/sell/keep at the last COMPLETED review. A review dated in the still-running period
+    (e.g. today, mid-month) is provisional, so it is skipped and reported separately."""
+    hs = list(holdings)
+    provisional = False
+    if hs:
+        last = pd.Timestamp(hs[-1]["date"])
+        period_end = (last + _PERIOD_END.get(rebalance, pd.offsets.MonthEnd(0))).normalize()
+        if last.normalize() < period_end and last.date() >= as_of.date():
+            hs = hs[:-1]
+            provisional = True
+    if not hs:
+        return {"date": None, "buy": [], "sell": [], "keep": [], "provisional_skipped": provisional}
+    cur = set(hs[-1]["symbols"])
+    prev = set(hs[-2]["symbols"]) if len(hs) > 1 else set()
+    return {"date": hs[-1]["date"], "buy": sorted(cur - prev), "sell": sorted(prev - cur),
+            "keep": sorted(cur & prev), "provisional_skipped": provisional}
+
+
+def compute_picks(market: MarketData, body: PicksRequest, ew_cache: dict | None = None) -> dict:
     symbols = body.symbols or sp500_symbols()
     # One extra year before `start` so 12-month factors exist on day one.
     fetch_start = (pd.Timestamp(body.start) - pd.Timedelta(days=400)).date().isoformat()
@@ -53,9 +77,14 @@ def compute_picks(market: MarketData, body: PicksRequest) -> dict:
         res = run_picker(frames, bench, cfg, start=body.start)
         # Honest yardstick: the same stocks, equal weight, no selection. It shares the
         # survivorship bias, so the gap to it measures the selection skill itself.
-        ew = run_picker(frames, bench, PickerConfig(top_n=len(frames), trend_filter=False,
-                                                    rebalance=body.rebalance, cost_bps=body.cost_bps),
-                        start=body.start)
+        ew_key = (tuple(sorted(frames)), body.rebalance, body.cost_bps, body.start, body.benchmark)
+        ew = ew_cache.get(ew_key) if ew_cache is not None else None
+        if ew is None:
+            ew = run_picker(frames, bench, PickerConfig(top_n=len(frames), trend_filter=False,
+                                                        rebalance=body.rebalance, cost_bps=body.cost_bps),
+                            start=body.start)
+            if ew_cache is not None:
+                ew_cache[ew_key] = ew
     except ValueError as exc:
         raise ServiceError(400, str(exc)) from exc
     res.stats["universe_cagr_%"] = ew.stats["cagr_%"]
@@ -77,13 +106,8 @@ def compute_picks(market: MarketData, body: PicksRequest) -> dict:
     current = [x for x in ranking if x["eligible"]][: body.top_n]
     risk_off = bool(res.holdings and res.holdings[-1]["risk_off"])
 
-    # What changed at the latest rebalance (buy / sell / keep).
-    changes = {"buy": [], "sell": [], "keep": [], "date": None}
-    if res.holdings:
-        last = set(res.holdings[-1]["symbols"])
-        prev = set(res.holdings[-2]["symbols"]) if len(res.holdings) > 1 else set()
-        changes = {"date": res.holdings[-1]["date"], "buy": sorted(last - prev),
-                   "sell": sorted(prev - last), "keep": sorted(last & prev)}
+    # What changed at the last completed review (buy / sell / keep).
+    changes = completed_changes(res.holdings, body.rebalance, res.equity.index[-1])
 
     return ser.clean({
         "preset": body.preset, "preset_info": PRESET_INFO,
@@ -116,7 +140,12 @@ def market_mood(market: MarketData, breadth_pct: float | None) -> dict:
     except DataUnavailable:
         pass
 
-    score = (1 if dist > 0 else -1) + (1 if (breadth_pct or 50) >= 55 else -1 if (breadth_pct or 50) < 45 else 0) \
+    if not math.isfinite(dist):
+        raise DataUnavailable("S&P 500 trend unavailable")
+    if vix is not None and not math.isfinite(vix):
+        vix = None
+    breadth = 50.0 if breadth_pct is None else breadth_pct
+    score = (1 if dist > 0 else -1) + (1 if breadth >= 55 else -1 if breadth < 45 else 0) \
         + (0 if vix is None else 1 if vix < 18 else -1 if vix > 25 else 0)
     label = "Risk-on" if score >= 2 else "Risk-off" if score <= -1 else "Neutral"
     parts = [f"The S&P 500 is {abs(dist):.1f}% {'above' if dist >= 0 else 'below'} its 200-day average "

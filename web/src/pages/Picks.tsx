@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { fmtNum, fmtPct, fmtPrice } from "../lib/format";
@@ -48,13 +48,16 @@ export default function Picks() {
   const { resolved } = useTheme();
 
   const isDefault = topN === "10" && start === "2015-01-01" && rebalance === "ME" && trend && !regime;
+  const reqId = useRef(0);
   const run = async () => {
+    const id = ++reqId.current; // ignore responses from older requests (fast preset switching)
     setLoading(true); setError(null);
     const custom = () => api.picks({ preset, top_n: Number(topN), start, rebalance, trend_filter: trend, regime_filter: regime });
     try {
       // Default settings: instant precomputed result. Custom settings (or not ready yet): compute now.
-      setRes(isDefault ? await api.picksLatest(preset).catch(custom) : await custom());
-    } catch (e) { setError((e as Error).message); } finally { setLoading(false); }
+      const r = isDefault ? await api.picksLatest(preset).catch(custom) : await custom();
+      if (id === reqId.current) setRes(r);
+    } catch (e) { if (id === reqId.current) setError((e as Error).message); } finally { if (id === reqId.current) setLoading(false); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { run(); }, [preset]);
@@ -106,8 +109,8 @@ export default function Picks() {
       <ErrorBox error={error} />
       {loading && !res && <div className="empty"><Spinner /> Ranking ~120 S&amp;P 500 leaders on today's prices…</div>}
 
-      {res?.changes?.date && !res.risk_off && (
-        <Card title={<>Changes at the last review · {res.changes.date}<Hint>What changed when the list was last refreshed: buy the new names, sell the ones that dropped out, keep the rest.</Hint></>}>
+      {res?.changes?.date && (
+        <Card title={<>Changes at the last review · {res.changes.date}<Hint>What changed at the last completed review: buy the new names, sell the ones that dropped out, keep the rest. Reviews happen at the end of each period; the ranking below is today's and becomes official at the next review.</Hint></>}>
           <div className="changes inline">
             {([["Buy", res.changes.buy, "up"], ["Sell", res.changes.sell, "down"], ["Keep", res.changes.keep, ""]] as const).map(([label, list, tone]) => (
               <div key={label} className="change-row"><span className={`badge ${tone}`}>{label}</span><span className="change-syms">{list.length ? list.join(" · ") : <span className="muted">None</span>}</span></div>))}

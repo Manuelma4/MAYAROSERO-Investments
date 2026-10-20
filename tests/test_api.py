@@ -193,3 +193,22 @@ def test_pick_reason_plain_english():
     r = pick_reason({"momentum_12_1_%": 45.2, "rel_strength_%": -3.1, "trend_%": 12.0, "volatility_%": 21})
     assert r == ("Up 45% over the past year, lagging the S&P 500 by 3% over 6 months, "
                  "12% above its 200-day average, calm price action.")
+
+
+def test_completed_changes_skips_provisional_review():
+    import pandas as pd
+
+    from tradebot.api.services import completed_changes
+
+    h = [{"date": "2026-08-31", "symbols": ["A", "B"]},
+         {"date": "2026-09-30", "symbols": ["B", "C"]},
+         {"date": "2026-10-20", "symbols": ["C", "D"]}]  # mid-month: still provisional
+    c = completed_changes(h, "ME", pd.Timestamp("2026-10-20"))
+    assert c["date"] == "2026-09-30" and c["buy"] == ["C"] and c["sell"] == ["A"] and c["keep"] == ["B"]
+    assert c["provisional_skipped"] is True
+    done = completed_changes(h[:2], "ME", pd.Timestamp("2026-09-30"))
+    assert done["date"] == "2026-09-30" and done["provisional_skipped"] is False
+
+
+def test_unknown_preset_is_404(client):
+    assert client.get("/api/picks/latest", params={"preset": "nope"}).status_code == 404

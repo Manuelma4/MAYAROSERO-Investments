@@ -12,11 +12,15 @@ scanner only ever see this normalized format.
 
 from __future__ import annotations
 
+import threading
 from abc import ABC, abstractmethod
 
 import pandas as pd
 
 OHLCV = ["open", "high", "low", "close", "volume"]
+
+# yfinance keeps shared module state during downloads; concurrent calls can mix results.
+_YF_LOCK = threading.Lock()
 
 
 def normalize(df: pd.DataFrame) -> pd.DataFrame:
@@ -61,7 +65,8 @@ class YahooProvider(DataProvider):
             kwargs["period"] = f"{days}d"
         else:
             kwargs["period"] = self._PERIOD_FOR.get(timeframe, "max")
-        raw = yf.download(symbol, **kwargs)
+        with _YF_LOCK:
+            raw = yf.download(symbol, **kwargs)
         if raw.empty:
             raise ValueError(f"No data from Yahoo for {symbol} {timeframe}")
         df = normalize(raw)
@@ -82,7 +87,8 @@ class YahooProvider(DataProvider):
         else:
             days = int((limit or 300) * (7 if timeframe == "1wk" else 1) * 1.5) + 10
             kwargs["period"] = f"{days}d"
-        raw = yf.download(symbols, **kwargs)
+        with _YF_LOCK:
+            raw = yf.download(symbols, **kwargs)
         out: dict[str, pd.DataFrame] = {}
         for sym in symbols:
             try:

@@ -138,8 +138,11 @@ class MoversScanner:
 
         from ..data.providers import normalize
 
-        raw = yf.download(symbols, interval=self.settings.timeframe, period="5d",
-                          group_by="ticker", progress=False, auto_adjust=True, threads=True)
+        from ..data.providers import _YF_LOCK
+
+        with _YF_LOCK:
+            raw = yf.download(symbols, interval=self.settings.timeframe, period="5d",
+                              group_by="ticker", progress=False, auto_adjust=True, threads=True)
         out = {}
         for sym in symbols:
             try:

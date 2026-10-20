@@ -407,7 +407,7 @@ tbody tr:hover { background: var(--surface-2); }
 .hint-btn { all: unset; cursor: pointer; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line-strong); color: var(--text-2); font: 600 10px/16px var(--font); text-align: center; letter-spacing: 0; text-transform: none; }
 .hint-btn:hover, .hint-btn[aria-expanded="true"] { color: var(--text); border-color: var(--text); }
 .hint-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-.hint-pop { position: absolute; z-index: 50; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(300px, 80vw); padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: var(--radius); color: var(--text); font: 400 13px/1.5 var(--font); letter-spacing: 0; text-transform: none; text-align: left; white-space: normal; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.hint-pop { position: fixed; z-index: 60; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: var(--radius); color: var(--text); font: 400 13px/1.5 var(--font); letter-spacing: 0; text-transform: none; text-align: left; white-space: normal; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
 
 /* Today board */
 .mood { border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; }

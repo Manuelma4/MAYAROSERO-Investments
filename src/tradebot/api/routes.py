@@ -77,6 +77,10 @@ def picks(request: Request, body: PicksRequest):
 @router.get("/picks/latest")
 def picks_latest(request: Request, preset: str = "quality_momentum"):
     """Precomputed picks for a preset with default settings (instant)."""
+    from ..picker import PRESETS
+
+    if preset not in PRESETS:
+        raise HTTPException(404, f"Unknown strategy '{preset}'. Available: {', '.join(PRESETS)}")
     data = _state(request).precompute.get(f"picks:{preset}")
     if data is None:
         raise HTTPException(503, "Picks are being computed. They will be ready in about a minute.")

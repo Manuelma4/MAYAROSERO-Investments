@@ -40,14 +40,14 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
   const ch = core?.changes;
   return (
     <>
-      <section className="mood">
+      {t.mood && <section className="mood">
         <div className="mood-head">
           <span className="kpi-label">Market mood<Hint>Combines the S&amp;P 500's trend (above or below its 200-day average), how many leading stocks are rising, and the fear index (VIX). It tells you whether the market wind is at your back.</Hint></span>
           <span className={`mood-label ${MOOD_TONE[t.mood.label]}`}>{t.mood.label}</span>
         </div>
         <p className="mood-text">{t.mood.explanation}</p>
         <p className="mood-advice">{t.mood.advice}</p>
-      </section>
+      </section>}
 
       <div className="grid-3">
         <Card className="span-2" title={<>What to hold now<Hint>The engine's current top picks among the S&amp;P 500 leaders: strong 12-month performance, beating the index, in an uptrend, with calmer price action. Split your money equally between them and review once a month.</Hint></>}
@@ -72,10 +72,10 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
           )}
         </Card>
 
-        <Card title={<>Changes this month<Hint>What changed at the last monthly review: stocks to buy (new in the picks), to sell (dropped out) and to keep.</Hint></>}>
+        <Card title={<>Changes at the last review<Hint>What changed at the last completed monthly review: stocks to buy (new in the picks), to sell (dropped out) and to keep. Reviews happen at month end, so mid-month rankings are not acted on yet.</Hint></>}>
           {!ch?.date ? <Empty>No changes yet.</Empty> : (
             <div className="changes">
-              <p className="muted small">Review of {ch.date}</p>
+              <p className="muted small">Review of {ch.date}{ch.provisional_skipped ? " · next review at month end" : ""}</p>
               {([["Buy", ch.buy, "up"], ["Sell", ch.sell, "down"], ["Keep", ch.keep, ""]] as const).map(([label, list, tone]) => (
                 <div key={label} className="change-row">
                   <span className={`badge ${tone}`}>{label}</span>

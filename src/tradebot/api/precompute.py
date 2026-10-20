@@ -8,12 +8,14 @@ Jobs run at startup and then every `interval` seconds in a daemon thread:
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from datetime import datetime, timezone
 
 from ..picker import PRESETS
 from ..universe import sp500_symbols
+from . import serialize as ser
 from .market import MarketData
 from .schemas import PicksRequest
 from .services import compute_picks, market_mood
@@ -42,9 +44,10 @@ class Precomputer:
 
     def run_once(self) -> None:
         errors = []
+        ew_cache: dict = {}  # the equal-weight yardstick is identical for every preset
         for preset in PRESETS:
             try:
-                self.put(f"picks:{preset}", compute_picks(self.market, PicksRequest(preset=preset)))
+                self.put(f"picks:{preset}", compute_picks(self.market, PicksRequest(preset=preset), ew_cache))
             except Exception as exc:  # keep the previous result if a refresh fails
                 errors.append(f"picks {preset}: {exc}")
         try:
@@ -58,10 +61,15 @@ class Precomputer:
 
     def build_today(self) -> dict:
         core = self.get("picks:quality_momentum")
-        mood = market_mood(self.market, core.get("breadth_%") if core else None)
-        quotes = [q for q in self.market.quotes(sp500_symbols()) if q.get("change_pct") is not None]
+        try:
+            mood = market_mood(self.market, core.get("breadth_%") if core else None)
+        except Exception as exc:  # the board still shows picks and movers without the mood
+            log.warning("market mood unavailable: %s", exc)
+            mood = None
+        quotes = [q for q in self.market.quotes(sp500_symbols())
+                  if isinstance(q.get("change_pct"), (int, float)) and math.isfinite(q["change_pct"])]
         quotes.sort(key=lambda q: q["change_pct"], reverse=True)
-        return {
+        return ser.clean({
             "as_of": datetime.now(timezone.utc).isoformat(),
             "mood": mood,
             "core": None if core is None else {
@@ -71,7 +79,7 @@ class Precomputer:
             },
             "gainers": [{k: q[k] for k in ("symbol", "price", "change_pct")} for q in quotes[:6]],
             "losers": [{k: q[k] for k in ("symbol", "price", "change_pct")} for q in quotes[::-1][:6]],
-        }
+        })
 
     def _loop(self) -> None:
         while not self._stop.is_set():
