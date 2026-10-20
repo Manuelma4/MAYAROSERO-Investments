@@ -38,15 +38,15 @@ export function ForecastPanel({ symbol, horizon }: { symbol: string; horizon: nu
   return (
     <div className="forecast">
       <div className="fc-stats">
-        <div><span className="kpi-label">Chance higher {days}<Hint>Share of 5,000 simulated futures that end above today's price. The simulation uses the stock's real past daily moves and today's volatility, so it describes risk and range more than direction.</Hint></span><strong>{fmtPct(mc.p_up * 100, 0, false)}</strong></div>
+        <div><span className="kpi-label">Chance higher {days}<Hint term="monte-carlo">Share of 5,000 simulated futures that end above today's price. The simulation uses the stock's real past daily moves and today's volatility, so it describes risk and range more than direction.</Hint></span><strong>{fmtPct(mc.p_up * 100, 0, false)}</strong></div>
         <div><span className="kpi-label">Likely range<Hint>90% of simulated outcomes land inside this range (between the 5th and 95th percentile).</Hint></span><strong>{fmtPrice(mc.range_5_95[0])} – {fmtPrice(mc.range_5_95[1])}</strong></div>
         <div><span className="kpi-label">Chance of ±5% move<Hint>How often the simulated futures end at least 5% higher (green) or at least 5% lower (red). Small numbers mean big swings are unlikely over this period.</Hint></span><strong><span className="up">{fmtPct(mc["p_move_up_5%"] * 100, 0, false)}</span> / <span className="down">{fmtPct(mc["p_move_down_5%"] * 100, 0, false)}</span></strong></div>
-        <div><span className="kpi-label">Volatility (yearly)<Hint>How much the price typically swings over a year. About 15-20% is calm for a stock index; 40%+ is a bumpy ride.</Hint></span><strong>{fmtNum(mc["annual_vol_%"], 0)}%</strong></div>
+        <div><span className="kpi-label">Volatility (yearly)<Hint term="volatility">How much the price typically swings over a year. About 15-20% is calm for a stock index; 40%+ is a bumpy ride.</Hint></span><strong>{fmtNum(mc["annual_vol_%"], 0)}%</strong></div>
       </div>
       <LinesChart series={fan} height={220} />
       {vp.poc !== null && (
         <div className="vprofile">
-          <span className="kpi-label">Volume profile · last 120 days<Hint>Where most shares changed hands. The busiest price (point of control) and the zone holding 70% of volume (value area) often act as support or resistance.</Hint></span>
+          <span className="kpi-label">Volume profile · last 120 days<Hint term="volume-profile">Where most shares changed hands. The busiest price (point of control) and the zone holding 70% of volume (value area) often act as support or resistance.</Hint></span>
           <ul>
             {[...vp.bins].reverse().map((b) => {
               const inVA = vp.value_area[0] !== null && b.price >= (vp.value_area[0] ?? 0) && b.price <= (vp.value_area[1] ?? 0);

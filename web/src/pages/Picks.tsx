@@ -111,7 +111,7 @@ export default function Picks() {
       {loading && !res && <div className="empty"><Spinner /> Ranking the ~500 S&amp;P 500 stocks on today's prices…</div>}
 
       {res?.changes?.date && (
-        <Card title={<>Changes at the last review · {fmtDay(res.changes.date)}<Hint>What changed at the last completed review: buy the new names, sell the ones that dropped out, keep the rest. Reviews happen at the end of each period; the ranking below is today's and becomes official at the next review.</Hint></>}>
+        <Card title={<>Changes at the last review · {fmtDay(res.changes.date)}<Hint term="rebalance">What changed at the last completed review: buy the new names, sell the ones that dropped out, keep the rest. Reviews happen at the end of each period; the ranking below is today's and becomes official at the next review.</Hint></>}>
           <div className="changes inline">
             {([["Buy", res.changes.buy, "up"], ["Sell", res.changes.sell, "down"], ["Keep", res.changes.keep, ""]] as const).map(([label, list, tone]) => (
               <div key={label} className="change-row"><span className={`badge ${tone}`}>{label}</span><span className="change-syms">{list.length ? list.join(" · ") : <span className="muted">None</span>}</span></div>))}
@@ -120,7 +120,7 @@ export default function Picks() {
       )}
 
       {res && (
-        <Card title={<>{res.risk_off ? "Signal: stay in cash" : `Hold now · ${res.picks.length} stocks`}<Hint>The stocks to own today, best first. Put the same amount of money in each ("equal weight") and check back at the next review for changes. "Basket today" is how the whole list is doing since yesterday's close.</Hint></>}
+        <Card title={<>{res.risk_off ? "Signal: stay in cash" : `Hold now · ${res.picks.length} stocks`}<Hint term="equal-weight">The stocks to own today, best first. Put the same amount of money in each ("equal weight") and check back at the next review for changes. "Basket today" is how the whole list is doing since yesterday's close.</Hint></>}
           actions={<span className="muted small">{basketToday !== undefined && <>Basket today <Delta v={basketToday} digits={2} /> · </>}equal weight · ranked {fmtDay(res.as_of)}</span>}>
           {res.risk_off ? (
             <div className="notice">The S&amp;P 500 is below its 200-day average, so the bear-market filter says to hold cash until the trend recovers.</div>
@@ -142,7 +142,7 @@ export default function Picks() {
             </ul>
             <div className="table-wrap picks-table">
               <table className="picks">
-                <thead><tr><th>#</th><th>Company</th><th className="hide-sm">Sector</th><th>Score<Hint>The engine's overall grade combining momentum, trend, strength vs the S&amp;P 500 and calmness. Longer bar = stronger candidate.</Hint></th><th className="r">Price</th><th className="r">Today</th><th className="r">1M</th><th className="r hide-sm">12M ex-1M<Hint>Return over the last 12 months, leaving out the most recent month (recent moves often reverse briefly). The core momentum signal.</Hint></th><th className="r hide-sm">vs S&amp;P 6M<Hint>How much better (or worse) the stock did than the S&amp;P 500 over 6 months.</Hint></th><th className="r">Weight<Hint>Share of your money for this stock. Equal weights keep the portfolio diversified.</Hint></th></tr></thead>
+                <thead><tr><th>#</th><th>Company</th><th className="hide-sm">Sector</th><th>Score<Hint>The engine's overall grade combining momentum, trend, strength vs the S&amp;P 500 and calmness. Longer bar = stronger candidate.</Hint></th><th className="r">Price</th><th className="r">Today</th><th className="r">1M</th><th className="r hide-sm">12M ex-1M<Hint term="momentum">Return over the last 12 months, leaving out the most recent month (recent moves often reverse briefly). The core momentum signal.</Hint></th><th className="r hide-sm">vs S&amp;P 6M<Hint term="relative-strength">How much better (or worse) the stock did than the S&amp;P 500 over 6 months.</Hint></th><th className="r">Weight<Hint>Share of your money for this stock. Equal weights keep the portfolio diversified.</Hint></th></tr></thead>
                 <tbody>
                   {res.picks.map((p, i) => {
                     const q = quotes[p.symbol];
@@ -221,12 +221,12 @@ export default function Picks() {
             <div className="history-body">
               <p className="muted small">History is only used to test and tune the engine. The picks above are what it recommends today. Settings are in Customize at the top.</p>
               <div className="kpis">
-                <div className="kpi"><span className="kpi-label">Annual return</span><span className="kpi-value">{fmtPct(s["cagr_%"], 1)}</span><span className="kpi-sub">S&amp;P 500 {fmtPct(s["benchmark_cagr_%"], 1)}</span></div>
-                <div className="kpi"><span className="kpi-label">Edge vs index / year</span><span className={`kpi-value ${beat ? "up" : "down"}`}>{fmtPct(s["excess_cagr_%"], 1)}</span><span className="kpi-sub">{beat ? "Outperformed" : "Underperformed"} since {s.start}</span></div>
-                <div className="kpi" title="Return over the same stocks held equally with no selection (each counted only while it was in the S&amp;P 500). This gap is the engine's own contribution."><span className="kpi-label">Selection skill / year</span><span className={`kpi-value ${s["skill_vs_universe_%"] >= 0 ? "up" : "down"}`}>{fmtPct(s["skill_vs_universe_%"], 1)}</span><span className="kpi-sub">vs same stocks equal-weight {fmtPct(s["universe_cagr_%"], 1)}</span></div>
-                <div className="kpi"><span className="kpi-label">Worst drawdown</span><span className="kpi-value">{fmtPct(s["max_drawdown_%"], 1)}</span><span className="kpi-sub">S&amp;P 500 {fmtPct(s["benchmark_max_drawdown_%"], 1)}</span></div>
-                <div className="kpi"><span className="kpi-label">Sharpe ratio</span><span className="kpi-value">{fmtNum(s.sharpe, 2)}</span><span className="kpi-sub">S&amp;P 500 {fmtNum(s.benchmark_sharpe, 2)}</span></div>
-                <div className="kpi"><span className="kpi-label">Months beating index</span><span className="kpi-value">{fmtNum(s["months_beating_benchmark_%"], 0)}%</span><span className="kpi-sub">Turnover {fmtNum(s["avg_turnover_%"], 0)}% / rebalance</span></div>
+                <div className="kpi"><span className="kpi-label">Annual return<Hint term="cagr">The average yearly growth of the picks over the test, compared with the S&amp;P 500 (SPY, dividends included) below.</Hint></span><span className="kpi-value">{fmtPct(s["cagr_%"], 1)}</span><span className="kpi-sub">S&amp;P 500 {fmtPct(s["benchmark_cagr_%"], 1)}</span></div>
+                <div className="kpi"><span className="kpi-label">Edge vs index / year<Hint term="benchmark">How many percentage points a year the picks did better (or worse) than the S&amp;P 500.</Hint></span><span className={`kpi-value ${beat ? "up" : "down"}`}>{fmtPct(s["excess_cagr_%"], 1)}</span><span className="kpi-sub">{beat ? "Outperformed" : "Underperformed"} since {s.start}</span></div>
+                <div className="kpi"><span className="kpi-label">Selection skill / year<Hint term="selection-skill">Compared with the same stocks held equally with no selection (each counted only while it was in the S&amp;P 500). This gap is the engine's own contribution.</Hint></span><span className={`kpi-value ${s["skill_vs_universe_%"] >= 0 ? "up" : "down"}`}>{fmtPct(s["skill_vs_universe_%"], 1)}</span><span className="kpi-sub">vs same stocks equal-weight {fmtPct(s["universe_cagr_%"], 1)}</span></div>
+                <div className="kpi"><span className="kpi-label">Worst drawdown<Hint term="drawdown">The biggest fall from a peak before recovering. Expect to live through a drop like this again.</Hint></span><span className="kpi-value">{fmtPct(s["max_drawdown_%"], 1)}</span><span className="kpi-sub">S&amp;P 500 {fmtPct(s["benchmark_max_drawdown_%"], 1)}</span></div>
+                <div className="kpi"><span className="kpi-label">Sharpe ratio<Hint term="sharpe">Return per unit of ups and downs. Higher is a smoother ride; around 1 is good.</Hint></span><span className="kpi-value">{fmtNum(s.sharpe, 2)}</span><span className="kpi-sub">S&amp;P 500 {fmtNum(s.benchmark_sharpe, 2)}</span></div>
+                <div className="kpi"><span className="kpi-label">Months beating index<Hint term="turnover">How often a single month beat the S&amp;P 500. Turnover is the share of the portfolio traded at each review.</Hint></span><span className="kpi-value">{fmtNum(s["months_beating_benchmark_%"], 0)}%</span><span className="kpi-sub">Turnover {fmtNum(s["avg_turnover_%"], 0)}% / rebalance</span></div>
               </div>
               <Card title={<>Growth of 100 <span className="muted small">· log scale · portfolio · S&amp;P 500 (SPY, dividends included) · same stocks equal-weight</span></>}>
                 <LinesChart series={curves} height={340} log />

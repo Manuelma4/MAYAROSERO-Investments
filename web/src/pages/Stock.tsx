@@ -8,6 +8,7 @@ import type { ChartData, EarningsRecord, StockInfo } from "../lib/types";
 import { AIDesk } from "../components/AIDesk";
 import { ForecastPanel } from "../components/Forecast";
 import { Hint } from "../components/Hint";
+import type { TermId } from "../lib/glossary";
 import { PriceChart, SERIES, type Overlay } from "../components/charts";
 import { Sparkline } from "../components/Sparkline";
 import { Badge, Card, ErrorBox, Spinner } from "../components/ui";
@@ -16,16 +17,16 @@ import { AddToWatchlist, AlertForm } from "../components/MyAlerts";
 const VERDICT_TONE = { pick: "up", ranked: "", excluded: "down", not_covered: "", unknown: "" } as const;
 const VERDICT_LABEL = { pick: "In the picks", ranked: "Ranked, not held", excluded: "Excluded (downtrend)", not_covered: "Not covered", unknown: "…" } as const;
 
-const FIELDS: { key: string; label: string; fmt: (v: number) => string; hint: string }[] = [
-  { key: "marketCap", label: "Market value", fmt: (v) => `$${fmtBig(v)}`, hint: "What the whole company is worth on the stock market (price × number of shares)." },
-  { key: "trailingPE", label: "P/E (last 12 months)", fmt: (v) => fmtNum(v, 1), hint: "Price ÷ profit per share. How many years of current profits you pay for. The S&P 500 average is usually around 20-25; high means the market expects strong growth." },
+const FIELDS: { key: string; label: string; fmt: (v: number) => string; hint: string; term?: TermId }[] = [
+  { key: "marketCap", term: "market-cap", label: "Market value", fmt: (v) => `$${fmtBig(v)}`, hint: "What the whole company is worth on the stock market (price × number of shares)." },
+  { key: "trailingPE", term: "pe-ratio", label: "P/E (last 12 months)", fmt: (v) => fmtNum(v, 1), hint: "Price ÷ profit per share. How many years of current profits you pay for. The S&P 500 average is usually around 20-25; high means the market expects strong growth." },
   { key: "forwardPE", label: "P/E (next 12 months)", fmt: (v) => fmtNum(v, 1), hint: "Same ratio using analysts' expected profits. Lower than the current P/E means profits are expected to grow." },
   { key: "priceToSalesTrailing12Months", label: "Price / sales", fmt: (v) => fmtNum(v, 1), hint: "Company value ÷ yearly revenue. Useful when profits are small or negative." },
   { key: "revenueGrowth", label: "Revenue growth", fmt: (v) => fmtPct(v * 100, 1), hint: "How much sales grew versus a year earlier (latest quarter)." },
   { key: "earningsGrowth", label: "Profit growth", fmt: (v) => fmtPct(v * 100, 1), hint: "How much profit grew versus a year earlier (latest quarter)." },
   { key: "profitMargins", label: "Profit margin", fmt: (v) => fmtPct(v * 100, 1, false), hint: "Share of each dollar of sales that ends up as profit." },
   { key: "debtToEquity", label: "Debt / equity", fmt: (v) => fmtNum(v, 0), hint: "Debt compared with the owners' money (×100). Above ~150 means a lot of debt." },
-  { key: "dividendYield", label: "Dividend yield", fmt: (v) => fmtPct(v, 2, false), hint: "Yearly cash dividend as a share of the price (Yahoo reports it in percent)." },
+  { key: "dividendYield", term: "dividend-yield", label: "Dividend yield", fmt: (v) => fmtPct(v, 2, false), hint: "Yearly cash dividend as a share of the price (Yahoo reports it in percent)." },
 ];
 
 const hasEarnings = (s: string) => !!s && !s.includes("/") && !s.startsWith("^") && !s.includes("=");
@@ -162,7 +163,7 @@ export default function Stock() {
         <Card title={<>Key figures<Hint>From the company's latest reports, via Yahoo Finance. Hover or tap "?" on each for what it means.</Hint></>}>
           <div className="figs">
             {FIELDS.filter((x) => typeof f[x.key] === "number").map((x) => (
-              <div key={x.key} className="fig"><span className="kpi-label">{x.label}<Hint>{x.hint}</Hint></span><strong>{x.fmt(f[x.key] as number)}</strong></div>))}
+              <div key={x.key} className="fig"><span className="kpi-label">{x.label}<Hint term={x.term}>{x.hint}</Hint></span><strong>{x.fmt(f[x.key] as number)}</strong></div>))}
           </div>
         </Card>
       )}

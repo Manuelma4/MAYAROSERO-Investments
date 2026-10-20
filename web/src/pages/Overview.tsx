@@ -80,7 +80,7 @@ function TodayBoardView({ t, ideas, earnings }: { t: TodayBoard; ideas: ReactNod
     <>
       {t.mood && <section className="mood">
         <div className="mood-head">
-          <span className="kpi-label">Market mood<Hint>Combines the S&amp;P 500's trend (above or below its 200-day average), how many S&amp;P 500 stocks are in an uptrend, and the fear index (VIX). It tells you whether the market wind is at your back.</Hint></span>
+          <span className="kpi-label">Market mood<Hint term="risk-on-off">Combines the S&amp;P 500's trend (above or below its 200-day average), how many S&amp;P 500 stocks are in an uptrend, and the fear index (VIX). It tells you whether the market wind is at your back.</Hint></span>
           <span className={`mood-label ${MOOD_TONE[t.mood.label]}`}>{t.mood.label}</span>
         </div>
         <p className="mood-text">{t.mood.explanation}</p>
@@ -90,7 +90,7 @@ function TodayBoardView({ t, ideas, earnings }: { t: TodayBoard; ideas: ReactNod
       {ideas}
 
       <div className="grid-3">
-        <Card className="span-2" title={<>What to hold now<Hint>The engine's current top picks among the S&amp;P 500 stocks: strong 12-month performance, beating the index, in an uptrend, with calmer price action. Split your money equally between them and review once a month.</Hint></>}
+        <Card className="span-2" title={<>What to hold now<Hint term="momentum">The engine's current top picks among the S&amp;P 500 stocks: strong 12-month performance, beating the index, in an uptrend, with calmer price action. Split your money equally between them and review once a month.</Hint></>}
           actions={<Link to="/picks" className="link">All picks</Link>}>
           {!core ? <Empty>Picks are being computed. They appear here within a few minutes of the server starting.</Empty> : core.risk_off ? (
             <div className="notice">The S&amp;P 500 is in a downtrend, so the engine suggests holding cash until it recovers.</div>
@@ -107,12 +107,12 @@ function TodayBoardView({ t, ideas, earnings }: { t: TodayBoard; ideas: ReactNod
           {core && !core.risk_off && (
             <p className="muted small edge-line">
               Tested since {core.edge.start} with {core.settings ?? "the default settings"}: {fmtPct(core.edge["cagr_%"], 1)} a year vs {fmtPct(core.edge["benchmark_cagr_%"], 1)} for the S&amp;P 500.
-              <Hint>How this strategy would have done in the past (not a guarantee). Each stock only counts from the day it joined the S&amp;P 500, but companies that left the index are missing, so this is still a bit flattering; the "selection skill" over the same stocks held equally is {fmtPct(core.edge["skill_vs_universe_%"], 1)} a year. Details in Picks › Track record.</Hint>
+              <Hint term="survivorship-bias">How this strategy would have done in the past (not a guarantee). Each stock only counts from the day it joined the S&amp;P 500, but companies that left the index are missing, so this is still a bit flattering; the "selection skill" over the same stocks held equally is {fmtPct(core.edge["skill_vs_universe_%"], 1)} a year. Details in Picks › Track record.</Hint>
             </p>
           )}
         </Card>
 
-        <Card title={<>Changes at the last review<Hint>What changed at the last completed monthly review: stocks to buy (new in the picks), to sell (dropped out) and to keep. Reviews happen at month end, so mid-month rankings are not acted on yet.</Hint></>}>
+        <Card title={<>Changes at the last review<Hint term="rebalance">What changed at the last completed monthly review: stocks to buy (new in the picks), to sell (dropped out) and to keep. Reviews happen at month end, so mid-month rankings are not acted on yet.</Hint></>}>
           {!ch?.date ? <Empty>No changes yet.</Empty> : (
             <div className="changes">
               <p className="muted small">Review of {fmtDay(ch.date)}{ch.provisional_skipped ? " · next review at month end" : ""}</p>

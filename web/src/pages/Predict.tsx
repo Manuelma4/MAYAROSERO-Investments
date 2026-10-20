@@ -97,7 +97,7 @@ export default function Predict() {
 
       {res && v && (
         <Card title={<>How good is this ranking? {v.has_edge ? <Badge>Small real edge</Badge> : <Badge>Weak signal</Badge>}
-          <Hint>Measured on years of past data the model never saw. Quant funds judge short-term models by whether their top picks beat their bottom picks; a small consistent gap is valuable, a big one is usually a mistake. Probabilities are calibrated: 52% means 52 of 100 similar past cases beat the typical stock.</Hint></>}>
+          <Hint term="information-coefficient">Measured on years of past data the model never saw. Quant funds judge short-term models by whether their top picks beat their bottom picks; a small consistent gap is valuable, a big one is usually a mistake. Probabilities are calibrated: 52% means 52 of 100 similar past cases beat the typical stock.</Hint></>}>
           <p className="ai-summary">{res.edge_sentence}</p>
           <p className="muted small">{res.quality_sentence}</p>
         </Card>

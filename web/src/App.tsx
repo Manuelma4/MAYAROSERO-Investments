@@ -4,6 +4,7 @@ import { TickerTape } from "./components/TickerTape";
 import { TopBar } from "./components/TopBar";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Spinner } from "./components/ui";
+import { Tour } from "./components/Tour";
 import { LiveProvider, useLive } from "./lib/live";
 import { STATIC, snapshotMeta } from "./lib/snapshot";
 import Overview from "./pages/Overview";
@@ -11,6 +12,7 @@ import Overview from "./pages/Overview";
 // Today loads with the shell; every other page is fetched on first visit (smaller first download).
 const Backtest = lazy(() => import("./pages/Backtest"));
 const Discover = lazy(() => import("./pages/Discover"));
+const Learn = lazy(() => import("./pages/Learn"));
 const Live = lazy(() => import("./pages/Live"));
 const Markets = lazy(() => import("./pages/Markets"));
 const Opportunities = lazy(() => import("./pages/Opportunities"));
@@ -30,6 +32,7 @@ const NAV = [
   { to: "/charts", label: "Charts", icon: "M4 19h16M6 15l4-5 3 3 5-7" },
   { to: "/predict", label: "Predict", icon: "M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z" },
   { to: "/backtest", label: "Backtest", icon: "M4 4v16h16M8 14l3-3 3 2 5-6" },
+  { to: "/learn", label: "Learn", icon: "M4 6.5C6.5 5 9.5 5 12 6.5v13c-2.5-1.5-5.5-1.5-8 0zM20 6.5C17.5 5 14.5 5 12 6.5v13c2.5-1.5 5.5-1.5 8 0z" },
   { to: "/settings", label: "Settings", short: "More", mobile: true, icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12l2-1-1-3-2 .2-1.3-1.3L17 5l-3-1-1 2h-2L10 4 7 5l.3 1.9L6 8.2 4 8l-1 3 2 1v0l-2 1 1 3 2-.2 1.3 1.3L7 19l3 1 1-2h2l1 2 3-1-.3-1.9 1.3-1.3 2 .2 1-3z" },
 ];
 
@@ -81,12 +84,14 @@ function Shell() {
             <Route path="/stock/:symbol" element={<Stock />} />
             <Route path="/predict" element={<Predict />} />
             <Route path="/backtest" element={<Backtest />} />
+            <Route path="/learn" element={<Learn />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
         </main>
       </div>
+      <Tour />
     </div>
   );
 }

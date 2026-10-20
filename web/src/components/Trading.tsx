@@ -73,7 +73,7 @@ export function OrderTicket({ o, onDone }: { o: Opportunity; onDone: (msg: strin
             <dd>{fmtNum(plan.qty, 4)} {o.symbol}</dd>
             <dt>Estimated cost<Hint>Quantity times the current price. The real fill can differ a little because prices move.</Hint></dt>
             <dd>{money(plan.value, ccy)}{pv.eur && <span className="muted"> ≈ {eur(pv.eur.value)}</span>}</dd>
-            <dt>Stop-loss<Hint>If the price reaches this level, the position is closed to limit the loss. {pv.broker === "paper" ? "The app watches it." : "It is placed at the broker, so it works even if this app is off."}</Hint></dt>
+            <dt>Stop-loss<Hint term="stop-loss">If the price reaches this level, the position is closed to limit the loss. {pv.broker === "paper" ? "The app watches it." : "It is placed at the broker, so it works even if this app is off."}</Hint></dt>
             <dd className="down">{fmtPrice(plan.stop)}</dd>
             <dt>Target<Hint>The price where the gain is taken. It is about twice as far as the stop-loss. Reaching it is not guaranteed.</Hint></dt>
             <dd className="up">{fmtPrice(plan.target)}</dd>
@@ -83,7 +83,7 @@ export function OrderTicket({ o, onDone }: { o: Opportunity; onDone: (msg: strin
             <dd>{pv.hold_days ?? 5} days{pv.expires_at && <span className="muted"> · idea valid until {fmtTime(pv.expires_at)}</span>}</dd>
             <dt>Account<Hint>Your account value at {brokerLabel(pv.broker)}. Buying power is how much you can still invest.</Hint></dt>
             <dd>{money(pv.equity, ccy)}{pv.buying_power != null && <span className="muted"> · buying power {money(pv.buying_power, ccy)}</span>}</dd>
-            <dt>Order type<Hint>How the order is sent. A limit order will not fill at a worse price than shown, so a sudden jump cannot surprise you.</Hint></dt>
+            <dt>Order type<Hint term="limit-vs-market">How the order is sent. A limit order will not fill at a worse price than shown, so a sudden jump cannot surprise you.</Hint></dt>
             <dd className="small">{pv.order_type}</dd>
           </dl>
           {!pv.can_place && <div className="error" role="alert">{pv.block_reason}</div>}
@@ -123,7 +123,7 @@ export function KillSwitch({ status, onChange }: { status: BrokerStatus | null; 
   return (
     <>
       <div className="setting">
-        <div><strong>Close everything</strong><Hint>The emergency button. It first pauses new orders, then cancels every open order and sells (or buys back) every position in the account at {where}, at the market price, including positions you opened outside this app. New orders stay paused {until}.</Hint>
+        <div><strong>Close everything</strong><Hint term="kill-switch">The emergency button. It first pauses new orders, then cancels every open order and sells (or buys back) every position in the account at {where}, at the market price, including positions you opened outside this app. New orders stay paused {until}.</Hint>
           <p className="muted small">Cancels all orders and closes all positions at {where}{status ? ` (${status.mode === "live" ? "real money" : "paper"})` : ""}.</p>
           {offline && <p className="down small" role="status">Not connected to {where}: pressing it pauses trading here, but cannot close anything. Close your positions at the broker manually.</p>}
         </div>

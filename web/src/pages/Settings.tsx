@@ -52,6 +52,7 @@ export default function Settings() {
           <Link to="/charts" className="btn">Charts</Link>
           <Link to="/predict" className="btn">Predict</Link>
           <Link to="/backtest" className="btn">Backtest</Link>
+          <Link to="/learn" className="btn">Learn</Link>
         </div>
       </Card>
 
@@ -63,7 +64,7 @@ export default function Settings() {
           {broker && <span className="row gap"><ModeBadge mode={broker.mode} /><Badge>{brokerLabel(broker.broker)}</Badge></span>}
         </div>
         <div className="setting">
-          <div><strong>Money</strong><Hint>PAPER = practice, nothing real can be lost. LIVE = real money. Only you can switch it on, by adding TRADING_MODE=live to the server's .env file and restarting; there is no button for it on purpose.</Hint>
+          <div><strong>Money</strong><Hint term="paper-account">PAPER = practice, nothing real can be lost. LIVE = real money. Only you can switch it on, by adding TRADING_MODE=live to the server's .env file and restarting; there is no button for it on purpose.</Hint>
             <p className="muted small">{broker?.mode === "live" ? "Real money. Every order asks for an extra confirmation." : "Practice only. Real money is off."}</p>
             {broker?.live_block && <p className="down small">{broker.live_block}</p>}
           </div>
@@ -72,12 +73,12 @@ export default function Settings() {
           <div className="setting">
             <div><strong>Safety limits</strong><Hint>Checked by the server before every order, for every broker. They can only be made stricter in .env, never looser.</Hint>
               <ul className="muted small limits">
-                <li>Risk per idea: {fmtNum(lim.risk_per_trade_pct, 1)}% of the account<Hint>The loss if the stop-loss is hit. 1% means a 10,000 account loses about 100 on a bad idea.</Hint></li>
-                <li>Max per position: {fmtNum(lim.max_position_pct, 0)}% of the account<Hint>No single idea can take more than this share of your money.</Hint></li>
+                <li>Risk per idea: {fmtNum(lim.risk_per_trade_pct, 1)}% of the account<Hint term="risk-per-trade">The loss if the stop-loss is hit. 1% means a 10,000 account loses about 100 on a bad idea.</Hint></li>
+                <li>Max per position: {fmtNum(lim.max_position_pct, 0)}% of the account<Hint term="position-size">No single idea can take more than this share of your money.</Hint></li>
                 <li>Max open ideas: {lim.max_open_positions}<Hint>How many Invest positions can be open at the same time.</Hint></li>
                 <li>Daily loss stop: {fmtNum(lim.max_daily_loss_pct, 0)}%{lim.max_daily_loss_value ? ` or ${fmtNum(lim.max_daily_loss_value, 0)}` : ""}<Hint>After losing this much in one day (open losses included), new orders are refused until tomorrow.</Hint></li>
                 {lim.max_order_value ? <li>Max order size: {fmtNum(lim.max_order_value, 0)}<Hint>No single order can cost more than this, in the account's currency.</Hint></li> : null}
-                <li>Short positions: at most {fmtNum(lim.max_short_exposure_pct, 0)}% of the account<Hint>Betting on a fall (short) is riskier, so it is capped.</Hint></li>
+                <li>Short positions: at most {fmtNum(lim.max_short_exposure_pct, 0)}% of the account<Hint term="short-selling">Betting on a fall (short) is riskier, so it is capped.</Hint></li>
               </ul>
             </div>
           </div>

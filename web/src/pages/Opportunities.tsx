@@ -45,12 +45,12 @@ function OppCard({ o, onDone }: { o: Opportunity; onDone: (m: string) => void })
       <ul className="opp-reasons muted small">{o.reasons.slice(0, 3).map((r) => <li key={r}>{r}</li>)}</ul>
       <div className="opp-plan">
         <div><span className="kpi-label">Entry<Hint>The price to buy at (or sell short at), close to the current price.</Hint></span><span>{fmtPrice(o.entry)}</span></div>
-        <div><span className="kpi-label">Stop<Hint>Where you exit if wrong. Placed beyond today's {long ? "low" : "high"} or 1.5x the normal daily range.</Hint></span><span className="down">{fmtPrice(o.stop)}</span></div>
-        <div><span className="kpi-label">Target<Hint>Twice the risk: if the stop is 3% away, the target is 6% away. You can be right less than half the time and still come out ahead.</Hint></span><span className="up">{fmtPrice(o.target)}</span></div>
+        <div><span className="kpi-label">Stop<Hint term="stop-loss">Where you exit if wrong. Placed beyond today's {long ? "low" : "high"} or 1.5x the normal daily range.</Hint></span><span className="down">{fmtPrice(o.stop)}</span></div>
+        <div><span className="kpi-label">Target<Hint term="target">Twice the risk: if the stop is 3% away, the target is 6% away. You can be right less than half the time and still come out ahead.</Hint></span><span className="up">{fmtPrice(o.target)}</span></div>
         <div><span className="kpi-label">Hold max<Hint>A short-term idea: if neither the stop nor the target is reached, close it after this many trading days.</Hint></span><span>{o.hold_days} days</span></div>
       </div>
       <p className="muted small opp-meta">Reward/risk {fmtNum(rr, 1)} · score {fmtNum(o.score, 0)}/100 · valid until {fmtTime(o.expires_at)}
-        <Hint>Reward/risk: the possible gain is {fmtNum(rr, 1)} times the possible loss. Score: how strongly the idea meets the rules (higher is better). After the time shown the idea expires and is no longer offered.</Hint></p>
+        <Hint term="reward-risk">Reward/risk: the possible gain is {fmtNum(rr, 1)} times the possible loss. Score: how strongly the idea meets the rules (higher is better). After the time shown the idea expires and is no longer offered.</Hint></p>
       {o.qualified && (
         <footer className="opp-foot">
           <button className="btn primary" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Close" : "Invest"}</button>
@@ -97,7 +97,7 @@ export default function Opportunities() {
         <p className="eyebrow">Live opportunities · {data ? `scanned ${fmtTime(data.as_of)}` : "scanning"} · {data?.us_market_open ? "US market open" : "US market closed: last session"}</p>
         <h1 className="display">Invest now</h1>
         <p className="muted lead">Stocks and coins making a big move right now for a real reason: news, heavy volume and a trend that agrees. Each idea comes with an entry, a stop-loss and a target.
-          <Hint>Rules: move of 3%+ (5% for crypto) that is unusual for the stock, at least 1.8x normal volume, in the direction of its long-term trend and near its 52-week extreme, liquid, and backed by a relevant headline. Research shows news-driven moves tend to continue while moves without news often fade. Stock prices are about 15 minutes delayed.</Hint>
+          <Hint term="relative-volume">Rules: move of 3%+ (5% for crypto) that is unusual for the stock, at least 1.8x normal volume, in the direction of its long-term trend and near its 52-week extreme, liquid, and backed by a relevant headline. Research shows news-driven moves tend to continue while moves without news often fade. Stock prices are about 15 minutes delayed.</Hint>
         </p>
         <div className="row gap wrap-row">
           <button className="btn" onClick={scan} disabled={scanning || STATIC}>{scanning ? <><Spinner /> Scanning</> : "Scan now"}</button>

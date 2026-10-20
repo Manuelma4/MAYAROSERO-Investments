@@ -119,14 +119,14 @@ export default function Markets() {
           <Card title={<>Structure<Hint>An automatic reading of the chart. The quickest check: trend "Uptrend" and price above the 200-day average (EMA200) means the long-term wind is at its back.</Hint></>}>
             <div className="stats tight">
               <Stat label="Last" value={fmtPrice(a.close)} hint="The latest price on this chart." />
-              <Stat label="Trend" value={trendLabel} tone={trendTone} hint="Uptrend = higher highs and higher lows; downtrend = the opposite; range = neither (Dow theory)." />
-              <Stat label="RSI 14" value={fmtNum(a.rsi, 1)} tone={a.rsi > 70 ? "down" : a.rsi < 30 ? "up" : ""} hint="Momentum from 0 to 100. Above 70 = stretched after a strong rise (overbought), below 30 = stretched after a fall (oversold)." />
-              <Stat label="Daily range" value={`${fmtNum(a.atr_pct, 2)}%`} hint="ATR: how much the price typically moves in one candle, as a % of the price. Useful to place a stop-loss outside normal noise." />
+              <Stat label="Trend" term="uptrend" value={trendLabel} tone={trendTone} hint="Uptrend = higher highs and higher lows; downtrend = the opposite; range = neither (Dow theory)." />
+              <Stat label="RSI 14" term="rsi" value={fmtNum(a.rsi, 1)} tone={a.rsi > 70 ? "down" : a.rsi < 30 ? "up" : ""} hint="Momentum from 0 to 100. Above 70 = stretched after a strong rise (overbought), below 30 = stretched after a fall (oversold)." />
+              <Stat label="Daily range" term="atr" value={`${fmtNum(a.atr_pct, 2)}%`} hint="ATR: how much the price typically moves in one candle, as a % of the price. Useful to place a stop-loss outside normal noise." />
             </div>
             <dl className="kv">
               <dt>Swing high / low<Hint>The last turning points: the recent peak and the recent dip.</Hint></dt><dd>{fmtPrice(a.swings.swing_high)} / {fmtPrice(a.swings.swing_low)}</dd>
               <dt>EMA 20 / 50 / 200<Hint>Average prices over the last 20, 50 and 200 candles (recent prices count more). Price above them = healthy trend.</Hint></dt><dd>{fmtPrice(a.ema["20"])} / {fmtPrice(a.ema["50"])} / {fmtPrice(a.ema["200"])}</dd>
-              <dt>Price vs EMA200<Hint>Above the 200-candle average = long-term uptrend; below = long-term downtrend.</Hint></dt><dd className={a.close > a.ema["200"] ? "up" : "down"}>{a.close > a.ema["200"] ? "Above" : "Below"}</dd>
+              <dt>Price vs EMA200<Hint term="200-day-average">Above the 200-candle average = long-term uptrend; below = long-term downtrend.</Hint></dt><dd className={a.close > a.ema["200"] ? "up" : "down"}>{a.close > a.ema["200"] ? "Above" : "Below"}</dd>
               <dt>MACD histogram<Hint>Short-term momentum: positive = gaining speed upward, negative = losing speed or falling.</Hint></dt><dd className={a.macd_hist > 0 ? "up" : "down"}>{a.macd_hist > 0 ? "Positive" : "Negative"} <span className="muted">({fmtNum(a.macd_hist, 2)})</span></dd>
               <dt>Wyckoff range<Hint>The recent trading range: support (floor) and resistance (ceiling). A tight range often comes before a bigger move.</Hint></dt><dd>{fmtPrice(a.wyckoff_range.support)} – {fmtPrice(a.wyckoff_range.resistance)} {a.wyckoff_range.tight ? <Badge>tight range</Badge> : <Badge>wide / trending</Badge>}</dd>
               <dt>Recent candles<Hint>Candle patterns that often appear at turning points. One pattern alone is a weak signal.</Hint></dt><dd>{a.recent_patterns.length ? a.recent_patterns.map((p) => <Badge key={p.time + p.pattern}>{p.pattern.replace(/_/g, " ")}</Badge>) : "None"}</dd>

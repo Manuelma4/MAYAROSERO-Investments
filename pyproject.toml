@@ -39,4 +39,5 @@ tradebot = ["data/*.csv"]
 testpaths = ["tests"]
 markers = [
     "e2e: browser end-to-end flows (Playwright + Chromium, needs web/dist); skip with -m \"not e2e\"",
+    "first_visit: e2e flow that starts as a brand-new visitor (the first-visit tour is not pre-dismissed)",
 ]

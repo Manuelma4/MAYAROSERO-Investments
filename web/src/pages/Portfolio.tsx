@@ -127,7 +127,7 @@ export default function Portfolio() {
               </dl>
               <p className="muted small">Today's holdings over the past 12 months. Today's picks were chosen partly because they rose, so this flatters them.</p>
             </Card>
-            <Card title={<>Diversification by sector<Hint>No sector gets more than 25% of the portfolio and no single stock more than 10%. When the top picks crowd into one sector, the next-best picks from other sectors are added instead.</Hint></>}>
+            <Card title={<>Diversification by sector<Hint term="diversification">No sector gets more than 25% of the portfolio and no single stock more than 10%. When the top picks crowd into one sector, the next-best picks from other sectors are added instead.</Hint></>}>
               <ul className="sector-bars">
                 {Object.entries(plan.by_sector).map(([sec, w]) => (
                   <li key={sec}><span>{sec}</span><span className="bar"><span style={{ width: `${(w / 0.25) * 100}%` }} /></span><span className="num">{fmtNum(w * 100, 1)}%</span></li>))}
@@ -177,7 +177,7 @@ function DriftCard({ drift, busy, err, onSave, onRemove }: { drift: PortfolioDri
   }, [savedAt]);
   const rm = tRisk?.status === "ok" ? tRisk.month : undefined;
   return (
-    <Card title={<>My target and drift<Hint>Save the plan you actually bought as your target. Prices move, so over time some positions grow bigger than planned and others smaller: that gap is the drift. The app compares what you hold with your target every 30 minutes and sends you one alert (at most once a week) when it drifts too far, with what to sell and buy to get back on plan. It never buys or sells for you.</Hint></>}
+    <Card title={<>My target and drift<Hint term="drift">Save the plan you actually bought as your target. Prices move, so over time some positions grow bigger than planned and others smaller: that gap is the drift. The app compares what you hold with your target every 30 minutes and sends you one alert (at most once a week) when it drifts too far, with what to sell and buy to get back on plan. It never buys or sells for you.</Hint></>}
       actions={t ? <button className="btn small ghost" onClick={onRemove} disabled={busy || STATIC}>Remove target</button> : undefined}>
       {t ? (
         <p className="muted small">Target saved {fmtDay(t.saved_at)}: {cur(t.amount, t.currency)}, {RISK_LABEL[t.risk] ?? t.risk}, {Object.keys(t.weights).length} positions kept for the long term.

@@ -208,6 +208,9 @@ class Page:
 @pytest.fixture(params=list(VIEWPORTS))
 def ui(request, server, browser):
     ctx = browser.new_context(viewport=VIEWPORTS[request.param], service_workers="block")
+    if not request.node.get_closest_marker("first_visit"):
+        # A returning visitor: the first-visit tour was already seen (it is tested on its own below).
+        ctx.add_init_script("try { localStorage.setItem('mri.tour', 'done') } catch (e) {}")
     # Offline guarantee: anything that is not this server is refused (and reported).
     blocked: list[str] = []
 
@@ -250,12 +253,13 @@ def test_today_loads_with_picks(ui):
 DESKTOP_NAV = [("Today", "/", "Today"), ("My portfolio", "/portfolio", "My portfolio"),
                ("Discover", "/discover", "The world's leading companies"), ("Beat the S&P", "/picks", "Beat the S&P"),
                ("Invest now", "/now", "Invest now"), ("Alerts", "/alerts", "Alerts"), ("Charts", "/charts", "Charts"),
-               ("Predict", "/predict", "Predict"), ("Backtest", "/backtest", "Backtest"), ("Settings", "/settings", "Settings")]
+               ("Predict", "/predict", "Predict"), ("Backtest", "/backtest", "Backtest"), ("Learn", "/learn", "Learn"),
+               ("Settings", "/settings", "Settings")]
 PHONE_NAV = [("Portfolio", "/portfolio", "My portfolio"), ("Now", "/now", "Invest now"),
              ("More", "/settings", "Settings"), ("Today", "/", "Today")]
 PHONE_TOOLS = [("Picks", "/picks", "Beat the S&P"), ("Discover", "/discover", "The world's leading companies"),
                ("Alerts", "/alerts", "Alerts"), ("Charts", "/charts", "Charts"), ("Predict", "/predict", "Predict"),
-               ("Backtest", "/backtest", "Backtest")]
+               ("Backtest", "/backtest", "Backtest"), ("Learn", "/learn", "Learn")]
 
 
 def _settled(ui, path: str):
@@ -279,6 +283,8 @@ def _settled(ui, path: str):
         expect(p.get_by_role("heading", name="Equity curve")).to_be_visible(timeout=30_000)
     elif path == "/settings":
         expect(p.get_by_role("heading", name="Appearance")).to_be_visible()
+    elif path == "/learn":
+        expect(p.get_by_role("heading", name=re.compile("Glossary"))).to_be_visible()
     elif path == "/":
         expect(p.locator(".hold-list")).to_be_visible()
     width = p.viewport_size["width"]
@@ -427,4 +433,56 @@ def test_keyboard_focus_is_visible(ui):
     button = ui.page.get_by_role("button", name="Update picks")
     button.focus()
     assert _focus_ring(button).startswith("solid"), "no visible focus on a button"
+    ui.check()
+
+
+def test_learn_glossary_search_filters(ui):
+    ui.goto("/learn")
+    expect(ui.heading("Learn")).to_be_visible()
+    entries = ui.page.locator("article.gloss")
+    total = entries.count()
+    assert total >= 40, f"only {total} glossary entries"
+    box = ui.page.get_by_label("Search the glossary")
+    box.fill("drawdown")
+    expect(ui.page.get_by_role("heading", name="Drawdown", exact=True)).to_be_visible()
+    expect(ui.page.get_by_role("heading", name="Momentum", exact=True)).to_have_count(0)
+    assert 0 < entries.count() < total
+    # A short result opens its examples straight away.
+    expect(ui.page.locator("#term-drawdown").get_by_text("Example", exact=True)).to_be_visible()
+    box.fill("zzzz")
+    expect(ui.page.get_by_text('No term matches "zzzz"')).to_be_visible()
+    ui.page.get_by_role("button", name="clear the search").click()
+    expect(entries).to_have_count(total)
+    # Hints link to an entry: it opens with its example.
+    ui.goto("/learn?term=stop-loss")
+    entry = ui.page.locator("#term-stop-loss")
+    expect(entry).to_be_in_viewport()
+    expect(entry.get_by_text("Example", exact=True)).to_be_visible()
+    ui.check()
+
+
+@pytest.mark.first_visit
+def test_first_visit_tour_can_be_dismissed_and_stays_dismissed(ui):
+    ui.goto("/")
+    tour = ui.page.get_by_role("dialog", name="Today")
+    expect(tour).to_be_visible()
+    expect(tour.get_by_role("button", name="Next: Beat the S&P")).to_be_focused()   # focus moves into the tour
+    tour.get_by_role("button", name="Next: Beat the S&P").click()
+    ui.page.wait_for_url(ui.base + "/picks")                                        # each step shows its page
+    expect(ui.page.get_by_role("dialog", name="Beat the S&P")).to_be_visible()
+    ui.page.keyboard.press("Escape")                                               # Escape closes it
+    expect(ui.page.get_by_role("dialog")).to_have_count(0)
+    ui.goto("/")
+    expect(ui.heading("Today")).to_be_visible()
+    expect(ui.page.locator(".hold-list")).to_be_visible()
+    ui.page.reload()
+    expect(ui.heading("Today")).to_be_visible()
+    expect(ui.page.locator(".hold-list")).to_be_visible()
+    expect(ui.page.get_by_role("dialog")).to_have_count(0)                          # remembered after reload
+    # It can still be replayed from Learn, and "Skip tour" closes it.
+    ui.goto("/learn")
+    ui.page.get_by_role("button", name="Take the quick tour").click()
+    expect(ui.page.get_by_role("dialog", name="Today")).to_be_visible()
+    ui.page.get_by_role("button", name="Skip tour").click()
+    expect(ui.page.get_by_role("dialog")).to_have_count(0)
     ui.check()

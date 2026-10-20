@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Hint } from "./Hint";
+import type { TermId } from "../lib/glossary";
 
 export function Card({ title, actions, children, className = "" }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -15,10 +16,10 @@ export function Card({ title, actions, children, className = "" }: { title?: Rea
   );
 }
 
-export function Stat({ label, value, tone = "", hint }: { label: string; value: ReactNode; tone?: string; hint?: ReactNode }) {
+export function Stat({ label, value, tone = "", hint, term }: { label: string; value: ReactNode; tone?: string; hint?: ReactNode; term?: TermId }) {
   return (
     <div className="stat">
-      <span className="stat-label">{label}{hint && <Hint>{hint}</Hint>}</span>
+      <span className="stat-label">{label}{hint && <Hint term={term}>{hint}</Hint>}</span>
       <span className={`stat-value ${tone}`}>{value}</span>
     </div>
   );

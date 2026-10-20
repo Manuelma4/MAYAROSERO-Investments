@@ -71,7 +71,7 @@ export default function Backtest() {
         <p className="eyebrow">Backtest · {sel.symbol} · {SETUP_NAME[strategy] ?? strategy} · since {fmtDay(start)}</p>
         <h1 className="display">Backtest</h1>
         <p className="muted lead">How a trading setup would have done on past prices. A result is shown right away; open Customize to try another market, period or setup.
-          <Hint>Realistic on purpose: each order fills at the next candle (no peeking at the future), and fees and slippage are included. Past results do not guarantee future ones.</Hint></p>
+          <Hint term="look-ahead">Realistic on purpose: each order fills at the next candle (no peeking at the future), and fees and slippage are included. Past results do not guarantee future ones.</Hint></p>
       </section>
       <details className="customize">
         <summary>Customize<span className="muted small"> · {sel.symbol} · {sel.timeframe} · {SETUP_NAME[strategy] ?? strategy} · {risk}% risk per trade{allowShort ? " · longs and shorts" : " · longs only"}</span></summary>
@@ -117,13 +117,13 @@ export default function Backtest() {
           <div className="stats">
             <Stat label="Total return" value={fmtPct(s["total_return_%"])} tone={tone(s["total_return_%"])} hint="Gain or loss of the account over the whole test, trading this setup." />
             <Stat label="Buy & hold" value={fmtPct(s["buy_hold_return_%"])} tone={tone(s["buy_hold_return_%"])} hint="What you would have made by buying at the start and doing nothing. The bar to beat." />
-            <Stat label="Per year" value={fmtPct(s["cagr_%"])} tone={tone(s["cagr_%"])} hint="CAGR: the average yearly growth rate over the test." />
-            <Stat label="Worst drop" value={fmtPct(s["max_drawdown_%"])} tone="down" hint="Max drawdown: the biggest fall from a peak before recovering. Tells you how painful the bad patch was." />
-            <Stat label="Sharpe" value={fmtNum(s.sharpe)} hint="Return per unit of risk. Below 0.5 is weak, around 1 is good, above 2 is rare." />
+            <Stat label="Per year" value={fmtPct(s["cagr_%"])} tone={tone(s["cagr_%"])} hint="CAGR: the average yearly growth rate over the test." term="cagr" />
+            <Stat label="Worst drop" value={fmtPct(s["max_drawdown_%"])} tone="down" term="drawdown" hint="Max drawdown: the biggest fall from a peak before recovering. Tells you how painful the bad patch was." />
+            <Stat label="Sharpe" term="sharpe" value={fmtNum(s.sharpe)} hint="Return per unit of risk. Below 0.5 is weak, around 1 is good, above 2 is rare." />
             <Stat label="Trades" value={s.trades} hint="How many trades the setup took. Fewer than about 30 makes the result unreliable." />
-            <Stat label="Win rate" value={fmtPct(s["win_rate_%"], 1, false)} hint="Share of trades that made money. A setup can win less than half the time and still profit if winners are bigger than losers." />
+            <Stat label="Win rate" term="win-rate" value={fmtPct(s["win_rate_%"], 1, false)} hint="Share of trades that made money. A setup can win less than half the time and still profit if winners are bigger than losers." />
             <Stat label="Profit factor" value={fmtNum(s.profit_factor)} hint="Total gains ÷ total losses. Above 1 = profitable; 1.5+ is solid." />
-            <Stat label="Expectancy" value={`${fmtNum(s.expectancy_R, 2)} R`} tone={tone(s.expectancy_R)} hint="Average result per trade in units of risk (R). +0.3 R means each trade made 0.3 times what it risked, on average." />
+            <Stat label="Expectancy" term="expectancy" value={`${fmtNum(s.expectancy_R, 2)} R`} tone={tone(s.expectancy_R)} hint="Average result per trade in units of risk (R). +0.3 R means each trade made 0.3 times what it risked, on average." />
           </div>
           <Card title={<>Equity curve<Hint>The account value over time trading the setup (blue) versus simply holding (dashed). Log scale: equal % moves look equal.</Hint></>}><LinesChart series={curves} log /></Card>
           <Card title={<>Trades on chart<Hint>Arrows mark entries (L = long, a bet on a rise; S = short, a bet on a fall). Dots mark exits with the result in R: +2.0R = won twice the risk, −1.0R = lost the risk.</Hint></>}><PriceChart candles={res.candles} markers={markers} height={420} /></Card>

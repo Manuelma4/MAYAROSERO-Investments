@@ -1,11 +1,15 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+import type { TermId } from "../lib/glossary";
 
 /**
  * Small "?" button that reveals a plain-English explanation (a disclosure, not a tooltip).
  * Click or Enter/Space toggles it; Escape, clicking elsewhere or tabbing away closes it.
  * The panel is positioned against the viewport so scroll containers (tables) never clip it.
+ * `term` (a glossary id) adds a small "Learn more" link to that entry on the Learn page. Only the id type is
+ * imported, so the glossary text stays in the Learn page's own chunk.
  */
-export function Hint({ children, label = "What this means" }: { children: ReactNode; label?: string }) {
+export function Hint({ children, label = "What this means", term }: { children: ReactNode; label?: string; term?: TermId }) {
   const [open, setOpen] = useState(false);
   const [style, setStyle] = useState<CSSProperties>({});
   const id = useId();
@@ -39,7 +43,10 @@ export function Hint({ children, label = "What this means" }: { children: ReactN
     <span className="hint" ref={wrap} onBlur={(e) => { if (!wrap.current?.contains(e.relatedTarget as Node)) setOpen(false); }}>
       <button ref={btn} type="button" className="hint-btn" aria-label={label} aria-expanded={open} aria-controls={id}
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}>?</button>
-      <span id={id} className="hint-pop" hidden={!open} style={style} tabIndex={-1}>{children}</span>
+      <span id={id} className="hint-pop" hidden={!open} style={style} tabIndex={-1}>
+        {children}
+        {term && <Link className="hint-more" to={`/learn?term=${term}`} onClick={() => setOpen(false)}>Learn more in the glossary</Link>}
+      </span>
     </span>
   );
 }
