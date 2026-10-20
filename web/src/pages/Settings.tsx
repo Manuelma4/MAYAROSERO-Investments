@@ -25,7 +25,11 @@ export default function Settings() {
 
   return (
     <div className="page narrow">
-      <div className="page-head"><div><h1>Settings</h1><p className="muted">Trading, appearance, notifications and access.</p></div></div>
+      <section className="hero-x">
+        <p className="eyebrow">Settings · {broker ? (broker.mode === "live" ? "real money on" : "practice money only") : "checking the broker"}</p>
+        <h1 className="display">Settings</h1>
+        <p className="muted lead">Trading safety, appearance, notifications and access.</p>
+      </section>
 
       <Card title="Tools" className="mobile-only">
         <div className="tool-links wrap">
@@ -84,10 +88,10 @@ export default function Settings() {
             ? <button className={`switch ${notify ? "on" : ""}`} role="switch" aria-checked={notify} aria-label="Browser notifications" onClick={async () => setNotify(await setBrowserNotify(!notify))}><span /></button>
             : <Badge>Not supported</Badge>}
         </div>
-        {[["email", "Email", "SMTP_* variables in .env"], ["whatsapp", "WhatsApp", "TWILIO_* variables in .env"]].map(([k, label, how]) => (
+        {[["email", "Email", "every alert in your inbox", "SMTP_* variables in .env"], ["whatsapp", "WhatsApp", "every alert as a WhatsApp message", "TWILIO_* variables in .env"]].map(([k, label, what, how]) => (
           <div className="setting" key={k}>
-            <div><strong>{label}</strong><p className="muted small">Configured on the server ({how}) and enabled in config.yaml notifiers.</p></div>
-            {channels.includes(k) ? <Badge tone="up">Active</Badge> : <Badge>Not configured</Badge>}
+            <div><strong>{label}</strong><Hint>Set up once on the server: {how}, then add it to the notifiers list in config.yaml.</Hint><p className="muted small">Receive {what}.</p></div>
+            {channels.includes(k) ? <Badge>Active</Badge> : <Badge>Not set up</Badge>}
           </div>))}
       </Card>
 

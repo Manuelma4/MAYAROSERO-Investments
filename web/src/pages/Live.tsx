@@ -4,6 +4,7 @@ import { fmtNum, fmtPct, fmtPrice, fmtTime, tone } from "../lib/format";
 import type { LiveEvent, PaperState } from "../lib/types";
 import { useLive } from "../lib/live";
 import { Badge, Card, Empty, ErrorBox, Spinner, Stat } from "../components/ui";
+import { Hint } from "../components/Hint";
 import { MyAlerts, Watchlists } from "../components/MyAlerts";
 import { alertText } from "../lib/browserNotify";
 
@@ -75,12 +76,11 @@ export default function Live() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>Alerts</h1>
-          <p className="muted">Your price alerts and watchlists, plus real-time notifications: sudden surges and crashes, and setups triggering. Also delivered to your browser, email and WhatsApp.</p>
-        </div>
-        <div className="row gap">
+      <section className="hero-x">
+        <p className="eyebrow">Notifications · {status?.running ? "engine running" : "engine stopped"}</p>
+        <h1 className="display">Alerts</h1>
+        <p className="muted lead">Your price alerts and watchlists, plus real-time notifications when a stock suddenly surges or crashes. They also reach your browser, email and WhatsApp.</p>
+        <div className="row gap wrap-row">
           <span className={`live-pill ${connected ? "on" : ""}`}><span className="dot" />{connected ? "Connected" : "Reconnecting"}</span>
           {status?.running
             ? <button className="btn" disabled={!!busy} onClick={() => act("stop", api.liveStop)}>Stop engine</button>
@@ -89,14 +89,14 @@ export default function Live() {
             {busy === "scan" ? <Spinner /> : "Scan now"}
           </button>
         </div>
-      </div>
+      </section>
       <ErrorBox error={error ?? status?.last_error ?? null} />
 
       {fired.length > 0 && (
-        <Card title={<>Your alerts <Badge>{fired.length}</Badge></>}>
+        <Card title={<>Alerts received <Badge>{fired.length}</Badge><Hint>Your own price alerts that fired, and every change to the Beat-the-S&amp;P picks. Newest first.</Hint></>}>
           <ul className="feed">{fired.slice(0, 20).map((e) => (
             <li key={e.id} className="feed-row">
-              <span className="feed-icon" aria-hidden>{e.type === "picks" ? "★" : "🔔"}</span>
+              <span className="feed-icon" aria-hidden>{e.type === "picks" ? "★" : <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" /></svg>}</span>
               {e.type === "picks" ? <>
                 <div className="feed-main"><strong>Beat-the-S&amp;P picks updated</strong><span className="muted small">Buy {e.buy?.join(", ") || "nothing new"} · Sell {e.sell?.join(", ") || "nothing"}</span></div>
                 <div className="feed-num"><span className="muted small">{fmtTime(e.created_at)}</span></div>
@@ -114,29 +114,20 @@ export default function Live() {
         <Watchlists />
       </div>
 
-      <div className="stats">
-        <Stat label="Engine" value={status?.running ? "Running" : "Stopped"} tone={status?.running ? "up" : ""} />
-        <Stat label="Poll interval" value={status ? `${status.poll_seconds}s` : "–"} />
-        <Stat label="Scans" value={status?.scans ?? "–"} />
-        <Stat label="Last scan" value={status?.last_scan ? fmtTime(status.last_scan) : "–"} />
-        <Stat label="Setups watched" value={status?.watchlist.length ?? "–"} />
-        <Stat label="Alerts via" value={status?.notifiers.join(", ") || "–"} />
-      </div>
-
       <div className="grid-2">
-        <Card title={<>Big movers <Badge>{moves.length}</Badge></>}>
+        <Card title={<>Big movers <Badge>{moves.length}</Badge><Hint>Unusual moves on the markets the engine watches: "z" says how many times bigger than a normal move it is (3 = very unusual), "vol" compares volume with a normal day.</Hint></>}>
           {status && !status.movers_enabled && <p className="muted small">Movers detection is disabled in the config (movers.enabled).</p>}
           {moves.length ? <ul className="feed">{moves.slice(0, 60).map((e) => <MoveRow key={e.id} e={e} />)}</ul>
             : <Empty>No abnormal moves yet. They appear here the moment a stock or coin surges or crashes.</Empty>}
         </Card>
-        <Card title={<>Setup signals <Badge>{signals.length}</Badge></>}>
+        <Card title={<>Setup signals <Badge>{signals.length}</Badge><Hint>A chart setup that just triggered: LONG means a possible rise, SHORT a possible fall. SL is the stop-loss, TP the target, and R how many times the risk the target could pay.</Hint></>}>
           {signals.length ? <ul className="feed">{signals.slice(0, 60).map((e) => <SignalRow key={e.id} e={e} />)}</ul>
-            : <Empty>No setup has triggered yet on the watchlist.</Empty>}
+            : <Empty>No setup has triggered yet. Signals appear here when one of the markets listed below forms a setup.</Empty>}
         </Card>
       </div>
 
       {paper?.enabled && (
-        <Card title="Paper trading" actions={<span className="muted">Cash {fmtPrice(paper.cash)}</span>}>
+        <Card title={<>Practice trades from signals<Hint>The engine trades its own setup signals with practice (paper) money, to show how they would do. No real money is involved.</Hint></>} actions={<span className="muted small">Cash {fmtPrice(paper.cash)}</span>}>
           <div className="table-wrap">
             <table>
               <thead><tr><th>Symbol</th><th>Strategy</th><th>Side</th><th>Entry</th><th>Stop</th><th>Target</th><th>Opened</th></tr></thead>
@@ -163,8 +154,20 @@ export default function Live() {
         </Card>
       )}
 
+      <section>
+        <h2 className="section-title">Alert engine<Hint>The part of the app that watches prices and sends the alerts on this page. It normally starts by itself with the server.</Hint></h2>
+        <div className="stats">
+          <Stat label="Engine" value={status?.running ? "Running" : "Stopped"} tone={status?.running ? "up" : ""} hint="Running = prices are being watched and alerts are sent. If it is stopped, press Start engine at the top." />
+          <Stat label="Checks every" value={status ? `${status.poll_seconds}s` : "–"} hint="How often the engine fetches new prices." />
+          <Stat label="Scans" value={status?.scans ?? "–"} hint="How many times the engine has checked prices since the server started." />
+          <Stat label="Last scan" value={status?.last_scan ? fmtTime(status.last_scan) : "–"} hint="When prices were last checked." />
+          <Stat label="Setups watched" value={status?.watchlist.length ?? "–"} hint="Markets the engine checks for trading setups (listed at the bottom of this page)." />
+          <Stat label="Alerts via" value={status?.notifiers.join(", ") || "–"} hint="Where alerts are delivered. 'console' means only inside this app; email and WhatsApp are set up on the server (see Settings)." />
+        </div>
+      </section>
+
       {status && status.watchlist.length > 0 && (
-        <Card title="Watchlist">
+        <Card title={<>Markets scanned for setups<Hint>The markets and time frames (1h = hourly candles, 1d = daily) the engine checks for setup signals. Your own lists are under My watchlists above.</Hint></>}>
           <div className="chips">
             {status.watchlist.map((w) => (
               <span className="chip" key={`${w.symbol}${w.timeframe}`} title={w.strategies.join(", ")}>

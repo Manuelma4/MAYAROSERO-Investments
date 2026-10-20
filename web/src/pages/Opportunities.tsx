@@ -44,16 +44,19 @@ function OppCard({ o, onDone }: { o: Opportunity; onDone: (m: string) => void })
       )}
       <ul className="opp-reasons muted small">{o.reasons.slice(0, 3).map((r) => <li key={r}>{r}</li>)}</ul>
       <div className="opp-plan">
-        <div><span className="kpi-label">Entry</span><span>{fmtPrice(o.entry)}</span></div>
+        <div><span className="kpi-label">Entry<Hint>The price to buy at (or sell short at), close to the current price.</Hint></span><span>{fmtPrice(o.entry)}</span></div>
         <div><span className="kpi-label">Stop<Hint>Where you exit if wrong. Placed beyond today's {long ? "low" : "high"} or 1.5x the normal daily range.</Hint></span><span className="down">{fmtPrice(o.stop)}</span></div>
         <div><span className="kpi-label">Target<Hint>Twice the risk: if the stop is 3% away, the target is 6% away. You can be right less than half the time and still come out ahead.</Hint></span><span className="up">{fmtPrice(o.target)}</span></div>
-        <div><span className="kpi-label">Hold max</span><span>{o.hold_days} days</span></div>
+        <div><span className="kpi-label">Hold max<Hint>A short-term idea: if neither the stop nor the target is reached, close it after this many trading days.</Hint></span><span>{o.hold_days} days</span></div>
       </div>
-      <footer className="opp-foot">
-        <span className="muted small">Reward/risk {fmtNum(rr, 1)} · score {fmtNum(o.score, 0)}/100 · valid until {fmtTime(o.expires_at)}</span>
-        {o.qualified && <button className="btn primary small" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Close" : "Invest"}</button>}
-      </footer>
-      {o.qualified && <AIDesk symbol={o.symbol} />}
+      <p className="muted small opp-meta">Reward/risk {fmtNum(rr, 1)} · score {fmtNum(o.score, 0)}/100 · valid until {fmtTime(o.expires_at)}
+        <Hint>Reward/risk: the possible gain is {fmtNum(rr, 1)} times the possible loss. Score: how strongly the idea meets the rules (higher is better). After the time shown the idea expires and is no longer offered.</Hint></p>
+      {o.qualified && (
+        <footer className="opp-foot">
+          <button className="btn primary" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Close" : "Invest"}</button>
+          <AIDesk symbol={o.symbol} />
+        </footer>
+      )}
       {open && <OrderTicket o={o} onDone={(m) => { setOpen(false); onDone(m); }} />}
     </article>
   );

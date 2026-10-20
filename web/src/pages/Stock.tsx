@@ -75,20 +75,20 @@ export default function Stock() {
         <div className="stock-actions">
           <AddToWatchlist key={symbol} symbol={symbol} />
           <details className="alert-details">
-            <summary className="btn">🔔 Set price alert</summary>
+            <summary className="btn">Set price alert</summary>
             <AlertForm key={symbol} symbol={symbol} price={q?.price} />
           </details>
         </div>
       </section>
 
-      <div className="grid-main">
+      <div className="grid-main stock-main">
         <Card title={<>Price · 1 year<Hint>Daily candles with the 50-day (orange) and 200-day (violet) averages. Price above the 200-day line = long-term uptrend.</Hint></>} actions={<Link className="link" to={`/charts?symbol=${encodeURIComponent(symbol)}`}>Full chart</Link>}>
           {chart ? <PriceChart candles={chart.candles} overlays={overlays} height={360} />
             : chartErr ? <div className="empty">The price history is not available right now. {chartErr}</div>
             : <div className="empty"><Spinner /> Loading one year of prices…</div>}
         </Card>
         <div className="stack">
-          <Card title="The engine's view">
+          <Card title={<>The engine's view<Hint>What this app's stock-selection engine thinks of this stock today: whether it is in the Beat-the-S&amp;P picks, how it ranks, and any live idea on it.</Hint></>}>
             {!info ? <div className="muted small"><Spinner /> Loading…</div> : (
               <div className="verdict">
                 <Badge tone={VERDICT_TONE[info.verdict.status]}>{VERDICT_LABEL[info.verdict.status]}</Badge>
@@ -128,7 +128,7 @@ export default function Stock() {
       </Card>
 
       {info && info.similar.length > 0 && (
-        <Card title="Similar companies">
+        <Card title={<>Similar companies<Hint>Companies in the same industry, with today's price and change and a line of the last 30 days. Useful to check whether a move is about this company or the whole industry.</Hint></>}>
           <div className="srows">
             {info.similar.map((s) => {
               const sq = quotes[s.symbol];

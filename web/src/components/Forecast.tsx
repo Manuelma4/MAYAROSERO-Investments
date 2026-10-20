@@ -40,8 +40,8 @@ export function ForecastPanel({ symbol, horizon }: { symbol: string; horizon: nu
       <div className="fc-stats">
         <div><span className="kpi-label">Chance higher {days}<Hint>Share of 5,000 simulated futures that end above today's price. The simulation uses the stock's real past daily moves and today's volatility, so it describes risk and range more than direction.</Hint></span><strong>{fmtPct(mc.p_up * 100, 0, false)}</strong></div>
         <div><span className="kpi-label">Likely range<Hint>90% of simulated outcomes land inside this range (between the 5th and 95th percentile).</Hint></span><strong>{fmtPrice(mc.range_5_95[0])} – {fmtPrice(mc.range_5_95[1])}</strong></div>
-        <div><span className="kpi-label">Chance of ±5% move</span><strong><span className="up">{fmtPct(mc["p_move_up_5%"] * 100, 0, false)}</span> / <span className="down">{fmtPct(mc["p_move_down_5%"] * 100, 0, false)}</span></strong></div>
-        <div><span className="kpi-label">Volatility (yearly)</span><strong>{fmtNum(mc["annual_vol_%"], 0)}%</strong></div>
+        <div><span className="kpi-label">Chance of ±5% move<Hint>How often the simulated futures end at least 5% higher (green) or at least 5% lower (red). Small numbers mean big swings are unlikely over this period.</Hint></span><strong><span className="up">{fmtPct(mc["p_move_up_5%"] * 100, 0, false)}</span> / <span className="down">{fmtPct(mc["p_move_down_5%"] * 100, 0, false)}</span></strong></div>
+        <div><span className="kpi-label">Volatility (yearly)<Hint>How much the price typically swings over a year. About 15-20% is calm for a stock index; 40%+ is a bumpy ride.</Hint></span><strong>{fmtNum(mc["annual_vol_%"], 0)}%</strong></div>
       </div>
       <LinesChart series={fan} height={220} />
       {vp.poc !== null && (

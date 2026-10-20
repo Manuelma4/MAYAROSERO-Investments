@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtPct, fmtPrice, fmtTime, stockPath } from "../lib/format";
+import { fmtDay, fmtPct, fmtPrice, fmtTime, stockPath } from "../lib/format";
 import { useLive } from "../lib/live";
 import { MARKETS, STOCKS, marketName } from "../lib/markets";
 import { useQuotes } from "../lib/quotes";
-import type { OpportunitiesResult, Quote, TodayBoard } from "../lib/types";
+import type { LiveEvent, OpportunitiesResult, Quote, TodayBoard } from "../lib/types";
 import { Hint } from "../components/Hint";
 import { Sparkline } from "../components/Sparkline";
 import { Card, Empty, Spinner } from "../components/ui";
@@ -13,6 +13,18 @@ import { Card, Empty, Spinner } from "../components/ui";
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
+/** One line per notification, whatever its type: what happened, when, and the number that matters. */
+function eventLine(e: LiveEvent): { title: string; what: string; value: string; tone: string } {
+  const when = fmtTime(e.created_at || e.time);
+  if (e.type === "picks") return { title: "Picks updated", what: `Buy ${e.buy?.join(", ") || "nothing new"} · ${when}`, value: "Review", tone: "" };
+  if (e.type === "alert") return { title: e.symbol, what: `Your price alert fired · ${when}`, value: fmtPrice(e.price), tone: "" };
+  if (e.type === "move") return { title: e.symbol, what: `${e.direction === "SURGE" ? "Sudden rise" : "Sudden drop"} · ${when}`, value: fmtPct(e.move_pct, 2), tone: (e.move_pct ?? 0) >= 0 ? "up" : "down" };
+  // Live ideas carry "long" / "short" in direction; setup signals carry it in side.
+  const long = (e.side ?? (e.direction as string | undefined)) === "long";
+  if (e.type === "opportunity") return { title: e.symbol, what: `Live idea: ${long ? "rising" : "falling"} on news · ${when}`, value: fmtPct(e.change_pct, 1), tone: long ? "up" : "down" };
+  return { title: e.symbol, what: `${long ? "Long" : "Short"} setup triggered · ${when}`, value: long ? "Long" : "Short", tone: long ? "up" : "down" };
 }
 
 const MOOD_TONE = { "Risk-on": "up", Neutral: "", "Risk-off": "down" } as const;
@@ -35,7 +47,7 @@ function MarketCard({ symbol, name, q }: { symbol: string; name: string; q?: Quo
   );
 }
 
-function TodayBoardView({ t }: { t: TodayBoard }) {
+function TodayBoardView({ t, ideas }: { t: TodayBoard; ideas: ReactNode }) {
   const core = t.core;
   const ch = core?.changes;
   return (
@@ -48,6 +60,8 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
         <p className="mood-text">{t.mood.explanation}</p>
         <p className="mood-advice">{t.mood.advice}</p>
       </section>}
+
+      {ideas}
 
       <div className="grid-3">
         <Card className="span-2" title={<>What to hold now<Hint>The engine's current top picks among the S&amp;P 500 stocks: strong 12-month performance, beating the index, in an uptrend, with calmer price action. Split your money equally between them and review once a month.</Hint></>}
@@ -75,7 +89,7 @@ function TodayBoardView({ t }: { t: TodayBoard }) {
         <Card title={<>Changes at the last review<Hint>What changed at the last completed monthly review: stocks to buy (new in the picks), to sell (dropped out) and to keep. Reviews happen at month end, so mid-month rankings are not acted on yet.</Hint></>}>
           {!ch?.date ? <Empty>No changes yet.</Empty> : (
             <div className="changes">
-              <p className="muted small">Review of {ch.date}{ch.provisional_skipped ? " · next review at month end" : ""}</p>
+              <p className="muted small">Review of {fmtDay(ch.date)}{ch.provisional_skipped ? " · next review at month end" : ""}</p>
               {([["Buy", ch.buy, "up"], ["Sell", ch.sell, "down"], ["Keep", ch.keep, ""]] as const).map(([label, list, tone]) => (
                 <div key={label} className="change-row">
                   <span className={`badge ${tone}`}>{label}</span>
@@ -122,6 +136,17 @@ export default function Overview() {
   }, []);
   const hot = (opps?.items ?? []).filter((o) => o.qualified).slice(0, 3);
 
+  const ideas = hot.length > 0 && (
+    <Card title={<>Invest now · {hot.length} live idea{hot.length > 1 ? "s" : ""}<Hint>Stocks moving strongly right now with news, heavy volume and the trend on their side. Open Invest now for the full plan (entry, stop-loss, target).</Hint></>}
+      actions={<Link to="/now" className="link">See the plans</Link>}>
+      <ul className="movers">{hot.map((o) => (
+        <li key={o.symbol}>
+          <Link to="/now" className="idea-main"><span><strong>{o.symbol}</strong> <span className="muted small">{o.name} · {o.direction === "long" ? "rising" : "falling"} on news</span></span>
+            {o.headline && <span className="muted small ellipsis">{o.headline}</span>}</Link>
+          <span className={o.direction === "long" ? "up" : "down"}>{fmtPct(o.change_pct, 1)}</span></li>))}</ul>
+    </Card>
+  );
+
   const watch = Array.from(new Set([...(status?.watchlist.map((w) => w.symbol) ?? []), ...STOCKS.map((s) => s.symbol)])).slice(0, 14);
   const { quotes } = useQuotes([...MARKETS.map((m) => m.symbol), ...watch]);
   const anyError = MARKETS.every((m) => quotes[m.symbol]?.error);
@@ -134,22 +159,13 @@ export default function Overview() {
         <p className="muted lead">Everything is already calculated: the market mood, what to hold, what changed and what is moving right now.</p>
       </section>
 
-      {hot.length > 0 && (
-        <Card title={<>Invest now · {hot.length} live idea{hot.length > 1 ? "s" : ""}<Hint>Stocks moving strongly right now with news, heavy volume and the trend on their side. Open Invest now for the full plan (entry, stop-loss, target).</Hint></>}
-          actions={<Link to="/now" className="link">Open</Link>}>
-          <ul className="movers">{hot.map((o) => (
-            <li key={o.symbol}><Link to="/now">{o.symbol} <span className="muted small">{o.headline ?? o.name}</span></Link>
-              <span className={o.direction === "long" ? "up" : "down"}>{fmtPct(o.change_pct, 1)}</span></li>))}</ul>
-        </Card>
-      )}
-
-      {today ? <TodayBoardView t={today} /> : todayErr ? <div className="error" role="alert">Today's board is not available yet. {todayErr}</div> : <div className="empty"><Spinner /> Preparing today's board…</div>}
+      {today ? <TodayBoardView t={today} ideas={ideas} /> : <>{ideas}{todayErr ? <div className="error" role="alert">Today's board is not available yet. {todayErr}</div> : <div className="empty"><Spinner /> Preparing today's board…</div>}</>}
 
       {anyError && <div className="error" role="alert">Market data is unreachable from this server. Check its network access to Yahoo Finance and your crypto exchange.</div>}
 
-      {(["Indices", "Crypto", "Commodities & FX"] as const).map((g) => (
+      {(["Indices", "Crypto", "Commodities & FX"] as const).map((g, i) => (
         <section key={g}>
-          <h2 className="section-title">{g}</h2>
+          <h2 className="section-title">{g}{i === 0 && <Hint>Each card shows the price now, today's change (the colored box) and a line of the last 30 days. The line can fall while today is up: they cover different periods.</Hint>}</h2>
           <div className="mcards">
             {MARKETS.filter((m) => m.group === g).map((m) => <MarketCard key={m.symbol} symbol={m.symbol} name={m.name} q={quotes[m.symbol]} />)}
           </div>
@@ -157,7 +173,7 @@ export default function Overview() {
       ))}
 
       <div className="grid-3">
-        <Card title="Watchlist" className="span-2">
+        <Card title={<>Watchlist<Hint>Live prices for the main markets and your watchlists. "Day" is the change since yesterday's close; the line shows the last 30 days. Tap a row to open its page.</Hint></>} className="span-2">
           <div className="table-wrap">
             <table className="watch">
               <thead><tr><th>Asset</th><th className="r">Price</th><th className="r">Day</th><th className="r hide-sm">30 days</th></tr></thead>
@@ -177,14 +193,17 @@ export default function Overview() {
             </table>
           </div>
         </Card>
-        <Card title="Latest alerts" actions={<Link to="/alerts" className="link">All</Link>}>
+        <Card title={<>Latest alerts<Hint>The newest notifications: your own price alerts, live ideas, sudden moves and changes to the picks. The same alerts reach your browser, email and WhatsApp when those are set up.</Hint></>} actions={<Link to="/alerts" className="link">All</Link>}>
           {events.length ? (
             <ul className="movers">
-              {events.slice(0, 8).map((e) => (
-                <li key={e.id}>
-                  <span><strong>{e.symbol}</strong> <span className="muted small">{e.type === "move" ? e.direction?.toLowerCase() : `${e.side} setup`} · {fmtTime(e.time)}</span></span>
-                  {e.type === "move" ? <span className={(e.move_pct ?? 0) >= 0 ? "up" : "down"}>{fmtPct(e.move_pct, 2)}</span> : <span className={e.side === "long" ? "up" : "down"}>{e.side === "long" ? "LONG" : "SHORT"}</span>}
-                </li>))}
+              {events.slice(0, 8).map((e) => {
+                const l = eventLine(e);
+                return (
+                  <li key={e.id}>
+                    <span className="idea-main"><strong>{l.title}</strong><span className="muted small">{l.what}</span></span>
+                    <span className={l.tone}>{l.value}</span>
+                  </li>);
+              })}
             </ul>
           ) : <Empty>No alerts yet. They appear here as soon as a stock surges or crashes.</Empty>}
         </Card>

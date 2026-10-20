@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Hint } from "./Hint";
 
 export function Card({ title, actions, children, className = "" }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -14,10 +15,10 @@ export function Card({ title, actions, children, className = "" }: { title?: Rea
   );
 }
 
-export function Stat({ label, value, tone = "", hint }: { label: string; value: ReactNode; tone?: string; hint?: string }) {
+export function Stat({ label, value, tone = "", hint }: { label: string; value: ReactNode; tone?: string; hint?: ReactNode }) {
   return (
-    <div className="stat" title={hint}>
-      <span className="stat-label">{label}</span>
+    <div className="stat">
+      <span className="stat-label">{label}{hint && <Hint>{hint}</Hint>}</span>
       <span className={`stat-value ${tone}`}>{value}</span>
     </div>
   );

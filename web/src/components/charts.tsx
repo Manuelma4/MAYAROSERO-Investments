@@ -4,7 +4,15 @@ import {
   type IChartApi, type SeriesMarker, type Time, type UTCTimestamp,
 } from "lightweight-charts";
 import { cssVar as css, useTheme } from "../lib/theme";
+import { fmtPrice } from "../lib/format";
 import type { Candle, Point } from "../lib/types";
+
+// Daily candles sit at midnight UTC: show the date only; intraday bars also show the time.
+const timeLabel = (time: Time) => {
+  const d = new Date((time as number) * 1000);
+  const day = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit", timeZone: "UTC" });
+  return d.getUTCHours() || d.getUTCMinutes() ? `${day} ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : day;
+};
 
 function baseChart(el: HTMLElement): IChartApi {
   return createChart(el, {
@@ -14,6 +22,7 @@ function baseChart(el: HTMLElement): IChartApi {
     rightPriceScale: { borderColor: css("--line") },
     timeScale: { borderColor: css("--line"), timeVisible: true, minBarSpacing: 0.05 },
     crosshair: { mode: 0 },
+    localization: { priceFormatter: (p: number) => fmtPrice(p), timeFormatter: timeLabel },
   });
 }
 

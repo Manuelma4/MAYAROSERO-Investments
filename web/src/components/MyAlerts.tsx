@@ -156,7 +156,7 @@ export function Watchlists() {
       <ErrorBox error={error} />
       {lists === null ? <Spinner /> : lists.length === 0 && <Empty>No watchlists yet. Create one below, or use "Add to watchlist" on any stock page.</Empty>}
       <div className="watchlists">{lists?.map((w) => <WatchlistCard key={w.id} w={w} onChange={load} />)}</div>
-      <form className="row gap" onSubmit={(e) => { e.preventDefault(); if (name.trim()) create(); }}>
+      <form className="row gap new-list" onSubmit={(e) => { e.preventDefault(); if (name.trim()) create(); }}>
         <input aria-label="New watchlist name" placeholder="New list name (e.g. Tech I like)" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
         <button className="btn" type="submit" disabled={!name.trim()}>Create list</button>
       </form>
@@ -180,11 +180,11 @@ export function AddToWatchlist({ symbol }: { symbol: string }) {
   if (lists === null) return null;
   return (
     <div className="row gap">
-      {inList ? <span className="pill">★ In {inList.name}</span>
-        : lists.length <= 1 ? <button className="btn" onClick={() => add(lists[0])}>☆ Add to watchlist</button>
+      {inList ? <span className="badge in-list">In watchlist · {inList.name}</span>
+        : lists.length <= 1 ? <button className="btn" onClick={() => add(lists[0])}>Add to watchlist</button>
         : (
           <select aria-label="Add to watchlist" value="" onChange={(e) => add(lists.find((w) => w.id === Number(e.target.value)))}>
-            <option value="" disabled>☆ Add to watchlist…</option>
+            <option value="" disabled>Add to watchlist…</option>
             {lists.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>)}
       {msg && <span className="muted small" role="status">{msg}</span>}

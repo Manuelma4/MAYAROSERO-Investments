@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
+import { fmtDay, fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
 import { useQuotes } from "../lib/quotes";
 import { STATIC } from "../lib/snapshot";
 import type { PicksResult } from "../lib/types";
@@ -110,7 +110,7 @@ export default function Picks() {
       {loading && !res && <div className="empty"><Spinner /> Ranking the ~500 S&amp;P 500 stocks on today's prices…</div>}
 
       {res?.changes?.date && (
-        <Card title={<>Changes at the last review · {res.changes.date}<Hint>What changed at the last completed review: buy the new names, sell the ones that dropped out, keep the rest. Reviews happen at the end of each period; the ranking below is today's and becomes official at the next review.</Hint></>}>
+        <Card title={<>Changes at the last review · {fmtDay(res.changes.date)}<Hint>What changed at the last completed review: buy the new names, sell the ones that dropped out, keep the rest. Reviews happen at the end of each period; the ranking below is today's and becomes official at the next review.</Hint></>}>
           <div className="changes inline">
             {([["Buy", res.changes.buy, "up"], ["Sell", res.changes.sell, "down"], ["Keep", res.changes.keep, ""]] as const).map(([label, list, tone]) => (
               <div key={label} className="change-row"><span className={`badge ${tone}`}>{label}</span><span className="change-syms">{list.length ? list.join(" · ") : <span className="muted">None</span>}</span></div>))}
@@ -119,8 +119,8 @@ export default function Picks() {
       )}
 
       {res && (
-        <Card title={<>{res.risk_off ? "Signal: stay in cash" : `Hold now · ${res.picks.length} stocks`}</>}
-          actions={<span className="muted small">{basketToday !== undefined && <>Basket today <Delta v={basketToday} digits={2} /> · </>}equal weight · ranked {res.as_of.slice(0, 10)}</span>}>
+        <Card title={<>{res.risk_off ? "Signal: stay in cash" : `Hold now · ${res.picks.length} stocks`}<Hint>The stocks to own today, best first. Put the same amount of money in each ("equal weight") and check back at the next review for changes. "Basket today" is how the whole list is doing since yesterday's close.</Hint></>}
+          actions={<span className="muted small">{basketToday !== undefined && <>Basket today <Delta v={basketToday} digits={2} /> · </>}equal weight · ranked {fmtDay(res.as_of)}</span>}>
           {res.risk_off ? (
             <div className="notice">The S&amp;P 500 is below its 200-day average, so the bear-market filter says to hold cash until the trend recovers.</div>
           ) : !res.picks.length ? <Empty>No stock passes the engine's rules today (strong trend, beating the index). Holding cash until one does is part of the plan.</Empty> : (
@@ -169,9 +169,9 @@ export default function Picks() {
       )}
 
       {res && (
-        <div className="grid-2">
-          <Card title="Rising candidates">
-            <ol className="ranking">
+        <>
+          <Card title={<>Rising candidates · top {Math.min(30, res.ranking.length)}<Hint>The full ranking behind the picks: the top of the list is held, the next names are the most likely to join at the next review. The bar is the engine's score; the % is the 12-month gain (leaving out the last month). Faded names are in a downtrend, so the uptrend filter skips them.</Hint></>}>
+            <ol className="ranking cols">
               {res.ranking.slice(0, 30).map((p) => (
                 <li key={p.symbol} className={p.eligible ? "" : "ineligible"} title={p.eligible ? "" : "Below its 200-day average: excluded by the uptrend filter"}>
                   <Link to={stockPath(p.symbol)}>{p.symbol}</Link>
@@ -181,7 +181,9 @@ export default function Picks() {
                 </li>))}
             </ol>
           </Card>
-          <Card title={<>Picks history<Hint>At every review the engine re-ranks all stocks. Green = bought (entered the list), red = sold (left it). The rest were kept. You get a notification each time this list changes.</Hint></>}>
+          <details className="fold">
+            <summary>Picks history<span className="muted small"> · what changed at each of the last {Math.min(12, res.holdings.length)} reviews</span></summary>
+            <p className="muted small">At every review the engine re-ranks all stocks. "+" = bought (entered the list), "−" = sold (left it); the rest were kept. You get a notification each time the list changes.</p>
             <ul className="timeline">
               {res.holdings.slice(0, 12).map((h, i) => {
                 const prev = res.holdings[i + 1];
@@ -189,7 +191,7 @@ export default function Picks() {
                 const sold = prev ? prev.symbols.filter((x) => !h.symbols.includes(x)) : [];
                 return (
                   <li key={h.date}>
-                    <span className="tl-date">{h.date}</span>
+                    <span className="tl-date">{fmtDay(h.date)}</span>
                     <span className="tl-body">
                       {h.risk_off ? <em className="muted">Cash (bear-market filter)</em>
                         : !bought.length && !sold.length ? <span className="muted">No change · {h.symbols.length} kept</span>
@@ -202,8 +204,8 @@ export default function Picks() {
                   </li>);
               })}
             </ul>
-          </Card>
-        </div>
+          </details>
+        </>
       )}
 
       {res && s && (

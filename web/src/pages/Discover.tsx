@@ -6,6 +6,7 @@ import { useQuotes } from "../lib/quotes";
 import type { Quote, Universe, UniverseStock } from "../lib/types";
 import { Sparkline } from "../components/Sparkline";
 import { Empty, ErrorBox, Spinner } from "../components/ui";
+import { Hint } from "../components/Hint";
 
 type Mode = "themes" | "sectors" | "regions";
 const REGIONS = ["US", "Europe", "Asia", "Global"];
@@ -17,7 +18,7 @@ function avgChange(stocks: UniverseStock[], quotes: Record<string, Quote>) {
 
 function heat(v: number | undefined) {
   if (v === undefined) return {};
-  const a = Math.min(0.55, Math.abs(v) / 4);
+  const a = Math.min(0.32, Math.abs(v) / 6); // capped so the text on the tile stays readable
   return { background: `color-mix(in srgb, var(${v >= 0 ? "--up" : "--down"}) ${Math.round(a * 100)}%, var(--surface))` };
 }
 
@@ -87,6 +88,8 @@ export default function Discover() {
       {!uni && !error && <div className="empty"><Spinner /> Loading the companies…</div>}
 
       {uni && !q && (
+        <>
+        <p className="muted small tiles-legend">Pick a group. The color shows its average move today: greener = rising more, redder = falling more.</p>
         <div className="tiles" role="tablist" aria-label="Groups">
           {groups.map((g) => {
             const v = avgChange(g.stocks, quotes);
@@ -97,11 +100,13 @@ export default function Discover() {
               </button>);
           })}
         </div>
+        </>
       )}
 
       {uni && (
         <section>
-          <h2 className="section-title">{q ? `Results for "${query}" · ${visible.length}` : `${current?.key} · ${visible.length}`}</h2>
+          <h2 className="section-title">{q ? `Results for "${query}" · ${visible.length}` : `${current?.key} · ${visible.length}`}
+            <Hint>Each row: the price now, today's change below it, and a line of the last 30 days (green if it rose over those 30 days). Tap a company to open its page.</Hint></h2>
           {visible.length ? (
             <div className="srows">
               {visible.map((s) => <StockRow key={s.symbol} s={s} q={quotes[s.symbol]} />)}

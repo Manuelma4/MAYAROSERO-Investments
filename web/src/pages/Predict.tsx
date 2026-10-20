@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtPct, fmtPrice, stockPath } from "../lib/format";
+import { fmtDay, fmtPct, fmtPrice, stockPath } from "../lib/format";
 import { STATIC } from "../lib/snapshot";
 import type { PredictionsResult, RankedItem } from "../lib/types";
 import { ForecastPanel } from "../components/Forecast";
@@ -18,7 +18,7 @@ function Row({ it, side, horizon }: { it: RankedItem; side: "up" | "down"; horiz
       <button className="pred-row-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
         <span className="pr-sym">{it.symbol}</span>
         <span className="pr-name"><strong>{it.name}</strong><span className="muted small">{it.reason}</span></span>
-        <span className="pr-num"><span className={side === "up" ? "up" : "down"}>{side === "up" ? `Top ${(11 - it.decile) * 10}%` : `Bottom ${it.decile * 10}%`}</span><span className="muted small">{fmtPct(p * 100, 0, false)} chance · {fmtPrice(it.price)}</span></span>
+        <span className="pr-num"><span className={side === "up" ? "up" : "down"}>{side === "up" ? `Top ${(11 - it.decile) * 10}%` : `Bottom ${it.decile * 10}%`}</span><span className="muted small">{fmtPct(p * 100, 0, false)} {side === "up" ? "to beat" : "to lag"} · {fmtPrice(it.price)}</span></span>
       </button>
       {open && (
         <div className="pred-detail">
@@ -61,7 +61,7 @@ export default function Predict() {
   return (
     <div className="page">
       <section className="hero-x">
-        <p className="eyebrow">Predictions · ranked {res ? `on ${res.as_of}` : "daily"} · {res?.universe_size ?? "~500"} stocks</p>
+        <p className="eyebrow">Predictions · ranked {res ? `on ${fmtDay(res.as_of)}` : "daily"} · {res?.universe_size ?? "~500"} stocks</p>
         <h1 className="display">Predict</h1>
         <p className="muted lead">Which stocks are likely to do better, or worse, than the others over the coming days. A machine-learning model ranks them every day, the way quant funds do. Tap a stock to see its simulated price range.</p>
         <div className="segmented" role="radiogroup" aria-label="Time horizon">
@@ -84,11 +84,19 @@ export default function Predict() {
           <li><strong>My own list:</strong> rank any group of at least 20 US stocks against each other. Takes about 30 seconds.</li>
         </ul>
       </details>
+      <div className="howto">
+        <strong>How to read this page</strong>
+        <ul>
+          <li><em>Expected to beat the others</em>: likely to do better than the rest over the period you picked. <em>Expected to lag</em>: likely to do worse.</li>
+          <li>"52% to beat" means 52 of 100 similar past cases did better than the typical stock. A few points above 50% is a real but small edge.</li>
+          <li>It compares stocks with each other; it does not say whether the whole market goes up. Edges this size pay off across many stocks and weeks, not on one trade.</li>
+        </ul>
+      </div>
       <ErrorBox error={err} />
       {!res && busy && <div className="empty"><Spinner /> Loading today's ranking…</div>}
 
       {res && v && (
-        <Card title={<>How good is this ranking? {v.has_edge ? <Badge tone="up">Small real edge</Badge> : <Badge>Weak signal</Badge>}
+        <Card title={<>How good is this ranking? {v.has_edge ? <Badge>Small real edge</Badge> : <Badge>Weak signal</Badge>}
           <Hint>Measured on years of past data the model never saw. Quant funds judge short-term models by whether their top picks beat their bottom picks; a small consistent gap is valuable, a big one is usually a mistake. Probabilities are calibrated: 52% means 52 of 100 similar past cases beat the typical stock.</Hint></>}>
           <p className="ai-summary">{res.edge_sentence}</p>
           <p className="muted small">{res.quality_sentence}</p>
@@ -98,7 +106,7 @@ export default function Predict() {
       {res && (
         <div className="grid-2">
           {dir !== "down" && (
-            <Card title={<>Expected to beat the others · {res.horizon_label}<Hint>"Top 10%" means the model ranks this stock among the best tenth of the list. The "chance" is how often similar past cases beat the typical stock: edges are small (a few points above 50%) but add up across many stocks and weeks.</Hint></>}>
+            <Card title={<>Expected to beat the others · {res.horizon_label}<Hint>"Top 10%" means the model ranks this stock among the best tenth of the list. "52% to beat" is how often similar past cases beat the typical stock: edges are small (a few points above 50%) but add up across many stocks and weeks.</Hint></>}>
               {risers.length ? <ul className="pred-list">{risers.map((it) => <Row key={it.symbol} it={it} side="up" horizon={res.horizon} />)}</ul> : <Empty>No ranking for this list yet.</Empty>}
             </Card>
           )}
@@ -109,7 +117,7 @@ export default function Predict() {
           )}
         </div>
       )}
-      <p className="caveat"><strong>How to read this page.</strong> Rankings compare stocks with each other; they don't predict whether the whole market goes up. Edges this size pay off across many stocks and many weeks, not on a single trade. Use them alongside the monthly picks and stop-losses. Research, not advice.</p>
+      <p className="caveat">Use these rankings alongside the monthly picks and stop-losses. Research, not advice.</p>
     </div>
   );
 }

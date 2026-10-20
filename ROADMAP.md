@@ -94,7 +94,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         picker backtest (37%/yr vs SPY 13.7% looks too good), show the honest figure on Picks.
 11. [x] **Predictions on the full S&P 500**: make the weekly ranker fast enough for ~500 stocks
         (was 21 min per horizon) without losing its edge.
-12. [ ] **Design review pass**: product-designer screenshot review of every page on real data
+12. [x] **Design review pass**: product-designer screenshot review of every page on real data
         (desktop + phone), fix polish issues; refresh the preview link.
 13. [ ] **Preview completeness**: static preview covers the new pages (movers board, alerts,
         watchlists, order ticket preview, stock pages for all picks).

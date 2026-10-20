@@ -86,9 +86,12 @@ export default function Markets() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <div><h1>Charts</h1><p className="muted">Interactive charts with market structure: Dow trend, Wyckoff ranges, Elliott impulses and candlestick patterns (last 120 bars: H hammer, BE bullish / bearish engulfing, MS/ES morning/evening star, SS shooting star).</p></div>
-      </div>
+      <section className="hero-x">
+        <p className="eyebrow">Charts · {data ? `${marketName(data.symbol)} · ${data.timeframe}` : sel.symbol}</p>
+        <h1 className="display">Charts</h1>
+        <p className="muted lead">Any stock, index or coin on an interactive chart. The Structure panel reads the chart for you: is it trending up or down, is it stretched, and which candle patterns just appeared.
+          <Hint>Letters on the chart mark candle patterns from the last 120 candles: H hammer, BE bullish or bearish engulfing, MS / ES morning or evening star, SS shooting star. Green arrows hint at a rise, red ones at a fall. Lines: EMA 20 (blue), 50 (orange) and 200 (violet) are moving averages of the price.</Hint></p>
+      </section>
       <Card>
         <form className="form" onSubmit={(e) => { e.preventDefault(); if (`${sel.symbol}|${sel.timeframe}` === urlKey) load(sel); else open(sel); }}>
           <MarketPicker value={sel} onChange={setSel} />
@@ -113,22 +116,22 @@ export default function Markets() {
             <PriceChart candles={data.candles} overlays={overlays} markers={markers} />
             <LinesChart series={rsiSeries} height={140} />
           </Card>
-          <Card title="Structure">
+          <Card title={<>Structure<Hint>An automatic reading of the chart. The quickest check: trend "Uptrend" and price above the 200-day average (EMA200) means the long-term wind is at its back.</Hint></>}>
             <div className="stats tight">
-              <Stat label="Last" value={fmtPrice(a.close)} />
-              <Stat label="Dow trend" value={trendLabel} tone={trendTone} />
-              <Stat label="RSI 14" value={fmtNum(a.rsi, 1)} tone={a.rsi > 70 ? "down" : a.rsi < 30 ? "up" : ""} hint="Above 70 overbought, below 30 oversold" />
-              <Stat label="ATR" value={`${fmtNum(a.atr_pct, 2)}%`} hint="Average true range, as % of price" />
+              <Stat label="Last" value={fmtPrice(a.close)} hint="The latest price on this chart." />
+              <Stat label="Trend" value={trendLabel} tone={trendTone} hint="Uptrend = higher highs and higher lows; downtrend = the opposite; range = neither (Dow theory)." />
+              <Stat label="RSI 14" value={fmtNum(a.rsi, 1)} tone={a.rsi > 70 ? "down" : a.rsi < 30 ? "up" : ""} hint="Momentum from 0 to 100. Above 70 = stretched after a strong rise (overbought), below 30 = stretched after a fall (oversold)." />
+              <Stat label="Daily range" value={`${fmtNum(a.atr_pct, 2)}%`} hint="ATR: how much the price typically moves in one candle, as a % of the price. Useful to place a stop-loss outside normal noise." />
             </div>
             <dl className="kv">
-              <dt>Swing high / low</dt><dd>{fmtPrice(a.swings.swing_high)} / {fmtPrice(a.swings.swing_low)}</dd>
-              <dt>EMA 20 / 50 / 200</dt><dd>{fmtPrice(a.ema["20"])} / {fmtPrice(a.ema["50"])} / {fmtPrice(a.ema["200"])}</dd>
-              <dt>Price vs EMA200</dt><dd className={a.close > a.ema["200"] ? "up" : "down"}>{a.close > a.ema["200"] ? "Above" : "Below"}</dd>
-              <dt>MACD histogram</dt><dd className={a.macd_hist > 0 ? "up" : "down"}>{fmtNum(a.macd_hist, 4)}</dd>
-              <dt>Wyckoff range</dt><dd>{fmtPrice(a.wyckoff_range.support)} – {fmtPrice(a.wyckoff_range.resistance)} {a.wyckoff_range.tight ? <Badge>tight range</Badge> : <Badge>wide / trending</Badge>}</dd>
-              <dt>Recent candles</dt><dd>{a.recent_patterns.length ? a.recent_patterns.map((p) => <Badge key={p.time + p.pattern}>{p.pattern.replace(/_/g, " ")}</Badge>) : "none"}</dd>
+              <dt>Swing high / low<Hint>The last turning points: the recent peak and the recent dip.</Hint></dt><dd>{fmtPrice(a.swings.swing_high)} / {fmtPrice(a.swings.swing_low)}</dd>
+              <dt>EMA 20 / 50 / 200<Hint>Average prices over the last 20, 50 and 200 candles (recent prices count more). Price above them = healthy trend.</Hint></dt><dd>{fmtPrice(a.ema["20"])} / {fmtPrice(a.ema["50"])} / {fmtPrice(a.ema["200"])}</dd>
+              <dt>Price vs EMA200<Hint>Above the 200-candle average = long-term uptrend; below = long-term downtrend.</Hint></dt><dd className={a.close > a.ema["200"] ? "up" : "down"}>{a.close > a.ema["200"] ? "Above" : "Below"}</dd>
+              <dt>MACD histogram<Hint>Short-term momentum: positive = gaining speed upward, negative = losing speed or falling.</Hint></dt><dd className={a.macd_hist > 0 ? "up" : "down"}>{a.macd_hist > 0 ? "Positive" : "Negative"} <span className="muted">({fmtNum(a.macd_hist, 2)})</span></dd>
+              <dt>Wyckoff range<Hint>The recent trading range: support (floor) and resistance (ceiling). A tight range often comes before a bigger move.</Hint></dt><dd>{fmtPrice(a.wyckoff_range.support)} – {fmtPrice(a.wyckoff_range.resistance)} {a.wyckoff_range.tight ? <Badge>tight range</Badge> : <Badge>wide / trending</Badge>}</dd>
+              <dt>Recent candles<Hint>Candle patterns that often appear at turning points. One pattern alone is a weak signal.</Hint></dt><dd>{a.recent_patterns.length ? a.recent_patterns.map((p) => <Badge key={p.time + p.pattern}>{p.pattern.replace(/_/g, " ")}</Badge>) : "None"}</dd>
               <dt>AI desk</dt><dd><AIDesk symbol={data.symbol} /></dd>
-              <dt>Elliott</dt><dd>{a.elliott ? <>Valid {a.elliott.direction} impulse {a.elliott.start.slice(0, 10)} → {a.elliott.end.slice(0, 10)} (w3/w1 {fmtNum(a.elliott.wave3_extension, 2)})</> : "No rule-valid 5-wave impulse recently"}</dd>
+              <dt>Elliott<Hint>Whether the price recently made a clean 5-wave move (Elliott wave theory). Advanced; ignore it if unsure.</Hint></dt><dd>{a.elliott ? <>Valid {a.elliott.direction} impulse {a.elliott.start.slice(0, 10)} → {a.elliott.end.slice(0, 10)} (w3/w1 {fmtNum(a.elliott.wave3_extension, 2)})</> : "No rule-valid 5-wave impulse recently"}</dd>
             </dl>
           </Card>
         </div>

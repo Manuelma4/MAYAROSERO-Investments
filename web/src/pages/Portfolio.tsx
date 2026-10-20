@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { fmtNum, fmtPct, stockPath } from "../lib/format";
+import { fmtDay, fmtNum, fmtPct, fmtPrice, stockPath } from "../lib/format";
 import type { PortfolioPlan } from "../lib/types";
 import { Hint } from "../components/Hint";
 import { Badge, Card, Empty, ErrorBox, Spinner } from "../components/ui";
@@ -13,7 +13,8 @@ const RISKS = [
   { id: "bold", label: "Bold", hint: "75% picks, 25% live ideas, no index. Biggest potential edge, biggest swings." },
 ];
 const ROLE = { core: "Picks", satellite: "Live idea", anchor: "S&P 500", cash: "Cash" } as const;
-const ROLE_COLOR = { core: "var(--text)", satellite: "var(--up)", anchor: "#6b7489", cash: "var(--surface-3)" } as const;
+// Monochrome on purpose: green and red are reserved for price direction (BRAND.md).
+const ROLE_COLOR = { core: "var(--text)", satellite: "var(--text-2)", anchor: "var(--text-3)", cash: "var(--surface-3)" } as const;
 
 function load(): { amount: string; currency: "EUR" | "USD"; risk: string; fractional: boolean } {
   try { return { amount: "10000", currency: "EUR", risk: "balanced", fractional: true, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; }
@@ -87,9 +88,9 @@ export default function Portfolio() {
               {lines.map((l) => (
                 <li key={l.symbol}>
                   <div className="pc-top">
-                    <Badge tone={l.role === "satellite" ? "up" : ""}>{ROLE[l.role]}</Badge>
+                    <Badge>{ROLE[l.role]}</Badge>
                     <Link to={stockPath(l.symbol)} className="pc-name"><strong>{l.name}</strong><span className="muted small">{l.symbol}{l.sector ? ` · ${l.sector}` : ""}</span></Link>
-                    <span className="pc-num"><span className="num">{money(l.invested)}</span><span className="muted small">{fmtNum(l.shares, 4)} sh × ${fmtNum(l.price, 2)}</span></span>
+                    <span className="pc-num"><span className="num">{money(l.invested)}</span><span className="muted small">{fmtNum(l.shares, 4)} shares × ${fmtPrice(l.price)}</span></span>
                   </div>
                   <p className="muted small">{fmtNum(l.invested / plan.amount * 100, 1)}% of the portfolio{l.stop ? ` · stop-loss $${fmtNum(l.stop, 2)}` : ""}{l.note ? ` · ${l.note}` : ""}</p>
                 </li>))}
@@ -116,7 +117,7 @@ export default function Portfolio() {
           </div>
 
           {plan.changes?.date && (
-            <Card title={<>Changes at the last review · {plan.changes.date}<Hint>When you already hold the plan, this is what to adjust after the monthly review.</Hint></>}>
+            <Card title={<>Changes at the last review · {fmtDay(plan.changes.date)}<Hint>When you already hold the plan, this is what to adjust after the monthly review.</Hint></>}>
               <div className="changes inline">
                 {([["Buy", plan.changes.buy, "up"], ["Sell", plan.changes.sell, "down"], ["Keep", plan.changes.keep, ""]] as const).map(([label, list, tone]) => (
                   <div key={label} className="change-row"><span className={`badge ${tone}`}>{label}</span><span className="change-syms">{list.length ? list.join(" · ") : <span className="muted">None</span>}</span></div>))}
@@ -126,7 +127,7 @@ export default function Portfolio() {
 
           {t && (
             <details className="customize">
-              <summary>Track record of this mix<span className="muted small"> · since {t.start}: {fmtPct(t["cagr_%"], 1)}/yr vs S&amp;P 500 {fmtPct(t["spy_cagr_%"], 1)}/yr</span></summary>
+              <summary>Track record of this mix<span className="muted small"> · since {fmtDay(t.start)}: {fmtPct(t["cagr_%"], 1)}/yr vs S&amp;P 500 {fmtPct(t["spy_cagr_%"], 1)}/yr</span></summary>
               <dl className="kv">
                 <dt>Yearly return (picks + index part)</dt><dd>{fmtPct(t["cagr_%"], 1)} <span className="muted">vs {fmtPct(t["spy_cagr_%"], 1)}</span></dd>
                 <dt>Worst drop</dt><dd>{fmtPct(t["max_drawdown_%"], 1)} <span className="muted">vs {fmtPct(t["spy_max_drawdown_%"], 1)}</span></dd>

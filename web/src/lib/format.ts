@@ -5,8 +5,11 @@ export const fmtPrice = (v: number | null | undefined) => {
   return v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 };
 
-export const fmtPct = (v: number | null | undefined, digits = 1, sign = true) =>
-  v === null || v === undefined || Number.isNaN(v) ? "–" : `${sign && v > 0 ? "+" : ""}${v.toFixed(digits)}%`;
+export const fmtPct = (v: number | null | undefined, digits = 1, sign = true) => {
+  if (v === null || v === undefined || Number.isNaN(v)) return "–";
+  if (Number(v.toFixed(digits)) === 0) return `${(0).toFixed(digits)}%`; // never "-0.00%"
+  return `${sign && v > 0 ? "+" : ""}${v.toFixed(digits)}%`;
+};
 
 export const fmtNum = (v: number | null | undefined, digits = 2) =>
   v === null || v === undefined || Number.isNaN(v) ? "–" : v.toLocaleString("en-US", { maximumFractionDigits: digits });
@@ -28,3 +31,10 @@ export const fmtBig = (v: number | null | undefined) => {
 };
 
 export const stockPath = (symbol: string) => `/stock/${encodeURIComponent(symbol)}`;
+
+/** "2026-09-30" (or an ISO timestamp) as "30 Sep 2026". */
+export const fmtDay = (iso: string | null | undefined) => {
+  if (!iso) return "–";
+  const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};

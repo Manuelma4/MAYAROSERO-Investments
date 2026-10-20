@@ -14,8 +14,8 @@ export function ModeBadge({ mode }: { mode: string }) {
   return mode === "live" ? <span className="badge live" title="Real money">Live</span> : <Badge>Paper</Badge>;
 }
 
-const money = (v: number | null | undefined, ccy: string) => `${fmtPrice(v)} ${ccy === "USDT" ? "USDT" : ccy === "USD" ? "$" : ccy}`;
-const eur = (v: number | null | undefined) => `${fmtPrice(v)} €`;
+const money = (v: number | null | undefined, ccy: string) => ccy === "USD" ? `$${fmtPrice(v)}` : `${fmtPrice(v)} ${ccy}`;
+const eur = (v: number | null | undefined) => `€${fmtPrice(v)}`;
 
 /** Order ticket for one live idea: server-side plan, short-lived confirmation, extra step for real money. */
 export function OrderTicket({ o, onDone }: { o: Opportunity; onDone: (msg: string) => void }) {
