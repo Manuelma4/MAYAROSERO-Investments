@@ -123,7 +123,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
 22. [x] **Funds-only plan**: a "Simple funds" choice on My portfolio: 60% S&P 500 fund + 40% momentum fund
         (SPMO; UCITS equivalents named for a European broker), with its real-fund track record vs the S&P 500.
-23. [ ] **Night review**: code review of tonight's big changes (plans, screener, digest, earnings, currency),
+23. [x] **Night review**: code review of tonight's big changes (plans, screener, digest, earnings, currency),
         fix what is found, final QA.
 
 ## Later research track

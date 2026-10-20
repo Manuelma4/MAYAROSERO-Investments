@@ -232,6 +232,8 @@ def test_portfolio_target_and_drift_endpoints(client):  # noqa: F811
     assert any(x["symbol"] == sym for x in d["sell"]) and d["suggestion"].startswith("Sell about $")
     sent = []
     st.precompute.notify = sent.append
+    night = datetime(2026, 10, 18, 1, 0, tzinfo=UTC)   # 03:00 in Paris: no alert, and the week is not used up
+    assert st.precompute.check_drift(night) is None and sent == [] and st.store.last_notice("drift") is None
     now = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
     assert st.precompute.check_drift(now) and len(sent) == 1 and sent[0].startswith("[PORTFOLIO DRIFT]")
     assert "Nothing is traded automatically" in sent[0]

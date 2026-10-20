@@ -227,3 +227,20 @@ def test_scan_records_qualified_ideas(client):
     assert [r["symbol"] for r in rows] == ["AAA"]      # qualified only, once per day
     tr = pre.track_record(max_age=0)
     assert tr["ideas"]["pending_count"] == 1 and tr["started"] == "2026-10-20"
+
+
+def test_restart_does_not_repeat_an_opportunity_alert(client):
+    """The idea is already in SQLite: a restarted Precomputer (empty memory) must not announce it again."""
+    from tradebot.api.precompute import Precomputer
+
+    item = {"symbol": "AAA", "name": "Aaa", "direction": "long", "as_of": "2026-10-20T15:00:00+00:00",
+            "entry": 100.0, "stop": 95.0, "target": 110.0, "hold_days": 5, "qualified": True}
+    scanner = type("S", (), {"scan": lambda self, now=None: [type("O", (), {"to_dict": lambda s2: dict(item)})()]})()
+    sent = []
+    first = Precomputer(client.app.state.market, store=client.app.state.store, on_opportunity=sent.append)
+    first._scanner = scanner
+    first.scan_opportunities()
+    restarted = Precomputer(client.app.state.market, store=client.app.state.store, on_opportunity=sent.append)
+    restarted._scanner = scanner
+    restarted.scan_opportunities()
+    assert [o["symbol"] for o in sent] == ["AAA"]

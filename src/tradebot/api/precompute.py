@@ -19,6 +19,7 @@ import math
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from .. import screener as sc
 from ..data import earnings as er
@@ -219,7 +220,8 @@ class Precomputer:
             key = (o["symbol"], o["direction"], o["as_of"][:10])
             if o["qualified"] and self.store is not None:
                 try:   # live track record: one row per symbol, direction and day (idempotent)
-                    self.store.record_idea(o, now.isoformat())
+                    if not self.store.record_idea(o, now.isoformat()):
+                        self._seen.add(key)   # already recorded (and announced) before a restart
                 except Exception as exc:
                     log.warning("track record idea failed: %s", exc)
             if o["qualified"] and key not in self._seen:
@@ -284,6 +286,7 @@ class Precomputer:
 
     # ---- portfolio drift and weekly digest ------------------------------------------
     TARGET_KEY = "portfolio_target"
+    DRIFT_HOURS = (8, 21)   # drift alerts only from 08:00 to 21:00 in the owner's time zone
 
     def _fx_to(self, target_ccy: str, account_ccy: str) -> float:
         """Multiply account-currency money by this to get the target currency (USD <-> EUR only)."""
@@ -313,12 +316,16 @@ class Precomputer:
         return ser.clean({**d, "target": target, "source": h["source"], "as_of": datetime.now(timezone.utc).isoformat()})
 
     def check_drift(self, now: datetime | None = None) -> dict | None:
-        """One alert when the portfolio drifted past the limits, at most once every 7 days (stored in SQLite)."""
+        """One alert when the portfolio drifted past the limits, at most once every 7 days (stored in SQLite), in daytime."""
         if self.store is None or self.holdings is None or not self.store.get_value(self.TARGET_KEY):
             return None
         now = now or datetime.now(timezone.utc)
         d = self.portfolio_drift()
         self.put("drift", d)
+        # This runs every 30 min around the clock: only alert in the owner's daytime (no 03:00 phone buzz).
+        local_hour = now.astimezone(ZoneInfo(self.digest_schedule.timezone)).hour
+        if not self.DRIFT_HOURS[0] <= local_hour < self.DRIFT_HOURS[1]:
+            return None
         if d.get("breached") and self.store.claim_notice("drift", now.date().isoformat(), now, min_gap=timedelta(days=7)):
             if self.notify:
                 self.notify(dr.alert_text(d, d["source"]))

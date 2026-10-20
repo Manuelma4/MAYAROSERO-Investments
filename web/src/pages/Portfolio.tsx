@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { asCcy, ccySign, fmtDay, fmtMoney, fmtNum, fmtPct, stockPath, type Ccy } from "../lib/format";
@@ -43,10 +43,15 @@ export default function Portfolio() {
   const pc: Ccy = plan?.currency ?? planCcy;   // the currency the plan's amounts come back in
   const money = (v: number | null | undefined) => <Money v={v} from={pc} />;
 
+  const seq = useRef(0);   // only the latest build may update the screen (a slower earlier answer is dropped)
   const build = async (next = inp) => {
+    const n = ++seq.current;
     setBusy(true); setErr(null);
     try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
-    try { setPlan(await api.portfolio({ ...next, currency: planCcy, amount: Number(next.amount) })); } catch (e) { setErr(`Your plan could not be built. ${(e as Error).message}`); } finally { setBusy(false); }
+    try {
+      const p = await api.portfolio({ ...next, currency: planCcy, amount: Number(next.amount) });
+      if (n === seq.current) setPlan(p);
+    } catch (e) { if (n === seq.current) setErr(`Your plan could not be built. ${(e as Error).message}`); } finally { if (n === seq.current) setBusy(false); }
   };
   // Built on arrival, and again if the display currency changes (the server converts at its live rate).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,7 +136,7 @@ export default function Portfolio() {
             </ul>}
           </Card>
 
-          {plan.weighting && plan.weighting.summary.length > 0 && (
+          {plan.weighting?.summary?.length ? (
             <Card title={<>Why these weights<Hint>{funds ? "A fixed mix: no forecasts, no stock picking, nothing to time. The momentum fund does the stock choosing by its own published rules; you only bring the two funds back to 60/40 from time to time." : <>Money is not the same as risk: 1,000 in a jumpy stock can move your plan as much as 3,000 in a calm one. So each pick gets the amount that makes its ups and downs count about equally, and each risk level has a limit on how much the whole plan may swing compared with the S&amp;P&nbsp;500. When the picks are too jumpy for that limit, money goes to the S&amp;P&nbsp;500 index first and only then to cash. Only past prices are used, never anything that happened after the plan date.</>}</Hint></>}>
               <div className="weights-why">
                 {plan.weighting.summary.map((s) => <p key={s}>{s}</p>)}
@@ -142,7 +147,7 @@ export default function Portfolio() {
                   <Hint>"Swings" means volatility: how much the plan's value typically moves up and down in a year. 1.0 times means about as much as simply owning the S&amp;P&nbsp;500. The limit is a ceiling, judged on the past year and on the last 3 months, whichever is jumpier; a calmer plan is left as it is.</Hint></p>
               )}
             </Card>
-          )}
+          ) : null}
 
           <RiskCard risk={plan.risk_view} />
 
@@ -222,8 +227,10 @@ function DriftCard({ drift, busy, err, onSave, onRemove }: { drift: PortfolioDri
   const [tRisk, setTRisk] = useState<PortfolioRiskView | null>(null);
   const savedAt = t?.saved_at;
   useEffect(() => {
+    let alive = true;
     setTRisk(null);
-    if (savedAt) api.portfolioRisk().then(setTRisk).catch(() => setTRisk(null));
+    if (savedAt) api.portfolioRisk().then((r) => alive && setTRisk(r)).catch(() => alive && setTRisk(null));
+    return () => { alive = false; };
   }, [savedAt]);
   const rm = tRisk?.status === "ok" ? tRisk.month : undefined;
   return (
