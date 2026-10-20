@@ -8,6 +8,8 @@ options, and every number has a short "what this means" hint.
 
 ## Start here (Manuel)
 
+Your checklist, in order, with costs: **[docs/YOUR_NEXT_STEPS.md](docs/YOUR_NEXT_STEPS.md)**.
+
 1. **Run it** at home or on a small server: [docs/HOSTING.md](docs/HOSTING.md) (about 10 minutes).
 2. **Get alerts on your phone** by email and WhatsApp: [docs/ALERTS_SETUP.md](docs/ALERTS_SETUP.md)
    (about 15 minutes), then check with `python scripts/test_alerts.py`.
