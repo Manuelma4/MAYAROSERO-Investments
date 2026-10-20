@@ -183,3 +183,19 @@ export interface PriceAlert {
   active: boolean; triggered_at: string | null; triggered_price: number | null;
 }
 export interface AlertsResult { kinds: Record<AlertKind, string>; alerts: PriceAlert[] }
+
+export interface TrackIdea {
+  symbol: string; direction: "long" | "short"; entry: number; stop: number; target: number | null; as_of: string; valid_until: string | null;
+  status: "pending" | "open" | "closed" | "invalid"; fill: number | null; fill_date: string | null; exit: number | null; exit_date: string | null;
+  reason: "stop" | "target" | "time limit" | null; r: number | null; days_held: number; mark?: number;
+}
+export interface TrackRecord {
+  preset: string; as_of: string; started: string | null; days: number; too_early: boolean; message: string;
+  picks: {
+    days: number; first_trade?: string | null; "return_%"?: number | null; "spy_%"?: number | null; "excess_%"?: number | null; "universe_%"?: number | null;
+    "max_drawdown_%"?: number | null; "spy_max_drawdown_%"?: number | null; "turnover_%"?: number; rebalances?: number; "days_beating_spy_%"?: number | null;
+    curve: { date: string; time: number; picks: number; spy: number }[]; holdings?: Record<string, number>;
+    snapshots: number; latest_date: string | null; current: { symbol: string; weight: number; price: number | null }[]; risk_off: boolean;
+  };
+  ideas: { count: number; closed_count: number; open_count: number; pending_count: number; win_rate: number | null; avg_r: number | null; "total_r_%": number | null; open: TrackIdea[]; closed: TrackIdea[] };
+}

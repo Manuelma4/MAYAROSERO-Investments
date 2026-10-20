@@ -238,3 +238,88 @@ def compute_predictions(market: MarketData, horizon: int = 5, symbols: list[str]
                       "edge_sentence": ("Small but statistically real edge." if v["has_edge"] else
                                         "No reliable edge at this horizon: treat the ranking as weak information."),
                       "items": items, "universe_size": len(frames)})
+
+
+def _day(iso: str) -> str:
+    d = pd.Timestamp(iso)
+    return f"{d.day} {d.strftime('%b %Y')}"
+
+
+def compute_track_record(market: MarketData, store, preset: str = "quality_momentum",
+                         universe_line: list[dict] | None = None, now=None) -> dict:
+    """The live forward record: recorded picks vs SPY, and the outcome of every recorded Invest-now idea."""
+    from ..data import provider_for
+    from ..live.track_record import (idea_outcome, ideas_summary, line_return, picks_forward,
+                                     session_close_known)
+
+    now = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz="UTC")
+    snaps = store.picks_snapshots(preset)
+    ideas = store.track_ideas()
+    firsts = [x for x in (snaps[0]["date"] if snaps else None, ideas[0]["day"] if ideas else None) if x]
+    started = min(firsts) if firsts else None
+
+    # ---- picks vs SPY
+    fw: dict = {"days": 0, "curve": []}
+    if snaps:
+        fetch_start = (pd.Timestamp(snaps[0]["date"]) - pd.Timedelta(days=10)).date().isoformat()
+        syms = sorted({s for snap in snaps for s in snap["weights"]})
+        frames = market.history_many("yahoo", syms, "1d", start=fetch_start) if syms else {}
+        try:
+            spy = market.history("yahoo", "SPY", "1d", start=fetch_start)
+        except DataUnavailable:
+            spy = None
+        fw = picks_forward(snaps, frames, spy)
+        last_day = fw["curve"][-1]["date"] if fw["curve"] else None
+        fw["universe_%"] = line_return(universe_line or [], snaps[0]["date"], last_day) if last_day else None
+        fw["missing"] = sorted(set(syms) - set(frames))
+    latest = snaps[-1] if snaps else None
+    fw.update(snapshots=len(snaps), latest_date=latest["date"] if latest else None,
+              current=latest["picks"] if latest else [], risk_off=bool(latest and latest["risk_off"]))
+
+    # ---- Invest-now ideas
+    outcomes = []
+    if ideas:
+        fetch_start = (pd.Timestamp(ideas[0]["day"]) - pd.Timedelta(days=5)).date().isoformat()
+        by_provider: dict[str, list[str]] = {}
+        for i in ideas:
+            by_provider.setdefault(provider_for(i["symbol"]), []).append(i["symbol"])
+        bars: dict[str, pd.DataFrame] = {}
+        for prov, syms in by_provider.items():
+            try:
+                bars.update(market.history_many(prov, sorted(set(syms)), "1d", start=fetch_start))
+            except Exception:   # an unreachable provider leaves its ideas pending
+                pass
+        today_ny = now.tz_convert("America/New_York").date().isoformat()
+        today_utc = now.tz_convert("UTC").date().isoformat()
+        for i in ideas:
+            df = bars.get(i["symbol"])
+            complete = True
+            if df is not None and len(df):
+                last = pd.Timestamp(df.index[-1])
+                last = (last.tz_convert("UTC") if last.tzinfo else last).date().isoformat()
+                complete = (last < today_utc) if "/" in i["symbol"] else (
+                    last < today_ny or session_close_known(today_ny, now))
+            outcomes.append(idea_outcome(i, df, max_days=int(i.get("hold_days") or 5), last_bar_complete=complete))
+    summary = ideas_summary(outcomes)
+    summary["closed"] = summary["closed"][:50]
+
+    days = int(fw.get("days") or 0)
+    if not started:
+        message = ("The live record starts at the next US market close: from then on, the picks and every "
+                   "Invest-now idea are saved each day and followed with real prices.")
+    elif not snaps:
+        message = (f"Just started on {_day(started)} with the first Invest-now ideas. The picks are saved after the "
+                   "next US market close and count from the open after that.")
+    elif days == 0:
+        message = (f"Just started: first picks saved for {_day(snaps[0]['date'])}. They count from the next market "
+                   "open, so there is no result yet.")
+    elif days < 20:
+        message = (f"Just started: {days} trading day{'s' if days != 1 else ''} so far. Far too early to judge; "
+                   "a few weeks can be pure luck either way, it takes many months to tell skill from luck.")
+    else:
+        message = (f"{days} trading days of real, forward results (no hindsight). Still short: judge the "
+                   "engine on a year or more.")
+    return ser.clean({
+        "preset": preset, "as_of": now.isoformat(), "started": started, "days": days,
+        "too_early": days < 20, "message": message, "picks": fw, "ideas": summary,
+    })

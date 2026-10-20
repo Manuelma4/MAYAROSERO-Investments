@@ -8,6 +8,7 @@ import type { PicksResult } from "../lib/types";
 import { LinesChart, SERIES, type Overlay } from "../components/charts";
 import { Card, Empty, ErrorBox, Field, Spinner } from "../components/ui";
 import { Hint } from "../components/Hint";
+import { TrackRecordCard } from "../components/TrackRecord";
 import { cssVar, useTheme } from "../lib/theme";
 
 const PRESETS = [
@@ -167,6 +168,8 @@ export default function Picks() {
           )}
         </Card>
       )}
+
+      {preset === "quality_momentum" && <TrackRecordCard />}
 
       {res && (
         <>

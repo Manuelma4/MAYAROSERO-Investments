@@ -8,6 +8,7 @@ import { useQuotes } from "../lib/quotes";
 import type { LiveEvent, OpportunitiesResult, Quote, TodayBoard } from "../lib/types";
 import { Hint } from "../components/Hint";
 import { Sparkline } from "../components/Sparkline";
+import { TrackRecordCard } from "../components/TrackRecord";
 import { Card, Empty, Spinner } from "../components/ui";
 
 function greeting() {
@@ -99,6 +100,8 @@ function TodayBoardView({ t, ideas }: { t: TodayBoard; ideas: ReactNode }) {
           )}
         </Card>
       </div>
+
+      <TrackRecordCard compact />
 
       <div className="grid-2">
         <Card title={<>Rising most today<Hint>The S&amp;P 500 stocks up the most today. A big jump is information, not a buy signal on its own: moves backed by news tend to continue, moves without news often fade.</Hint></>}>

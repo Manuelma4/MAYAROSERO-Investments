@@ -1,5 +1,5 @@
 import { STATIC, snapshotRequest } from "./snapshot";
-import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioPlan, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, Universe } from "./types";
+import type { AIAnalysis, AlertsResult, PriceAlert, Watchlist, BacktestResult, ChartData, LiveEvent, LiveStatus, PaperState, OpportunitiesResult, OrderPlan, PaperAccount, BrokerStatus, OrderPreviewResult, BrokerPositions, ForecastResult, PicksResult, PortfolioPlan, PredictionsResult, PredictResult, StockInfo, Quote, StrategyInfo, TodayBoard, TrackRecord, Universe } from "./types";
 
 const TOKEN_KEY = "mri.token";
 
@@ -68,6 +68,7 @@ export const api = {
   forecast: (symbol: string, horizon: number) => request<ForecastResult>(`/api/forecast?${qs({ symbol, horizon })}`),
   stock: (symbol: string) => request<StockInfo>(`/api/stock?${qs({ symbol })}`),
   today: () => request<TodayBoard>("/api/today"),
+  trackRecord: (preset = "quality_momentum") => request<TrackRecord>(`/api/track-record?${qs({ preset })}`),
   picksLatest: (preset: string) => request<PicksResult>(`/api/picks/latest?${qs({ preset })}`),
   picks: (body: object) => request<PicksResult>("/api/picks", { method: "POST", body: JSON.stringify(body) }),
   quotes: (symbols: string[]) => request<Quote[]>(`/api/quotes?${qs({ symbols: symbols.join(",") })}`),

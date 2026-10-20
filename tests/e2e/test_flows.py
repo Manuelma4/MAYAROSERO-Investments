@@ -242,6 +242,8 @@ def test_today_loads_with_picks(ui):
     assert holds.count() >= 3
     expect(ui.page.get_by_role("heading", name="Rising most today")).to_be_visible()
     expect(ui.page.locator(".mcard-price").first).to_be_visible()   # index / crypto cards have prices
+    track = ui.page.locator(".card", has=ui.page.get_by_role("heading", name=re.compile("Live track record")))
+    expect(track.get_by_text("Too early to judge")).to_be_visible()   # fresh database: honest "just started"
     ui.check()
 
 

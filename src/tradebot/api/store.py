@@ -1,4 +1,5 @@
-"""SQLite store for live events (signals, abnormal moves), watchlists and price alerts."""
+"""SQLite store for live events (signals, abnormal moves), watchlists, price alerts and the live
+track record (daily picks snapshots and Invest-now ideas, recorded as they happen)."""
 
 from __future__ import annotations
 
@@ -32,6 +33,28 @@ CREATE TABLE IF NOT EXISTS alerts (
     triggered_at TEXT,
     triggered_price REAL,
     last_bar TEXT
+);
+CREATE TABLE IF NOT EXISTS track_picks (
+    preset TEXT NOT NULL,
+    date TEXT NOT NULL,
+    recorded_at TEXT NOT NULL,
+    risk_off INTEGER NOT NULL DEFAULT 0,
+    picks TEXT NOT NULL,
+    PRIMARY KEY (preset, date)
+);
+CREATE TABLE IF NOT EXISTS track_ideas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    entry REAL NOT NULL,
+    stop REAL NOT NULL,
+    target REAL,
+    valid_until TEXT,
+    as_of TEXT NOT NULL,
+    hold_days INTEGER NOT NULL DEFAULT 5,
+    recorded_at TEXT NOT NULL,
+    UNIQUE (symbol, direction, day)
 );
 """
 
@@ -132,3 +155,42 @@ class EventStore:
             n = self._conn.execute("DELETE FROM alerts WHERE id = ?", (id_,)).rowcount
             self._conn.commit()
         return bool(n)
+
+    # --- live track record ------------------------------------------------------------------
+    def record_picks_snapshot(self, preset: str, date: str, picks: list[dict], risk_off: bool,
+                              recorded_at: str) -> bool:
+        """One snapshot per preset and session date; later calls for the same day are ignored."""
+        with self._lock:
+            n = self._conn.execute("INSERT OR IGNORE INTO track_picks(preset, date, recorded_at, risk_off, picks) "
+                                   "VALUES (?, ?, ?, ?, ?)",
+                                   (preset, date, recorded_at, int(risk_off), json.dumps(picks))).rowcount
+            self._conn.commit()
+        return bool(n)
+
+    def picks_snapshots(self, preset: str) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM track_picks WHERE preset = ? ORDER BY date", (preset,)).fetchall()
+        out = []
+        for r in rows:
+            picks = json.loads(r["picks"])
+            out.append({"preset": r["preset"], "date": r["date"], "recorded_at": r["recorded_at"],
+                        "risk_off": bool(r["risk_off"]), "picks": picks,
+                        "weights": {p["symbol"]: p["weight"] for p in picks}})
+        return out
+
+    def record_idea(self, idea: dict, recorded_at: str) -> bool:
+        """One row per symbol, direction and day (the first qualified version of the idea is kept)."""
+        with self._lock:
+            n = self._conn.execute(
+                "INSERT OR IGNORE INTO track_ideas(day, symbol, direction, entry, stop, target, valid_until, as_of, "
+                "hold_days, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (str(idea["as_of"])[:10], idea["symbol"], idea["direction"], float(idea["entry"]), float(idea["stop"]),
+                 None if idea.get("target") is None else float(idea["target"]), idea.get("expires_at"),
+                 str(idea["as_of"]), int(idea.get("hold_days") or 5), recorded_at)).rowcount
+            self._conn.commit()
+        return bool(n)
+
+    def track_ideas(self) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM track_ideas ORDER BY as_of").fetchall()
+        return [dict(r) for r in rows]

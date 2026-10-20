@@ -101,7 +101,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
 ## Phase 3: proof and habits (overnight Oct 20-21)
 
-14. [ ] **Live track record from today**: record the engine's picks (and Invest-now ideas) every day from
+14. [x] **Live track record from today**: record the engine's picks (and Invest-now ideas) every day from
         now on and show their real forward performance vs SPY (no backtest, no hindsight) on Today and Picks.
 15. [ ] **Weekly digest**: one short Sunday-evening message (email / WhatsApp) with the week's picks changes,
         your alerts, portfolio drift and the live track record; previewable in Settings.

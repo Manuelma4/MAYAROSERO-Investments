@@ -46,6 +46,14 @@ export async function snapshotRequest(path: string, init: RequestInit = {}): Pro
       }
     }
     case "/api/today": return load("today.json");
+    case "/api/track-record": {
+      try { return await load("track_record.json"); } catch {
+        return { preset: "quality_momentum", as_of: new Date().toISOString(), started: null, days: 0, too_early: true,
+          message: "The live record runs on the live server: from its first market close on, the picks and every Invest-now idea are saved each day and followed with real prices.",
+          picks: { days: 0, curve: [], snapshots: 0, latest_date: null, current: [], risk_off: false },
+          ideas: { count: 0, closed_count: 0, open_count: 0, pending_count: 0, win_rate: null, avg_r: null, "total_r_%": null, open: [], closed: [] } };
+      }
+    }
     case "/api/opportunities": case "/api/opportunities/scan": return load("opportunities.json");
     case "/api/paper/orders": case "/api/orders/preview": case "/api/orders": return limit("Placing orders");
     case "/api/orders/close-all": case "/api/orders/resume": return limit("The kill switch");

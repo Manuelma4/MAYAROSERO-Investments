@@ -75,6 +75,9 @@ def main(out: Path) -> None:
         for p in PRESETS:
             save(f"picks_{p}.json", get("/api/picks/latest", preset=p))
         save("today.json", get("/api/today"))
+        # Live forward record: this export starts from an empty database, so it shows the honest
+        # "just started" state (the preview has no recorded history of its own).
+        save("track_record.json", get("/api/track-record"))
         save("opportunities.json", post("/api/opportunities/scan", {}))
         (out / "forecasts").mkdir(exist_ok=True)
         fc_targets = {(s, 5) for s in featured}

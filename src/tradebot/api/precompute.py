@@ -3,6 +3,8 @@
 Jobs run at startup and then every `interval` seconds in a daemon thread:
 - picks for every preset with default settings
 - the "Today" board: market mood, what to hold, buy/sell/keep changes, today's biggest movers
+- the live track record: one picks snapshot per preset and trading day (once the US close is known),
+  and every qualified Invest-now idea (recorded by the opportunity loop)
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from ..universe import by_symbol, sp500_symbols
 from . import serialize as ser
 from .market import MarketData
 from .schemas import PicksRequest
-from .services import compute_picks, compute_predictions, market_mood
+from .services import compute_picks, compute_predictions, compute_track_record, market_mood
 
 log = logging.getLogger(__name__)
 
@@ -58,12 +60,20 @@ class Precomputer:
 
     def run_once(self, predictions: bool = True) -> None:
         errors = []
+        started = datetime.now(timezone.utc)
         ew_cache: dict = {}  # the equal-weight yardstick is identical for every preset
+        fresh = []
         for preset in PRESETS:
             try:
                 self.put(f"picks:{preset}", compute_picks(self.market, PicksRequest(preset=preset), ew_cache))
+                fresh.append(preset)
             except Exception as exc:  # keep the previous result if a refresh fails
                 errors.append(f"picks {preset}: {exc}")
+        try:
+            self.record_track_snapshots(fresh, started)
+            self.track_record(self.alert_preset, max_age=0)
+        except Exception as exc:
+            errors.append(f"track record: {exc}")
         try:
             self.record_picks_change()
         except Exception as exc:
@@ -115,6 +125,41 @@ class Precomputer:
             "losers": [{k: q[k] for k in ("symbol", "name", "price", "change_pct")} for q in quotes[::-1][:6]],
         })
 
+    # ---- live track record ----------------------------------------------------------
+    def record_track_snapshots(self, presets, started: datetime) -> int:
+        """Save today's picks for each freshly computed preset, once per trading day, and only when they
+        were ranked on a finished session (computation started after that day's US close)."""
+        from ..live.track_record import session_close_known
+
+        if self.store is None:
+            return 0
+        n = 0
+        for preset in presets:
+            data = self.get(f"picks:{preset}")
+            if not data or not data.get("as_of"):
+                continue
+            day = str(data["as_of"])[:10]
+            if not session_close_known(day, started):
+                continue   # ranked on an unfinished session: wait for the close
+            picks = data.get("picks") or []
+            rows = [{"symbol": p["symbol"], "weight": 1 / len(picks), "price": p.get("price")} for p in picks]
+            n += self.store.record_picks_snapshot(preset, day, rows, bool(data.get("risk_off")),
+                                                  datetime.now(timezone.utc).isoformat())
+        return n
+
+    def track_record(self, preset: str = "quality_momentum", max_age: float = 120.0) -> dict:
+        """Forward record (cached briefly: it re-reads prices for every recorded pick and idea)."""
+        key = f"track:{preset}"
+        hit = self.get(key)
+        if hit is not None and time.time() - hit["_at"] < max_age:
+            return hit["data"]
+        if self.store is None:
+            raise RuntimeError("no store")
+        universe = (self.get(f"picks:{preset}") or {}).get("universe")
+        data = compute_track_record(self.market, self.store, preset, universe)
+        self.put(key, {"_at": time.time(), "data": data})
+        return data
+
     # ---- live opportunities ---------------------------------------------------------
     def scan_opportunities(self) -> dict:
         import pandas as pd
@@ -130,6 +175,11 @@ class Precomputer:
         self.put("opportunities", data)
         for o in items:
             key = (o["symbol"], o["direction"], o["as_of"][:10])
+            if o["qualified"] and self.store is not None:
+                try:   # live track record: one row per symbol, direction and day (idempotent)
+                    self.store.record_idea(o, now.isoformat())
+                except Exception as exc:
+                    log.warning("track record idea failed: %s", exc)
             if o["qualified"] and key not in self._seen:
                 self._seen.add(key)
                 if self.on_opportunity:

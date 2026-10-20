@@ -618,3 +618,12 @@ tbody tr:hover { background: var(--surface-2); }
 .opp-foot .btn.small { min-height: 42px; font-size: 11px; padding: 10px 16px; }
 /* Stock page on narrow screens: the engine's verdict (what to do) comes before the chart. */
 @media (max-width: 1180px) { .stock-main > .stack { order: -1; } }
+
+/* ---------- live track record ---------- */
+.stats.track { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; margin-top: 12px; }
+.stats.track .stat { background: var(--surface-2); border-color: transparent; padding: 10px 12px; }
+.stats.track .stat-value { font-size: 18px; font-variant-numeric: tabular-nums; }
+.track-sub { margin: 18px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-2); }
+.track-chart { margin-top: 12px; }
+.track-fold { margin-top: 14px; }
+.card .notice { margin: 0; }

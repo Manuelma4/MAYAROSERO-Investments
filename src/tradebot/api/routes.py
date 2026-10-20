@@ -105,6 +105,19 @@ def today(request: Request):
     return data
 
 
+@router.get("/track-record")
+def track_record(request: Request, preset: str = "quality_momentum"):
+    """Live forward record since the first recorded day: picks vs SPY and Invest-now idea outcomes."""
+    from ..picker import PRESETS
+
+    if preset not in PRESETS:
+        raise HTTPException(404, f"Unknown strategy '{preset}'. Available: {', '.join(PRESETS)}")
+    try:
+        return _state(request).precompute.track_record(preset)
+    except DataUnavailable as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
 @router.get("/opportunities")
 def opportunities(request: Request):
     data = _state(request).precompute.get("opportunities")
