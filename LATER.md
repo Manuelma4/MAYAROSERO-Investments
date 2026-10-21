@@ -128,7 +128,7 @@ balance and protects any coins it finds.
 Note: investing your own money through your own account is fine. Managing other people's
 money or selling signals as a service needs a license in France (AMF); talk to a professional first.
 
-## 3. AI analyst (Claude API key)
+## 3. AI analyst (Anthropic API key)
 The live "invest now" opportunities can be checked by a team of AI agents (TradingAgents:
 news, fundamentals, sentiment, bull vs bear debate, risk check) before you invest.
 Create a key at console.anthropic.com (pay as you go, roughly a few cents per analysis) and add:

@@ -60,7 +60,7 @@ Open the app's address in Safari or Chrome → Share / menu → **Add to Home Sc
    everything button works, and that the app only closes what it opened.
 
 Details: [LATER.md section 2](../LATER.md). Interactive Brokers (popular in France) is ready in paper mode
-only; tell Claude to finish it if you choose IBKR for real money.
+only; it needs finishing if you choose IBKR for real money.
 
 ## 5. Decide with real evidence, not the backtest
 
@@ -111,8 +111,7 @@ use small amounts for the picks.
 Never risk money you need in the next few years, keep each idea small (the app sizes them at 1% risk), and
 remember: this app gives information, not financial advice.
 
-## If you continue with Claude later
+## Continuing development later
 
-The plan and status are in [ROADMAP.md](../ROADMAP.md); the project rules are in [CLAUDE.md](../CLAUDE.md).
-Ask Claude to "work the first unchecked item in ROADMAP.md". Ideas not built yet: Interactive Brokers for
-real money, replaying Invest-now ideas in the plan backtest, Qlib factor research.
+The plan and status are in [ROADMAP.md](../ROADMAP.md): work the first unchecked item. Ideas not built yet:
+Interactive Brokers for real money, replaying Invest-now ideas in the plan backtest, Qlib factor research.

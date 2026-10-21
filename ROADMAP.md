@@ -34,7 +34,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
        Moves without news are filtered out (research: they tend to reverse; news-driven moves drift).
        Each signal: entry, stop, target, time limit, one-tap "Invest" (paper broker now), push notification,
        auto-expiry. Validate the rules on history internally; never show backtests on the main screens.
-0c. [x] **AI analyst on live candidates**: integrate TradingAgents (Apache-2.0, supports Claude) as an
+0c. [x] **AI analyst on live candidates**: integrate TradingAgents (Apache-2.0) as an
        optional service — analysts (news, fundamentals, sentiment, technicals), bull/bear debate and a
        risk check produce a short verdict + reasons shown on each opportunity before "Invest". Enabled by
        `ANTHROPIC_API_KEY` in `.env` (documented in LATER.md); app works without it.
@@ -136,9 +136,10 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - Microsoft Qlib + RD-Agent to discover better ranking factors for the monthly core picks
   (offline, validated walk-forward before adoption).
 
-## Rules for every session
-- Use the subagents in `.claude/agents/` (see CLAUDE.md): quant-researcher for strategy work, product-designer
-  for UI, risk-guardian for anything with money, code-reviewer on the diff, qa-tester before pushing.
-- English only. Commits authored by Manuelma4 only, no co-author trailers.
+## Rules for every change
+- Strategy changes are validated honestly (no look-ahead, point-in-time data, costs); UI copy stays plain English
+  with a hint on every number; anything touching money gets a safety review; review the diff and run the tests
+  (offline + browser flows) before pushing.
+- English only.
 - Tests offline (synthetic data); verify on real data before pushing.
 - Never place real orders. Keep honesty notes (survivorship bias, no guaranteed returns).

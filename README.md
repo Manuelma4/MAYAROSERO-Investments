@@ -217,7 +217,7 @@ src/tradebot/
   portfolio.py             diversified ready-to-buy plan (core / ideas / anchor, sector caps)
   forecast.py              Monte Carlo fan, volume profile, VWAP bands
   ml/ranker.py             weekly cross-sectional ranker with walk-forward IC
-  ai/analyst.py            optional Claude-powered analyst desk
+  ai/analyst.py            optional AI analyst desk (Anthropic API key)
   live/alerts.py           price alerts; live/opportunities.py "invest now" scanner + movers board
   trading/                 risk limits, broker adapters (paper / Alpaca / ccxt / IBKR), safety guard
   api/                     FastAPI app: routes, orders, precompute, WebSocket broadcast, SQLite store
