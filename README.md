@@ -27,17 +27,18 @@ Your checklist, in order, with costs: **[docs/YOUR_NEXT_STEPS.md](docs/YOUR_NEXT
 
 | Page | What it does |
 |---|---|
-| **Today** | Market mood, what to hold this month, buy / sell / keep changes, today's biggest movers |
-| **My portfolio** | A ready-to-buy diversified plan for your amount and risk level: picks core, live ideas, S&P 500 anchor, sector caps |
-| **Discover** | ~520 stocks (the full S&P 500 plus curated Europe / Asia names) + crypto by theme, GICS sector and region, with live performance |
-| **Beat the S&P** | Factor engine ranks every S&P 500 member monthly: this month's picks, why each one, picks history, and a collapsed honest track record vs SPY |
+| **Today** | Market mood, what to hold this month, buy / sell / keep changes, earnings this week, live track record, today's biggest movers |
+| **My portfolio** | A ready-to-buy plan for your amount in €: Cautious / Balanced / Bold (risk matched to the label) or **Simple funds** (60% S&P 500 fund + 40% momentum fund); "How risky is this plan?", save as target with drift alerts |
+| **Discover** | ~520 stocks (the full S&P 500 plus curated Europe / Asia names) + crypto by theme, sector and region, and a **Screener** (size, valuation, dividends, trend, momentum) |
+| **Beat the S&P** | Default **Core + momentum** (60% S&P 500 + 40% the 10 strongest momentum stocks): this month's picks, why each one, picks history, live track record, and an honest collapsed backtest (realistic edge about +1–2%/yr, not proven) |
 | **Invest now** | Stocks and coins moving hard right now on news and heavy volume, with entry / stop / target and an order ticket; the S&P 500 movers board |
-| **Stock page** | Any symbol: price, key figures, the engine's verdict, forecast, live idea, similar companies, Set price alert, Add to watchlist |
-| **Alerts** | Your price alerts and watchlists, picks updates, surges / crashes and setup signals, pushed live |
+| **Stock page** | Any symbol: price (with € value), key figures, next earnings, the engine's verdict, forecast, live idea, similar companies, Set price alert, Add to watchlist |
+| **Alerts** | Your price alerts and watchlists, picks updates, earnings, drift, surges / crashes and setup signals, pushed live; weekly digest on Sundays |
 | **Charts** | Candlesticks + volume, VWAP, EMAs, Bollinger, patterns, structure (Dow, Wyckoff, Elliott) and a Monte Carlo forecast fan |
-| **Predict** | Weekly ranking of which stocks should beat the others, with up / down probabilities and an honest validation |
+| **Predict** | Ranking of which S&P 500 stocks should beat the others, with up / down probabilities and an honest validation (only the 1-day ranking shows a real edge) |
 | **Backtest** | Test any setup on history before risking money |
-| **Settings** | Broker and safety limits, Close everything (kill switch), notifications, theme, access token |
+| **Learn** | 5-minute guide, honest expectations, a 55-term glossary with examples, and the first-visit tour |
+| **Settings** | Display currency (€ / $), broker and safety limits, Close everything (kill switch), notifications and weekly digest, theme, access token |
 
 Run it:
 
